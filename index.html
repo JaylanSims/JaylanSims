@@ -420,6 +420,7 @@
         const deathScreen = document.getElementById("death-screen");
         const deathSummary = document.getElementById("death-summary");
         const deathLifeNote = document.getElementById("death-life-note");
+        const deathSound = new Audio("Danzon De Pasion (Sting) - Jimmy Fontanez_Media Right Productions.mp3");
 
         const healthText = document.getElementById("health-text");
         const happinessText = document.getElementById("happiness-text");
@@ -553,7 +554,7 @@
             fn();
             logEvent(actionText);
             if (state.health <= 0) {
-                triggerDeath();
+                onPlayerDeath();
                 return;
             }
             updateUI();
@@ -671,7 +672,7 @@
                         logEvent("Random Event - " + eventObj.name + ": " + choice.label + ".");
                         if (state.health <= 0) {
                             closeModal();
-                            triggerDeath();
+                            onPlayerDeath();
                             return;
                         }
                         closeModal();
@@ -698,6 +699,13 @@
             } else {
                 deathLifeNote.textContent = "A perfectly average life.";
             }
+        }
+
+        function onPlayerDeath() {
+            deathSound.currentTime = 0;
+            deathSound.play();
+            triggerDeath();
+            console.log("Player has died!");
         }
 
         function ageUp() {
@@ -738,7 +746,7 @@
             logEvent("Age " + state.age + ": You lived another year.");
 
             if (state.health <= 0) {
-                triggerDeath();
+                onPlayerDeath();
                 return;
             }
 
