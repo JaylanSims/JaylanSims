@@ -1,0 +1,803 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>BitBalance: ROI vs. Passion</title>
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #000;
+            font-family: sans-serif;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        #app-container {
+            background-color: #121212;
+            color: #E0E0E0;
+            max-width: 500px;
+            margin: 0 auto;
+            height: 100vh;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.8);
+        }
+
+        #setup-screen {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 24px;
+            gap: 16px;
+            text-align: center;
+        }
+
+        .title {
+            margin: 0;
+            font-size: 1.8rem;
+            line-height: 1.2;
+        }
+
+        .subtitle {
+            margin: 0;
+            color: #bdbdbd;
+            font-size: 0.95rem;
+            max-width: 360px;
+        }
+
+        .major-grid {
+            width: 100%;
+            display: grid;
+            gap: 12px;
+            margin-top: 8px;
+        }
+
+        .major-btn {
+            border: 1px solid #333;
+            background: #1f1f1f;
+            color: #fff;
+            border-radius: 12px;
+            padding: 14px 12px;
+            text-align: left;
+            font-size: 0.95rem;
+            line-height: 1.35;
+            cursor: pointer;
+        }
+
+        .major-btn strong {
+            display: block;
+            margin-bottom: 4px;
+            font-size: 1.05rem;
+        }
+
+        .major-btn:active {
+            transform: scale(0.99);
+        }
+
+        #game-ui {
+            display: none;
+            flex-direction: column;
+            height: 100%;
+            min-height: 0;
+            position: relative;
+        }
+
+        #stats-bar {
+            flex-shrink: 0;
+            background: #1E1E1E;
+            border-bottom: 1px solid #333;
+            display: flex;
+            align-items: stretch;
+            justify-content: space-between;
+            height: 96px;
+            padding: 8px 6px;
+            gap: 6px;
+        }
+
+        .stat-block {
+            flex: 1;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            gap: 5px;
+            background: #161616;
+            border: 1px solid #2a2a2a;
+            border-radius: 8px;
+            padding: 6px 7px;
+        }
+
+        .stat-name {
+            font-size: 0.68rem;
+            color: #bdbdbd;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .stat-value {
+            font-size: 0.9rem;
+            font-weight: 700;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .bar-track {
+            height: 8px;
+            background: #2b2b2b;
+            border-radius: 999px;
+            overflow: hidden;
+        }
+
+        .bar-fill {
+            height: 100%;
+            width: 50%;
+            border-radius: 999px;
+            transition: width 0.2s ease;
+        }
+
+        #health-fill {
+            background: #FF4C4C;
+        }
+
+        #happiness-fill {
+            background: #FFD700;
+        }
+
+        #smarts-fill {
+            background: #4C9AFF;
+        }
+
+        #event-log {
+            flex: 1;
+            overflow-y: auto;
+            padding: 12px 14px 138px;
+            min-height: 0;
+        }
+
+        #event-log p {
+            margin: 0 0 10px;
+            background: #191919;
+            border: 1px solid #2b2b2b;
+            border-radius: 10px;
+            padding: 10px 12px;
+            line-height: 1.35;
+            font-size: 0.95rem;
+        }
+
+        #action-area {
+            position: relative;
+            height: 0;
+            flex-shrink: 0;
+        }
+
+        #age-up-btn {
+            width: 110px;
+            height: 110px;
+            border-radius: 50%;
+            border: none;
+            background: linear-gradient(135deg, #00C853, #64DD17);
+            color: #fff;
+            font-size: 1.1rem;
+            font-weight: 700;
+            text-align: center;
+            line-height: 1.15;
+            position: absolute;
+            left: 50%;
+            bottom: -55px;
+            transform: translateX(-50%);
+            z-index: 7;
+            cursor: pointer;
+            box-shadow: 0 16px 35px rgba(0, 200, 83, 0.5), 0 5px 12px rgba(0, 0, 0, 0.7);
+        }
+
+        #age-up-btn:active {
+            transform: translateX(-50%) scale(0.97);
+        }
+
+        #bottom-nav {
+            flex-shrink: 0;
+            height: 65px;
+            background: #1E1E1E;
+            border-top: 1px solid #333;
+            display: flex;
+            align-items: center;
+            justify-content: stretch;
+            position: relative;
+            z-index: 3;
+        }
+
+        .nav-btn {
+            flex: 1;
+            height: 100%;
+            border: none;
+            background: transparent;
+            color: #fff;
+            font-size: 0.92rem;
+            cursor: pointer;
+        }
+
+        .nav-btn:active {
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        #modal-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.72);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 18px;
+            z-index: 20;
+        }
+
+        #modal-card {
+            width: 100%;
+            background: #1a1a1a;
+            border: 1px solid #333;
+            border-radius: 14px;
+            padding: 16px;
+        }
+
+        #modal-title {
+            margin: 0 0 8px;
+            font-size: 1.2rem;
+        }
+
+        #modal-description {
+            margin: 0 0 14px;
+            font-size: 0.95rem;
+            color: #d2d2d2;
+            line-height: 1.35;
+        }
+
+        #modal-actions {
+            display: grid;
+            gap: 10px;
+        }
+
+        .modal-btn {
+            border: 1px solid #3a3a3a;
+            border-radius: 10px;
+            background: #242424;
+            color: #fff;
+            padding: 12px;
+            font-size: 0.95rem;
+            cursor: pointer;
+            text-align: left;
+        }
+
+        .modal-btn:active {
+            transform: scale(0.995);
+        }
+
+        #death-screen {
+            display: none;
+            flex: 1;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            text-align: center;
+            padding: 24px;
+            gap: 14px;
+        }
+
+        #tombstone {
+            font-size: 3rem;
+            margin: 0;
+        }
+
+        #death-title {
+            margin: 0;
+            font-size: 1.5rem;
+        }
+
+        #death-summary,
+        #death-life-note {
+            margin: 0;
+            color: #d6d6d6;
+            line-height: 1.4;
+        }
+
+        #play-again-btn {
+            margin-top: 4px;
+            border: none;
+            border-radius: 10px;
+            background: #4C9AFF;
+            color: #fff;
+            padding: 12px 18px;
+            font-size: 1rem;
+            font-weight: 700;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div id="app-container">
+        <div id="setup-screen">
+            <h1 class="title">BitBalance: ROI vs. Passion</h1>
+            <p class="subtitle">Choose your path and survive year by year. Build wealth without sacrificing your life.</p>
+            <div class="major-grid">
+                <button class="major-btn" data-major="finance">
+                    <strong>Finance</strong>
+                    Debt: $60,000 · Salary: $85,000 · Smarts: 80<br>
+                    Trait: Every year Health -5, Happiness -10
+                </button>
+                <button class="major-btn" data-major="arts">
+                    <strong>Arts</strong>
+                    Debt: $40,000 · Salary: $30,000 · Smarts: 60<br>
+                    Trait: Every year Health -2, Happiness -2, and if Happiness &gt; 85 then Salary +10%
+                </button>
+                <button class="major-btn" data-major="trades">
+                    <strong>Trades</strong>
+                    Debt: $5,000 · Salary: $55,000 · Smarts: 50<br>
+                    Trait: Every year Health -8, Happiness -3
+                </button>
+            </div>
+        </div>
+
+        <div id="game-ui" style="display: none; flex-direction: column; height: 100%;">
+            <header id="stats-bar">
+                <div class="stat-block">
+                    <div class="stat-name">Health</div>
+                    <div class="stat-value" id="health-text">100</div>
+                    <div class="bar-track"><div id="health-fill" class="bar-fill"></div></div>
+                </div>
+                <div class="stat-block">
+                    <div class="stat-name">Happiness</div>
+                    <div class="stat-value" id="happiness-text">100</div>
+                    <div class="bar-track"><div id="happiness-fill" class="bar-fill"></div></div>
+                </div>
+                <div class="stat-block">
+                    <div class="stat-name">Smarts</div>
+                    <div class="stat-value" id="smarts-text">50</div>
+                    <div class="bar-track"><div id="smarts-fill" class="bar-fill"></div></div>
+                </div>
+                <div class="stat-block">
+                    <div class="stat-name">Net Worth</div>
+                    <div class="stat-value" id="networth-text">$0</div>
+                    <div class="bar-track"><div class="bar-fill" style="width: 100%; background: #888;"></div></div>
+                </div>
+            </header>
+
+            <main id="event-log"></main>
+
+            <div id="action-area">
+                <button id="age-up-btn">+1 Year</button>
+            </div>
+
+            <nav id="bottom-nav">
+                <button class="nav-btn" id="career-nav-btn">Career</button>
+                <button class="nav-btn" id="activities-nav-btn">Activities</button>
+                <button class="nav-btn" id="assets-nav-btn">Assets</button>
+            </nav>
+        </div>
+
+        <div id="modal-overlay">
+            <div id="modal-card">
+                <h2 id="modal-title"></h2>
+                <p id="modal-description"></p>
+                <div id="modal-actions"></div>
+            </div>
+        </div>
+
+        <div id="death-screen">
+            <p id="tombstone">🪦</p>
+            <h2 id="death-title">Game Over</h2>
+            <p id="death-summary"></p>
+            <p id="death-life-note"></p>
+            <button id="play-again-btn">Play Again</button>
+        </div>
+    </div>
+
+    <script>
+        let state = {
+            age: 18, health: 100, happiness: 100, smarts: 50,
+            cash: 0, investments: 0, debt: 0, salary: 0, expenses: 25000,
+            major: null, isDead: false
+        };
+
+        const setupScreen = document.getElementById("setup-screen");
+        const gameUI = document.getElementById("game-ui");
+        const eventLog = document.getElementById("event-log");
+        const modalOverlay = document.getElementById("modal-overlay");
+        const modalTitle = document.getElementById("modal-title");
+        const modalDescription = document.getElementById("modal-description");
+        const modalActions = document.getElementById("modal-actions");
+        const deathScreen = document.getElementById("death-screen");
+        const deathSummary = document.getElementById("death-summary");
+        const deathLifeNote = document.getElementById("death-life-note");
+
+        const healthText = document.getElementById("health-text");
+        const happinessText = document.getElementById("happiness-text");
+        const smartsText = document.getElementById("smarts-text");
+        const networthText = document.getElementById("networth-text");
+
+        const healthFill = document.getElementById("health-fill");
+        const happinessFill = document.getElementById("happiness-fill");
+        const smartsFill = document.getElementById("smarts-fill");
+
+        const randomEvents = [
+            {
+                name: "Market Crash",
+                text: "The economy tanked.",
+                choices: [
+                    {
+                        label: "Panic Sell",
+                        effect: function () {
+                            state.cash += state.investments * 0.5;
+                            state.investments = 0;
+                        }
+                    },
+                    {
+                        label: "Hold",
+                        effect: function () {
+                            state.investments *= 0.70;
+                        }
+                    }
+                ]
+            },
+            {
+                name: "Burnout",
+                text: "You can't get out of bed.",
+                choices: [
+                    {
+                        label: "Take unpaid leave",
+                        effect: function () {
+                            state.cash -= 10000;
+                            state.happiness += 20;
+                        }
+                    },
+                    {
+                        label: "Push through",
+                        effect: function () {
+                            state.health -= 25;
+                        }
+                    }
+                ]
+            },
+            {
+                name: "Viral Success",
+                text: "A side project blew up.",
+                choices: [
+                    {
+                        label: "Cash out",
+                        effect: function () {
+                            state.cash += 50000;
+                            state.happiness -= 20;
+                        }
+                    },
+                    {
+                        label: "Keep Control",
+                        effect: function () {
+                            state.happiness += 30;
+                            state.salary *= 1.10;
+                        }
+                    }
+                ]
+            }
+        ];
+
+        function formatMoney(num) {
+            return "$" + Math.round(num).toLocaleString("en-US");
+        }
+
+        function clampStat(num) {
+            if (num < 0) return 0;
+            if (num > 100) return 100;
+            return num;
+        }
+
+        function updateUI() {
+            state.health = clampStat(state.health);
+            state.happiness = clampStat(state.happiness);
+            state.smarts = clampStat(state.smarts);
+
+            const netWorth = state.cash + state.investments - state.debt;
+
+            healthText.textContent = Math.round(state.health);
+            happinessText.textContent = Math.round(state.happiness);
+            smartsText.textContent = Math.round(state.smarts);
+            networthText.textContent = formatMoney(netWorth);
+
+            healthFill.style.width = state.health + "%";
+            happinessFill.style.width = state.happiness + "%";
+            smartsFill.style.width = state.smarts + "%";
+
+            eventLog.scrollTop = eventLog.scrollHeight;
+        }
+
+        function logEvent(text) {
+            const p = document.createElement("p");
+            p.textContent = text;
+            eventLog.appendChild(p);
+        }
+
+        function openModal(title, description, actions) {
+            modalTitle.textContent = title;
+            modalDescription.textContent = description;
+            modalActions.innerHTML = "";
+
+            actions.forEach(function (action) {
+                const btn = document.createElement("button");
+                btn.className = "modal-btn";
+                btn.textContent = action.label;
+                btn.addEventListener("click", function () {
+                    action.handler();
+                });
+                modalActions.appendChild(btn);
+            });
+
+            modalOverlay.style.display = "flex";
+        }
+
+        function closeModal() {
+            modalOverlay.style.display = "none";
+        }
+
+        function applyActionWithRefresh(actionText, fn) {
+            if (state.isDead) return;
+            fn();
+            logEvent(actionText);
+            if (state.health <= 0) {
+                triggerDeath();
+                return;
+            }
+            updateUI();
+            closeModal();
+        }
+
+        function openCareerMenu() {
+            openModal("Career", "Push income higher, but your body and mind pay for it.", [
+                {
+                    label: "Work Overtime",
+                    handler: function () {
+                        applyActionWithRefresh("You worked overtime. Salary rose, but your health and happiness dropped.", function () {
+                            state.salary *= 1.10;
+                            state.health -= 10;
+                            state.happiness -= 15;
+                        });
+                    }
+                },
+                {
+                    label: "Ask for Raise",
+                    handler: function () {
+                        applyActionWithRefresh("You asked for a raise.", function () {
+                            if (Math.random() < (state.smarts / 100)) {
+                                state.salary *= 1.15;
+                                logEvent("Your raise request succeeded.");
+                            } else {
+                                state.happiness -= 10;
+                                logEvent("Your raise request was denied.");
+                            }
+                        });
+                    }
+                },
+                {
+                    label: "Close",
+                    handler: function () {
+                        closeModal();
+                    }
+                }
+            ]);
+        }
+
+        function openActivitiesMenu() {
+            openModal("Activities", "Spend resources to recover your life stats.", [
+                {
+                    label: "Therapy ($2k)",
+                    handler: function () {
+                        applyActionWithRefresh("You invested in therapy.", function () {
+                            if (state.cash >= 2000) {
+                                state.cash -= 2000;
+                                state.happiness += 25;
+                            } else {
+                                logEvent("You couldn't afford therapy.");
+                            }
+                        });
+                    }
+                },
+                {
+                    label: "Gym ($500)",
+                    handler: function () {
+                        applyActionWithRefresh("You spent time at the gym.", function () {
+                            if (state.cash >= 500) {
+                                state.cash -= 500;
+                                state.health += 15;
+                            } else {
+                                logEvent("You couldn't afford the gym.");
+                            }
+                        });
+                    }
+                },
+                {
+                    label: "Read (Free)",
+                    handler: function () {
+                        applyActionWithRefresh("You read and learned something new.", function () {
+                            state.smarts += 5;
+                        });
+                    }
+                },
+                {
+                    label: "Close",
+                    handler: function () {
+                        closeModal();
+                    }
+                }
+            ]);
+        }
+
+        function openAssetsMenu() {
+            openModal("Assets", "Move money into investments and ride market volatility.", [
+                {
+                    label: "Invest 50% Cash",
+                    handler: function () {
+                        applyActionWithRefresh("You invested half your cash.", function () {
+                            const amt = state.cash * 0.5;
+                            state.cash -= amt;
+                            state.investments += amt;
+                        });
+                    }
+                },
+                {
+                    label: "Close",
+                    handler: function () {
+                        closeModal();
+                    }
+                }
+            ]);
+        }
+
+        function triggerRandomEvent() {
+            const eventObj = randomEvents[Math.floor(Math.random() * randomEvents.length)];
+            const actions = eventObj.choices.map(function (choice) {
+                return {
+                    label: choice.label,
+                    handler: function () {
+                        choice.effect();
+                        logEvent("Random Event - " + eventObj.name + ": " + choice.label + ".");
+                        if (state.health <= 0) {
+                            closeModal();
+                            triggerDeath();
+                            return;
+                        }
+                        closeModal();
+                        updateUI();
+                    }
+                };
+            });
+            openModal(eventObj.name, eventObj.text, actions);
+        }
+
+        function triggerDeath() {
+            state.isDead = true;
+            closeModal();
+            gameUI.style.display = "none";
+            deathScreen.style.display = "flex";
+
+            const netWorth = state.cash + state.investments - state.debt;
+            deathSummary.textContent = "You died at Age " + state.age + ". Final Net Worth: " + formatMoney(netWorth) + ".";
+
+            if (state.happiness > 80) {
+                deathLifeNote.textContent = "You lived a deeply happy life.";
+            } else if (state.happiness < 40) {
+                deathLifeNote.textContent = "You died stressed and miserable.";
+            } else {
+                deathLifeNote.textContent = "A perfectly average life.";
+            }
+        }
+
+        function ageUp() {
+            if (state.isDead || !state.major) return;
+
+            state.age++;
+
+            if (state.major === "finance") {
+                state.health -= 5;
+                state.happiness -= 10;
+            } else if (state.major === "arts") {
+                state.health -= 2;
+                state.happiness -= 2;
+                if (state.happiness > 85) {
+                    state.salary *= 1.10;
+                }
+            } else if (state.major === "trades") {
+                state.health -= 8;
+                state.happiness -= 3;
+            }
+
+            let netIncome = state.salary * 0.75;
+
+            state.debt *= 1.06;
+            if (state.debt > 0) {
+                let payment = netIncome * 0.15;
+                state.debt -= payment;
+                netIncome -= payment;
+                if (state.debt < 0) {
+                    state.debt = 0;
+                }
+            }
+
+            state.cash += (netIncome - state.expenses);
+
+            state.investments *= (1 + (Math.random() * 0.25 - 0.10));
+
+            logEvent("Age " + state.age + ": You lived another year.");
+
+            if (state.health <= 0) {
+                triggerDeath();
+                return;
+            }
+
+            if (Math.random() < 0.25) {
+                triggerRandomEvent();
+            } else {
+                updateUI();
+            }
+        }
+
+        function chooseMajor(major) {
+            state.major = major;
+
+            if (major === "finance") {
+                state.debt = 60000;
+                state.salary = 85000;
+                state.smarts = 80;
+            } else if (major === "arts") {
+                state.debt = 40000;
+                state.salary = 30000;
+                state.smarts = 60;
+            } else if (major === "trades") {
+                state.debt = 5000;
+                state.salary = 55000;
+                state.smarts = 50;
+            }
+
+            setupScreen.style.display = "none";
+            gameUI.style.display = "flex";
+
+            logEvent("You chose " + major.charAt(0).toUpperCase() + major.slice(1) + ". Your adult life begins at age 18.");
+            updateUI();
+        }
+
+        document.querySelectorAll(".major-btn").forEach(function (btn) {
+            btn.addEventListener("click", function () {
+                chooseMajor(btn.dataset.major);
+            });
+        });
+
+        document.getElementById("age-up-btn").addEventListener("click", ageUp);
+        document.getElementById("career-nav-btn").addEventListener("click", function () {
+            if (!state.isDead && state.major) openCareerMenu();
+        });
+        document.getElementById("activities-nav-btn").addEventListener("click", function () {
+            if (!state.isDead && state.major) openActivitiesMenu();
+        });
+        document.getElementById("assets-nav-btn").addEventListener("click", function () {
+            if (!state.isDead && state.major) openAssetsMenu();
+        });
+        document.getElementById("play-again-btn").addEventListener("click", function () {
+            location.reload();
+        });
+
+        modalOverlay.addEventListener("click", function (event) {
+            if (event.target === modalOverlay) {
+                closeModal();
+            }
+        });
+    </script>
+</body>
+</html>
