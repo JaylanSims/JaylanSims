@@ -700,6 +700,16 @@
                     }
                 },
                 {
+                    label: "Contribute 10% Cash",
+                    handler: function () {
+                        applyActionWithRefresh("You contributed 10% of your cash to investments.", function () {
+                            const amt = state.cash * 0.10;
+                            state.cash -= amt;
+                            state.investments += amt;
+                        });
+                    }
+                },
+                {
                     label: "Close",
                     handler: function () {
                         closeModal();
