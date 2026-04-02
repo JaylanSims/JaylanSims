@@ -427,6 +427,7 @@
                 <button class="nav-btn" id="career-nav-btn">Career</button>
                 <button class="nav-btn" id="activities-nav-btn">Activities</button>
                 <button class="nav-btn" id="assets-nav-btn">Assets</button>
+                <button class="nav-btn" id="relationships-nav-btn">Relationships</button>
             </nav>
         </div>
 
@@ -749,6 +750,52 @@
             ]);
         }
 
+        function openRelationshipsMenu() {
+            openModal("Relationships", "Invest in your connections to improve quality of life.", [
+                {
+                    label: "Date Night ($1.5k)",
+                    handler: function () {
+                        applyActionWithRefresh("You invested in a date night.", function () {
+                            if (state.cash >= 1500) {
+                                state.cash -= 1500;
+                                state.happiness += 18;
+                            } else {
+                                logEvent("You couldn't afford date night.");
+                            }
+                        });
+                    }
+                },
+                {
+                    label: "Call Family (Free)",
+                    handler: function () {
+                        applyActionWithRefresh("You called family and recharged emotionally.", function () {
+                            state.happiness += 10;
+                        });
+                    }
+                },
+                {
+                    label: "Networking Event ($1k)",
+                    handler: function () {
+                        applyActionWithRefresh("You attended a networking event.", function () {
+                            if (state.cash >= 1000) {
+                                state.cash -= 1000;
+                                state.salary *= 1.05;
+                                state.happiness -= 4;
+                            } else {
+                                logEvent("You couldn't afford the networking event.");
+                            }
+                        });
+                    }
+                },
+                {
+                    label: "Close",
+                    handler: function () {
+                        closeModal();
+                    }
+                }
+            ]);
+        }
+
         function triggerRandomEvent() {
             const eventObj = randomEvents[Math.floor(Math.random() * randomEvents.length)];
             const actions = eventObj.choices.map(function (choice) {
@@ -883,6 +930,9 @@
         });
         document.getElementById("assets-nav-btn").addEventListener("click", function () {
             if (!state.isDead && state.major) openAssetsMenu();
+        });
+        document.getElementById("relationships-nav-btn").addEventListener("click", function () {
+            if (!state.isDead && state.major) openRelationshipsMenu();
         });
         document.getElementById("play-again-btn").addEventListener("click", function () {
             location.reload();
