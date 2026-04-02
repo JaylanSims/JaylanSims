@@ -692,10 +692,13 @@
                 {
                     label: "Invest 50% Cash",
                     handler: function () {
-                        applyActionWithRefresh("You invested half your cash.", function () {
+                        applyActionWithRefresh("You invested 50% cash, and your net worth dropped by 50%.", function () {
                             const amt = state.cash * 0.5;
                             state.cash -= amt;
                             state.investments += amt;
+                            const netWorthBeforeDrop = state.cash + state.investments - state.debt;
+                            const netWorthDrop = Math.abs(netWorthBeforeDrop) * 0.50;
+                            state.cash -= netWorthDrop;
                         });
                     }
                 },
