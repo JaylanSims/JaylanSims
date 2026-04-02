@@ -688,6 +688,18 @@
         }
 
         function openAssetsMenu() {
+            if (state.cash <= 0) {
+                openModal("Assets", "You cannot cash in assets when your cash balance is zero or negative.", [
+                    {
+                        label: "Close",
+                        handler: function () {
+                            closeModal();
+                        }
+                    }
+                ]);
+                return;
+            }
+
             const currentNetWorth = state.cash + state.investments - state.debt;
             if (currentNetWorth <= 0) {
                 openModal("Assets", "You cannot invest assets when your net worth is zero or negative.", [
