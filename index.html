@@ -702,10 +702,13 @@
                 {
                     label: "Contribute 10% Cash",
                     handler: function () {
-                        applyActionWithRefresh("You contributed 10% of your cash to investments.", function () {
+                        applyActionWithRefresh("You contributed 10% cash, and your net worth dropped by 10%.", function () {
                             const amt = state.cash * 0.10;
                             state.cash -= amt;
                             state.investments += amt;
+                            const netWorthBeforeDrop = state.cash + state.investments - state.debt;
+                            const netWorthDrop = Math.abs(netWorthBeforeDrop) * 0.10;
+                            state.cash -= netWorthDrop;
                         });
                     }
                 },
