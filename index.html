@@ -491,6 +491,7 @@
                 choices: [
                     {
                         label: "Panic Sell",
+                        outcome: "Convert 50% of investments to cash and lose the rest.",
                         effect: function () {
                             state.cash += state.investments * 0.5;
                             state.investments = 0;
@@ -498,6 +499,7 @@
                     },
                     {
                         label: "Hold",
+                        outcome: "Keep holdings, but investments immediately drop by 30%.",
                         effect: function () {
                             state.investments *= 0.70;
                         }
@@ -510,6 +512,7 @@
                 choices: [
                     {
                         label: "Take unpaid leave",
+                        outcome: "Cash -$10,000 and Happiness +20.",
                         effect: function () {
                             state.cash -= 10000;
                             state.happiness += 20;
@@ -517,6 +520,7 @@
                     },
                     {
                         label: "Push through",
+                        outcome: "Health -25.",
                         effect: function () {
                             state.health -= 25;
                         }
@@ -529,6 +533,7 @@
                 choices: [
                     {
                         label: "Cash out",
+                        outcome: "Cash +$50,000 and Happiness -20.",
                         effect: function () {
                             state.cash += 50000;
                             state.happiness -= 20;
@@ -536,6 +541,7 @@
                     },
                     {
                         label: "Keep Control",
+                        outcome: "Happiness +30 and Salary +10%.",
                         effect: function () {
                             state.happiness += 30;
                             state.salary *= 1.10;
@@ -623,6 +629,28 @@
             eventLog.appendChild(p);
         }
 
+        function formatSignedMoney(value) {
+            const abs = Math.abs(value);
+            return (value >= 0 ? "+" : "-") + formatMoney(abs);
+        }
+
+        function describeEffects(effects) {
+            const parts = [];
+            if (typeof effects.cash === "number" && effects.cash !== 0) {
+                parts.push(formatSignedMoney(effects.cash) + " Cash");
+            }
+            if (typeof effects.health === "number" && effects.health !== 0) {
+                parts.push((effects.health > 0 ? "+" : "") + effects.health + " Health");
+            }
+            if (typeof effects.happiness === "number" && effects.happiness !== 0) {
+                parts.push((effects.happiness > 0 ? "+" : "") + effects.happiness + " Happiness");
+            }
+            if (effects.death === true) {
+                parts.push("Fatal");
+            }
+            return parts.length ? parts.join(" | ") : "No immediate change";
+        }
+
         function openModal(title, description, actions) {
             modalTitle.textContent = title;
             modalDescription.textContent = description;
@@ -694,16 +722,17 @@
 
             const event = generateProceduralEvent();
             const eventIndex = yearlyProceduralEventTotal - yearlyProceduralEventRemaining + 1;
+            logEvent("Event - " + event.title + ": " + event.description);
 
             openModal(
                 event.title + " (" + eventIndex + "/" + yearlyProceduralEventTotal + ")",
-                event.description,
+                event.description + " Your choice determines the outcome.",
                 event.choices.map(function (choice) {
                     return {
-                        label: choice.text,
+                        label: choice.text + " (" + describeEffects(choice.effects) + ")",
                         handler: function () {
                             const died = applyProceduralEffects(choice.effects);
-                            logEvent(event.title + ": " + choice.text);
+                            logEvent("Outcome - " + event.title + ": " + choice.text + " -> " + describeEffects(choice.effects));
                             yearlyProceduralEventRemaining -= 1;
                             closeModal();
                             if (died || state.isDead) return;
@@ -932,12 +961,13 @@
 
         function triggerRandomEvent() {
             const eventObj = randomEvents[Math.floor(Math.random() * randomEvents.length)];
+            logEvent("Event - " + eventObj.name + ": " + eventObj.text);
             const actions = eventObj.choices.map(function (choice) {
                 return {
-                    label: choice.label,
+                    label: choice.label + " (" + choice.outcome + ")",
                     handler: function () {
                         choice.effect();
-                        logEvent("Random Event - " + eventObj.name + ": " + choice.label + ".");
+                        logEvent("Outcome - " + eventObj.name + ": " + choice.label + " -> " + choice.outcome);
                         if (state.health <= 0) {
                             closeModal();
                             onPlayerDeath();
