@@ -458,7 +458,7 @@
         let state = {
             age: 18, health: 100, happiness: 100, smarts: 50,
             cash: 0, investments: 0, debt: 0, salary: 0, expenses: 25000,
-            major: null, isDead: false
+            major: null, isDead: false, currentIllnesses: []
         };
 
         const setupScreen = document.getElementById("setup-screen");
@@ -551,6 +551,30 @@
             }
         ];
 
+        const DISEASES = {
+            commonCold: {
+                name: "Common Cold",
+                healthDrain: 5,
+                cureCost: 50,
+                baseLethality: 0.01,
+                ageMultiplier: 1.0
+            },
+            bronchitis: {
+                name: "Bronchitis",
+                healthDrain: 15,
+                cureCost: 250,
+                baseLethality: 0.05,
+                ageMultiplier: 1.5
+            },
+            heartDisease: {
+                name: "Heart Disease",
+                healthDrain: 30,
+                cureCost: 5000,
+                baseLethality: 0.10,
+                ageMultiplier: 3.5
+            }
+        };
+
         const proceduralWordBanks = {
             relative: ["cousin", "uncle", "aunt", "step-brother", "grandma"],
             animal: ["rabid raccoon", "stray dog", "massive bear", "feral cat", "pigeon"],
@@ -608,8 +632,6 @@
             state.health = clampStat(state.health);
             state.happiness = clampStat(state.happiness);
             state.smarts = clampStat(state.smarts);
-
-            const netWorth = state.cash + state.investments - state.debt;
 
             healthText.textContent = Math.round(state.health);
             happinessText.textContent = Math.round(state.happiness);
@@ -770,6 +792,109 @@
             closeModal();
         }
 
+        function calculateDiseaseLethality(disease) {
+            const ageRisk = Math.max(0, state.age - 40) / 40;
+            const lethality = disease.baseLethality * (1 + ageRisk * disease.ageMultiplier);
+            return Math.min(0.95, lethality);
+        }
+
+        function processIllnessesForYear() {
+            if (!state.currentIllnesses.length) return false;
+
+            for (let i = 0; i < state.currentIllnesses.length; i++) {
+                const illnessKey = state.currentIllnesses[i];
+                const disease = DISEASES[illnessKey];
+                if (!disease) continue;
+
+                state.health -= disease.healthDrain;
+                logEvent(disease.name + " drains " + disease.healthDrain + " health this year.");
+
+                const lethality = calculateDiseaseLethality(disease);
+                if (Math.random() < lethality || state.health <= 0) {
+                    logEvent(disease.name + " became fatal.");
+                    onPlayerDeath();
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        function maybeContractDisease() {
+            if (state.currentIllnesses.length >= 2) return;
+            if (Math.random() > 0.22) return;
+
+            const weights = [
+                { key: "commonCold", weight: 0.6 },
+                { key: "bronchitis", weight: state.age >= 35 ? 0.3 : 0.2 },
+                { key: "heartDisease", weight: state.age >= 50 ? 0.25 : 0.05 }
+            ];
+            const totalWeight = weights.reduce(function (sum, item) { return sum + item.weight; }, 0);
+            let roll = Math.random() * totalWeight;
+            let selected = weights[0].key;
+
+            for (let i = 0; i < weights.length; i++) {
+                roll -= weights[i].weight;
+                if (roll <= 0) {
+                    selected = weights[i].key;
+                    break;
+                }
+            }
+
+            if (!state.currentIllnesses.includes(selected)) {
+                state.currentIllnesses.push(selected);
+                logEvent("New illness diagnosed: " + DISEASES[selected].name + ".");
+            }
+        }
+
+        function openDoctorMenu() {
+            if (!state.currentIllnesses.length) {
+                openModal("Doctor", "You have no current illnesses to treat.", [
+                    {
+                        label: "Close",
+                        handler: function () {
+                            closeModal();
+                        }
+                    }
+                ]);
+                return;
+            }
+
+            const actions = state.currentIllnesses.map(function (illnessKey) {
+                const disease = DISEASES[illnessKey];
+                return {
+                    label: "Treat " + disease.name + " (" + formatMoney(disease.cureCost) + ")",
+                    handler: function () {
+                        if (state.cash >= disease.cureCost) {
+                            state.cash -= disease.cureCost;
+                            state.currentIllnesses = state.currentIllnesses.filter(function (key) {
+                                return key !== illnessKey;
+                            });
+                            logEvent("You cured " + disease.name + " for " + formatMoney(disease.cureCost) + ".");
+                        } else {
+                            logEvent("Not enough cash to cure " + disease.name + ".");
+                        }
+
+                        if (!state.currentIllnesses.length) {
+                            closeModal();
+                        } else {
+                            openDoctorMenu();
+                        }
+                        updateUI();
+                    }
+                };
+            });
+
+            actions.push({
+                label: "Close",
+                handler: function () {
+                    closeModal();
+                }
+            });
+
+            openModal("Doctor", "Choose an illness to treat.", actions);
+        }
+
         function openCareerMenu() {
             openModal("Career", "Push income higher, but your body and mind pay for it.", [
                 {
@@ -840,6 +965,12 @@
                         applyActionWithRefresh("You read and learned something new.", function () {
                             state.smarts += 5;
                         });
+                    }
+                },
+                {
+                    label: "Visit Doctor",
+                    handler: function () {
+                        openDoctorMenu();
                     }
                 },
                 {
@@ -1042,6 +1173,11 @@
             state.investments *= (1 + (Math.random() * 0.25 - 0.10));
 
             logEvent("Age " + state.age + ": You lived another year.");
+
+            if (processIllnessesForYear()) {
+                return;
+            }
+            maybeContractDisease();
 
             if (state.health <= 0) {
                 onPlayerDeath();
