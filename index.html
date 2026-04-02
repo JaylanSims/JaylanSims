@@ -545,6 +545,47 @@
             }
         ];
 
+        const proceduralWordBanks = {
+            relative: ["cousin", "uncle", "aunt", "step-brother", "grandma"],
+            animal: ["rabid raccoon", "stray dog", "massive bear", "feral cat", "pigeon"],
+            item: ["dirty magazine", "gold watch", "bag of weird pills", "stack of cash"],
+            location: ["the grocery store", "a dark alley", "the park", "your front porch"],
+            ailment: ["the flu", "food poisoning", "a mysterious rash", "a crippling migraine"]
+        };
+
+        const proceduralEventTemplates = [
+            {
+                id: "animal_attack",
+                title: "Wild Encounter!",
+                description: "While walking near [location], a [animal] suddenly lunges at you!",
+                choices: [
+                    { text: "Fight it off!", effects: { health: -20, happiness: -10 } },
+                    { text: "Run for your life!", effects: { health: -5, happiness: -5 } }
+                ]
+            },
+            {
+                id: "found_item",
+                title: "Look What I Found",
+                description: "Your [relative] calls you over and gives you a [item] they found near [location].",
+                choices: [
+                    { text: "Take it.", effects: { cash: 50, happiness: 15 } },
+                    { text: "Refuse it. That's weird.", effects: { happiness: -5 } }
+                ]
+            },
+            {
+                id: "sudden_illness",
+                title: "Feeling Under the Weather",
+                description: "You wake up feeling terrible. The doctor says you have caught [ailment].",
+                choices: [
+                    { text: "Pay $100 for medicine.", effects: { cash: -100, health: 10, happiness: 5 } },
+                    { text: "Tough it out.", effects: { health: -30, happiness: -20 } }
+                ]
+            }
+        ];
+
+        let yearlyProceduralEventTotal = 0;
+        let yearlyProceduralEventRemaining = 0;
+
         function formatMoney(num) {
             return "$" + Math.round(num).toLocaleString("en-US");
         }
@@ -600,6 +641,88 @@
 
         function closeModal() {
             modalOverlay.style.display = "none";
+        }
+
+        function applyProceduralEffects(effects) {
+            state.cash += effects.cash || 0;
+            state.health += effects.health || 0;
+            state.happiness += effects.happiness || 0;
+
+            if (effects.death === true || state.health <= 0) {
+                state.health = 0;
+                onPlayerDeath();
+                return true;
+            }
+            return false;
+        }
+
+        function generateProceduralEvent() {
+            const template = proceduralEventTemplates[Math.floor(Math.random() * proceduralEventTemplates.length)];
+            const event = {
+                title: template.title,
+                description: template.description,
+                choices: template.choices.map(function (choice) {
+                    return {
+                        text: choice.text,
+                        effects: Object.assign({}, choice.effects)
+                    };
+                })
+            };
+
+            event.description = event.description.replace(/\[(.*?)\]/g, function (match, tag) {
+                const bank = proceduralWordBanks[tag];
+                if (!bank || bank.length === 0) {
+                    return match;
+                }
+                return bank[Math.floor(Math.random() * bank.length)];
+            });
+
+            return event;
+        }
+
+        function showNextProceduralEvent() {
+            if (state.isDead) return;
+
+            if (yearlyProceduralEventRemaining <= 0) {
+                updateUI();
+                return;
+            }
+
+            const event = generateProceduralEvent();
+            const eventIndex = yearlyProceduralEventTotal - yearlyProceduralEventRemaining + 1;
+
+            openModal(
+                event.title + " (" + eventIndex + "/" + yearlyProceduralEventTotal + ")",
+                event.description,
+                event.choices.map(function (choice) {
+                    return {
+                        label: choice.text,
+                        handler: function () {
+                            const died = applyProceduralEffects(choice.effects);
+                            logEvent(event.title + ": " + choice.text);
+                            yearlyProceduralEventRemaining -= 1;
+                            closeModal();
+                            if (died || state.isDead) return;
+                            updateUI();
+                            showNextProceduralEvent();
+                        }
+                    };
+                })
+            );
+        }
+
+        function triggerProceduralYearEvents() {
+            yearlyProceduralEventTotal = Math.floor(Math.random() * 4);
+            yearlyProceduralEventRemaining = yearlyProceduralEventTotal;
+
+            if (yearlyProceduralEventTotal === 0) {
+                logEvent("A quiet, uneventful year passes by...");
+                updateUI();
+                return;
+            }
+
+            logEvent("This year brought " + yearlyProceduralEventTotal + " surprise event" + (yearlyProceduralEventTotal > 1 ? "s." : "."));
+            showNextProceduralEvent();
         }
 
         function applyActionWithRefresh(actionText, fn) {
@@ -891,11 +1014,7 @@
                 return;
             }
 
-            if (Math.random() < 0.25) {
-                triggerRandomEvent();
-            } else {
-                updateUI();
-            }
+            triggerProceduralYearEvents();
         }
 
         function chooseMajor(major) {
