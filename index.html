@@ -659,7 +659,8 @@
                                 state.cash -= 2000;
                                 state.happiness += 25;
                             } else {
-                                logEvent("You couldn't afford therapy.");
+                                state.happiness += 5;
+                                logEvent("You couldn't afford a full session, but deciding to seek help still improved your mood.");
                             }
                         });
                     }
