@@ -930,6 +930,13 @@
             closeModal();
         }
 
+        function getCureRecoveryAmount(disease) {
+            const base = Math.max(2, disease.annualHealthDrain);
+            const minRecovery = Math.max(2, Math.floor(base * 0.8));
+            const maxRecovery = Math.max(minRecovery + 1, Math.floor(base * 2.4));
+            return minRecovery + Math.floor(Math.random() * (maxRecovery - minRecovery + 1));
+        }
+
         function getActiveIllnessSummary() {
             if (!state.currentIllnesses.length) return "No active illnesses.";
             return state.currentIllnesses.map(function (key) {
@@ -1067,7 +1074,9 @@
                                 return illnessKey !== key;
                             });
                             delete state.illnessYears[key];
-                            logEvent("Doctor treated and cured " + disease.name + " for " + formatMoney(disease.cureCost) + ".");
+                            const recovery = getCureRecoveryAmount(disease);
+                            state.health += recovery;
+                            logEvent("Doctor treated and cured " + disease.name + " for " + formatMoney(disease.cureCost) + ". Health recovered by +" + recovery + ".");
                         } else {
                             logEvent("Doctor visit for " + disease.name + " cost " + formatMoney(disease.cureCost) + ", but it remains incurable.");
                         }
