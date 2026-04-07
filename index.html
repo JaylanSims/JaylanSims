@@ -138,11 +138,26 @@
             background: #1E1E1E;
             border-bottom: 1px solid #333;
             display: flex;
+            flex-direction: column;
+            gap: 6px;
+            padding: 8px 6px;
+        }
+
+        .stats-bar-row {
+            display: flex;
             align-items: stretch;
             justify-content: space-between;
-            height: 96px;
-            padding: 8px 6px;
             gap: 6px;
+            min-height: 88px;
+        }
+
+        .stats-bar-row .stat-block {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .hud-extra-hidden {
+            display: none !important;
         }
 
         .stat-block {
@@ -404,6 +419,14 @@
             background: #451f1f;
         }
 
+        #exam-penalty-warning {
+            margin: 16px 0 0;
+            font-size: 0.78rem;
+            line-height: 1.35;
+            color: #c9a227;
+            text-align: center;
+        }
+
         #diagnosis-overlay {
             position: fixed;
             inset: 0;
@@ -548,25 +571,39 @@
 
         <div id="game-ui" style="display: none; flex-direction: column; height: 100%;">
             <header id="stats-bar">
-                <div class="stat-block">
-                    <div class="stat-name">Health</div>
-                    <div class="stat-value" id="health-text">100</div>
-                    <div class="bar-track"><div id="health-fill" class="bar-fill"></div></div>
+                <div class="stats-bar-row">
+                    <div class="stat-block">
+                        <div class="stat-name">Health</div>
+                        <div class="stat-value" id="health-text">100</div>
+                        <div class="bar-track"><div id="health-fill" class="bar-fill"></div></div>
+                    </div>
+                    <div class="stat-block">
+                        <div class="stat-name">Happiness</div>
+                        <div class="stat-value" id="happiness-text">100</div>
+                        <div class="bar-track"><div id="happiness-fill" class="bar-fill"></div></div>
+                    </div>
+                    <div class="stat-block">
+                        <div class="stat-name">Smarts</div>
+                        <div class="stat-value" id="smarts-text">50</div>
+                        <div class="bar-track"><div id="smarts-fill" class="bar-fill"></div></div>
+                    </div>
+                    <div class="stat-block">
+                        <div class="stat-name">Cash Balance</div>
+                        <div class="stat-value" id="cash-balance-text">$0</div>
+                        <div class="bar-track"><div class="bar-fill" style="width: 100%; background: #888;"></div></div>
+                    </div>
                 </div>
-                <div class="stat-block">
-                    <div class="stat-name">Happiness</div>
-                    <div class="stat-value" id="happiness-text">100</div>
-                    <div class="bar-track"><div id="happiness-fill" class="bar-fill"></div></div>
-                </div>
-                <div class="stat-block">
-                    <div class="stat-name">Smarts</div>
-                    <div class="stat-value" id="smarts-text">50</div>
-                    <div class="bar-track"><div id="smarts-fill" class="bar-fill"></div></div>
-                </div>
-                <div class="stat-block">
-                    <div class="stat-name">Cash Balance</div>
-                    <div class="stat-value" id="cash-balance-text">$0</div>
-                    <div class="bar-track"><div class="bar-fill" style="width: 100%; background: #888;"></div></div>
+                <div class="stats-bar-row hud-extra-hidden" id="stats-bar-debt-salary">
+                    <div class="stat-block" id="stat-debt-block">
+                        <div class="stat-name">Debt</div>
+                        <div class="stat-value" id="debt-text">$0</div>
+                        <div class="bar-track"><div class="bar-fill" style="width: 100%; background: #ff8a65;"></div></div>
+                    </div>
+                    <div class="stat-block" id="stat-salary-block">
+                        <div class="stat-name">Salary</div>
+                        <div class="stat-value" id="salary-text">$0</div>
+                        <div class="bar-track"><div class="bar-fill" style="width: 100%; background: #81c784;"></div></div>
+                    </div>
                 </div>
             </header>
 
@@ -609,7 +646,7 @@
     <script type="text/babel" data-presets="react">
         let state = {
             age: 18, health: 100, happiness: 100, smarts: 50,
-            cash: 5000, investments: 0, debt: 0, salary: 0, expenses: 25000, annualExpenses: 25000, bankBalance: 5000,
+            cash: 0, investments: 0, debt: 0, existingDebt: 0, salary: 0, expenses: 25000, annualExpenses: 25000, bankBalance: 0,
             major: null, isDead: false, currentIllnesses: [], illnessYears: {},
             ownedAssets: [], realEstateListings: [], nextPropertyId: 1, nextListingId: 1,
             currentHousingMarketShift: 0, currentHousingMarketEvent: "stable",
@@ -622,8 +659,19 @@
             mentalIllnessState: {},
             happinessZeroStreakYears: 0,
             isInSchool: false,
-            isExamActive: false
+            isExamActive: false,
+            degreeWrongAnswersThisEnrollment: 0,
+            hudDebtSalaryUnlocked: false
         };
+
+        const TRACK_DEBT_BASE = {
+            STEM: 30000,
+            Humanities: 43000,
+            Trades: 10000
+        };
+
+        const STEM_BASE_TUITION = 30000;
+        const STEM_WRONG_ANSWER_PENALTY = 7500;
 
         const setupScreen = document.getElementById("setup-screen");
         const introScreen = document.getElementById("intro-screen");
@@ -647,6 +695,9 @@
         const happinessText = document.getElementById("happiness-text");
         const smartsText = document.getElementById("smarts-text");
         const cashBalanceText = document.getElementById("cash-balance-text");
+        const debtText = document.getElementById("debt-text");
+        const salaryText = document.getElementById("salary-text");
+        const statsBarDebtSalary = document.getElementById("stats-bar-debt-salary");
 
         const healthFill = document.getElementById("health-fill");
         const happinessFill = document.getElementById("happiness-fill");
@@ -1203,6 +1254,31 @@
             return "$" + Math.round(num).toLocaleString("en-US");
         }
 
+        function getTrackDebtBase(path) {
+            return TRACK_DEBT_BASE[path] || 0;
+        }
+
+        function getDisplayedStudentDebt() {
+            if (state.playerPath === "STEM") {
+                return state.existingDebt;
+            }
+            if (state.isInSchool && state.currentlyPursuing) {
+                const base = getTrackDebtBase(state.playerPath);
+                return state.existingDebt + (base / 4) * state.degreeWrongAnswersThisEnrollment;
+            }
+            return state.existingDebt;
+        }
+
+        function applyDegreeEndDebt() {
+            let added = 0;
+            if (state.playerPath !== "STEM") {
+                const base = getTrackDebtBase(state.playerPath);
+                added = (base / 4) * state.degreeWrongAnswersThisEnrollment;
+                state.existingDebt += added;
+            }
+            return added;
+        }
+
         function clampStat(num) {
             if (num < 0) return 0;
             if (num > 100) return 100;
@@ -1219,6 +1295,14 @@
             happinessText.textContent = Math.round(state.happiness);
             smartsText.textContent = Math.round(state.smarts);
             cashBalanceText.textContent = formatMoney(state.cash);
+
+            if (state.hudDebtSalaryUnlocked && statsBarDebtSalary) {
+                statsBarDebtSalary.classList.remove("hud-extra-hidden");
+                debtText.textContent = formatMoney(getDisplayedStudentDebt());
+                salaryText.textContent = formatMoney(state.salary);
+            } else if (statsBarDebtSalary) {
+                statsBarDebtSalary.classList.add("hud-extra-hidden");
+            }
 
             healthFill.style.width = state.health + "%";
             happinessFill.style.width = state.happiness + "%";
@@ -1312,6 +1396,9 @@
                                 );
                             })}
                         </div>
+                        <p id="exam-penalty-warning">
+                            Warning: Incorrect answers will increase your total student debt for this track.
+                        </p>
                     </div>
                 </div>
             );
@@ -1638,6 +1725,10 @@
 
         function handleAcademicDismissal(program, requiredPasses) {
             const passedCount = state.examsPassedThisDegree;
+            applyDegreeEndDebt();
+            state.degreeWrongAnswersThisEnrollment = 0;
+            const debtLine = "You have finished your studies with " + formatMoney(state.existingDebt) + " in student debt.";
+
             state.academicDismissed = true;
             state.jobSearchBlocked = true;
             state.yearsInSchool = 0;
@@ -1650,7 +1741,7 @@
                 "Academic Dismissal — Failed Final Year",
                 "<strong>You did not meet the graduation exam requirement.</strong><br><br>You passed " + passedCount + "/" + program.yearsRequired +
                 " exams (minimum required: " + requiredPasses + "). You must restart " +
-                program.degreeName + " from Year 1. Careers and Find a Job stay locked until you graduate successfully.",
+                program.degreeName + " from Year 1. Careers and Find a Job stay locked until you graduate successfully.<br><br>" + debtLine,
                 [
                     {
                         label: "Continue",
@@ -1678,6 +1769,10 @@
             state.smarts += 2;
             state.happiness -= 1;
             state.health -= 1;
+
+            if (state.yearsInSchool >= 1) {
+                state.hudDebtSalaryUnlocked = true;
+            }
 
             logEvent(
                 "Age " + state.age + ": Final exam " + (answerWasCorrect ? "passed" : "failed") +
@@ -1710,8 +1805,15 @@
             state.examsTakenThisDegree += 1;
             if (answerWasCorrect) {
                 state.examsPassedThisDegree += 1;
+            } else {
+                state.degreeWrongAnswersThisEnrollment += 1;
+                if (state.playerPath === "STEM") {
+                    state.existingDebt += STEM_WRONG_ANSWER_PENALTY;
+                }
             }
 
+            syncFinancialAliases();
+            updateUI();
             renderYearlyExamOverlay(selectedOptionIndex, true);
 
             window.setTimeout(function () {
@@ -1842,11 +1944,15 @@
             state.yearsInSchool = 0;
             state.examsPassedThisDegree = 0;
             state.examsTakenThisDegree = 0;
+            state.degreeWrongAnswersThisEnrollment = 0;
             state.currentExamQuestion = null;
             state.isExamModalOpen = false;
             state.isExamActive = false;
             state.isInSchool = true;
             state.jobSearchBlocked = true;
+            if (state.playerPath === "STEM") {
+                state.existingDebt += STEM_BASE_TUITION;
+            }
             state.annualIncome = 0;
             state.salary = 0;
             state.jobTitle = "Student";
@@ -1885,6 +1991,10 @@
         function completeProgram(programKey) {
             const program = EDUCATION_PROGRAMS[programKey];
             if (!program) return;
+            applyDegreeEndDebt();
+            state.degreeWrongAnswersThisEnrollment = 0;
+            const debtLine = "You have finished your studies with " + formatMoney(state.existingDebt) + " in student debt.";
+
             state.currentlyPursuing = null;
             state.yearsInSchool = 0;
             state.examsPassedThisDegree = 0;
@@ -1925,7 +2035,7 @@
 
             openModal(
                 "Congratulations! 🎉",
-                "After years of hard work, you have officially graduated with your " + program.degreeName + "!",
+                "After years of hard work, you have officially graduated with your " + program.degreeName + "!<br><br>" + debtLine,
                 actions
             );
             updateUI();
@@ -1966,6 +2076,7 @@
         function syncFinancialAliases() {
             state.bankBalance = state.cash;
             state.expenses = state.annualExpenses;
+            state.debt = getDisplayedStudentDebt();
         }
 
         function applyProceduralEffects(effects) {
