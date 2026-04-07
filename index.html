@@ -539,6 +539,25 @@
             line-height: 1.35 !important;
         }
 
+        #alignment-dashboard {
+            padding: 8px 12px 0;
+            font-size: 0.78rem;
+            line-height: 1.4;
+            text-align: center;
+        }
+
+        #alignment-dashboard.alignment-true-calling {
+            color: #81c784;
+        }
+
+        #alignment-dashboard.alignment-selling-out {
+            color: #e57373;
+        }
+
+        #alignment-dashboard.alignment-neutral {
+            color: #9e9e9e;
+        }
+
         #purchase-toast {
             position: fixed;
             left: 50%;
@@ -971,6 +990,7 @@
                         <div class="bar-track"><div class="bar-fill" style="width: 100%; background: #81c784;"></div></div>
                     </div>
                 </div>
+                <div id="alignment-dashboard" class="alignment-neutral hud-extra-hidden" aria-live="polite"></div>
             </header>
 
             <main id="event-log"></main>
@@ -1060,7 +1080,9 @@
             roommate: null,
             rentExpenseInBudget: 0,
             graduationTier: null,
-            totalWorkExperience: 0
+            examPerformanceTier: null,
+            totalWorkExperience: 0,
+            naturalAptitude: null
         };
 
         const RENTAL_LISTINGS = [
@@ -1113,6 +1135,7 @@
         const debtText = document.getElementById("debt-text");
         const salaryText = document.getElementById("salary-text");
         const statsBarDebtSalary = document.getElementById("stats-bar-debt-salary");
+        const alignmentDashboard = document.getElementById("alignment-dashboard");
 
         const healthFill = document.getElementById("health-fill");
         const happinessFill = document.getElementById("happiness-fill");
@@ -1790,6 +1813,33 @@
                 maxVisits: 14,
                 annualHappinessDrainOverride: 25
             },
+            imposterSyndrome: {
+                name: "Imposter Syndrome",
+                tier: "medium",
+                curable: true,
+                minVisits: 10,
+                maxVisits: 16,
+                annualHappinessDrainOverride: 15,
+                mentalCannotSuppress: true
+            },
+            creativeBlock: {
+                name: "Creative Block",
+                tier: "medium",
+                curable: true,
+                minVisits: 10,
+                maxVisits: 16,
+                annualHappinessDrainOverride: 15,
+                mentalCannotSuppress: true
+            },
+            physicalExhaustion: {
+                name: "Physical Exhaustion",
+                tier: "medium",
+                curable: true,
+                minVisits: 10,
+                maxVisits: 16,
+                annualHappinessDrainOverride: 15,
+                mentalCannotSuppress: true
+            },
 
             schizophrenia: { name: "Schizophrenia", tier: "severe", curable: false },
             bipolarI: { name: "Bipolar I", tier: "severe", curable: false },
@@ -1820,7 +1870,8 @@
                     mentalTier: def.tier,
                     mentalCurable: def.curable,
                     mentalMinVisits: def.minVisits || null,
-                    mentalMaxVisits: def.maxVisits || null
+                    mentalMaxVisits: def.maxVisits || null,
+                    mentalCannotSuppress: def.mentalCannotSuppress === true
                 });
             });
 
@@ -1864,6 +1915,8 @@
             for (var i = 0; i < state.currentIllnesses.length; i++) {
                 var key = state.currentIllnesses[i];
                 if (!isMentalIllness(key)) continue;
+                var d = DISEASES[key];
+                if (d && d.mentalCannotSuppress) return true;
                 var ms = state.mentalIllnessState[key];
                 if (!ms || ms.isSuppressed !== true) {
                     return true;
@@ -1908,6 +1961,8 @@
 
         function yearlyResetMentalSuppression() {
             Object.keys(state.mentalIllnessState).forEach(function (illnessKey) {
+                const d = DISEASES[illnessKey];
+                if (d && d.mentalCannotSuppress) return;
                 state.mentalIllnessState[illnessKey].isSuppressed = false;
             });
         }
@@ -1958,6 +2013,32 @@
 
         function formatMoney(num) {
             return "$" + Math.round(num).toLocaleString("en-US");
+        }
+
+        const APTITUDE_PATH = {
+            Analytical: "STEM",
+            Expressive: "Humanities",
+            Practical: "Trades"
+        };
+
+        function rollNaturalAptitude() {
+            var keys = ["Analytical", "Expressive", "Practical"];
+            return keys[Math.floor(Math.random() * keys.length)];
+        }
+
+        function pathForAptitude(apt) {
+            return APTITUDE_PATH[apt] || null;
+        }
+
+        function getAlignment() {
+            if (!state.naturalAptitude || !state.playerPath) return "Neutral";
+            return pathForAptitude(state.naturalAptitude) === state.playerPath ? "True Calling" : "Selling Out";
+        }
+
+        function graduationFloorPercent() {
+            if (getAlignment() === "Selling Out") return 75;
+            if (getAlignment() === "True Calling") return 50;
+            return 60;
         }
 
         function getTrackDebtBase(path) {
@@ -2037,11 +2118,53 @@
             if (p && p.pipeline === "residency") return;
             if (!state.isEmployed || !state.isEnrolled) return;
             if (state.jobType !== "Career") return;
+            if (getAlignment() === "True Calling") return;
             if (state.happiness >= 25) return;
             if (state.currentIllnesses.includes("severeAcademicBurnout")) return;
             if (Math.random() >= 0.5) return;
             diagnoseIllness("severeAcademicBurnout", { skipHappinessPenalty: true, forceOverlay: true });
             logEvent("Dual hustle overload: Severe Academic Burnout diagnosed.");
+        }
+
+        function isInMisalignedCareerWork() {
+            if (getAlignment() !== "Selling Out") return false;
+            if (!state.isEmployed || state.jobType !== "Career") return false;
+            var t = state.jobTitle;
+            if (t === "Student" || t === "Unemployed") return false;
+            return true;
+        }
+
+        function misalignmentCareerIllnessKey() {
+            if (state.playerPath === "STEM") return "imposterSyndrome";
+            if (state.playerPath === "Humanities") return "creativeBlock";
+            if (state.playerPath === "Trades") return "physicalExhaustion";
+            return null;
+        }
+
+        function maybeTriggerSellingOutCareerIllness() {
+            if (!isInMisalignedCareerWork()) return;
+            if (state.happiness >= 30) return;
+            var key = misalignmentCareerIllnessKey();
+            if (!key || state.currentIllnesses.includes(key)) return;
+            diagnoseIllness(key, { skipHappinessPenalty: true, forceOverlay: true });
+            logEvent("Misaligned career strain: diagnosed with " + (DISEASES[key] && DISEASES[key].name) + ".");
+        }
+
+        function maybeAlignmentCareerToast() {
+            if (
+                !state.isEmployed ||
+                state.jobType !== "Career" ||
+                state.jobTitle === "Student" ||
+                state.jobTitle === "Unemployed" ||
+                Math.random() >= 0.2
+            ) {
+                return;
+            }
+            if (getAlignment() === "Selling Out") {
+                showPurchaseToastMessage("You dread waking up for work. The money is fine, but the soul-crushing boredom is draining your will to live.");
+            } else if (getAlignment() === "True Calling") {
+                showPurchaseToastMessage("You lose track of time at work. Doing what you love makes the long hours feel effortless.");
+            }
         }
 
         function applyDualHustleStressForYear() {
@@ -2086,6 +2209,26 @@
                 salaryText.textContent = formatMoney(state.salary);
             } else if (statsBarDebtSalary) {
                 statsBarDebtSalary.classList.add("hud-extra-hidden");
+            }
+
+            if (alignmentDashboard) {
+                if (state.playerPath && state.naturalAptitude) {
+                    alignmentDashboard.classList.remove("hud-extra-hidden", "alignment-true-calling", "alignment-selling-out", "alignment-neutral");
+                    var al = getAlignment();
+                    if (al === "True Calling") {
+                        alignmentDashboard.classList.add("alignment-true-calling");
+                        alignmentDashboard.textContent = "[🔥 True Calling: +Promotion Speed, +Academic Intuition]";
+                    } else if (al === "Selling Out") {
+                        alignmentDashboard.classList.add("alignment-selling-out");
+                        alignmentDashboard.textContent = "[⛓️ Selling Out: -Career Cap, -High Stress]";
+                    } else {
+                        alignmentDashboard.classList.add("alignment-neutral");
+                        alignmentDashboard.textContent = "";
+                    }
+                } else {
+                    alignmentDashboard.classList.add("hud-extra-hidden");
+                    alignmentDashboard.textContent = "";
+                }
             }
 
             healthFill.style.width = state.health + "%";
@@ -2358,7 +2501,7 @@
                 state.jobTitle !== "Medical Resident" &&
                 state.yearsAtCurrentJob >= 3 &&
                 state.currentJobLevel < 4 &&
-                Math.random() < 0.3
+                Math.random() < getPromotionTriggerChance()
             ) {
                 const promo = generatePromotion(state.jobTitle, state.annualIncome, state.currentJobLevel, state.playerPath);
                 if (promo) {
@@ -2374,6 +2517,8 @@
                     return;
                 }
             }
+
+            maybeAlignmentCareerToast();
 
             runAgeUpWorkYearAfterPromotion();
             updateUI();
@@ -2695,7 +2840,9 @@
                 const disease = DISEASES[illnessKey];
                 applyMentalDefaultsForIllness(illnessKey, disease);
                 const mentalState = state.mentalIllnessState[illnessKey];
-                mentalState.isSuppressed = true;
+                if (!disease.mentalCannotSuppress) {
+                    mentalState.isSuppressed = true;
+                }
 
                 if (disease.mentalCurable && mentalState.requiredVisitsRemaining > 0) {
                     mentalState.requiredVisitsRemaining -= 1;
@@ -2748,7 +2895,8 @@
                 }
 
                 const baseDrain = MENTAL_TIER_HAPPINESS_DRAIN[tier] || 10;
-                const appliedDrain = mentalState.isSuppressed
+                const canUseSuppression = !disease.mentalCannotSuppress;
+                const appliedDrain = canUseSuppression && mentalState.isSuppressed
                     ? Math.round(baseDrain * MENTAL_HEALTH_SUPPRESSION_FACTOR)
                     : baseDrain;
 
@@ -2814,17 +2962,28 @@
             return program.yearsRequired * 2;
         }
 
-        /** @returns {1|2|3|null} null = below 60% correct (academic dismissal) */
-        function computeGraduationTierFromExams(passed, totalQuestions) {
+        /** @returns {1|2|3|null} null = below graduation floor (academic dismissal) */
+        function computeGraduationTierFromExams(passed, totalQuestions, floorPct) {
             if (totalQuestions <= 0) return null;
+            var floor = typeof floorPct === "number" ? floorPct : graduationFloorPercent();
             var pct = (passed / totalQuestions) * 100;
-            if (pct < 60) return null;
+            if (pct < floor) return null;
             if (pct >= 90) return 1;
             if (pct >= 75) return 2;
             return 3;
         }
 
+        function getPromotionTriggerChance() {
+            return getAlignment() === "True Calling" ? 0.75 : 0.3;
+        }
+
         function isCareerJobUnlocked(job) {
+            var glassCeiling =
+                getAlignment() === "Selling Out" &&
+                job.tier === 1 &&
+                state.examPerformanceTier === 1 &&
+                state.totalWorkExperience < (job.experienceRequired || 8);
+            if (glassCeiling) return false;
             if (state.graduationTier !== null && state.graduationTier <= job.tier) return true;
             if (state.totalWorkExperience >= job.experienceRequired) return true;
             return false;
@@ -2881,14 +3040,15 @@
             if (program && program.pipeline && program.pipeline !== "undergrad") {
                 if (belowGpaBar && passedCount >= requiredPasses) {
                     const debtLine = "You have finished your studies with " + formatMoney(state.existingDebt) + " in student debt.";
-                    logEvent("Academic dismissal: exam average below 60% for " + program.degreeName + ".");
+                    var fl = graduationFloorPercent();
+                    logEvent("Academic dismissal: exam average below " + fl + "% for " + program.degreeName + ".");
                     clearEnrollmentAfterDismissalOrQuit();
                     state._savedJobBeforeSchoolYear = null;
                     state.jobSearchBlocked = false;
                     openModal(
-                        "Academic Dismissal — Below 60% Correct",
-                        "<strong>Your overall exam performance fell below 60% correct.</strong><br><br>" +
-                        "You answered " + passedCount + "/" + totalQs + " questions correctly. Degrees require at least 60% mastery to graduate. " +
+                        "Academic Dismissal — Below Required Mastery",
+                        "<strong>Your overall exam performance fell below " + fl + "% correct.</strong><br><br>" +
+                        "You answered " + passedCount + "/" + totalQs + " questions correctly. This program requires at least " + fl + "% to graduate. " +
                         "You are not awarded " + program.degreeName + ". Tuition debt from this program remains on your record.<br><br>" + debtLine,
                         [{ label: "Continue", handler: function () { closeModal(); updateUI(); } }]
                     );
@@ -2923,9 +3083,10 @@
                 " exam questions (minimum required: " + requiredPasses + "). You must restart " +
                 program.degreeName + " from Year 1. Careers and Find a Job stay locked until you graduate successfully.<br><br>" + debtLine;
             if (belowGpaBar && passedCount >= requiredPasses) {
-                dismissTitle = "Academic Dismissal — Below 60% Correct";
-                dismissBody = "<strong>Your overall exam performance fell below 60% correct.</strong><br><br>You answered " + passedCount + "/" + totalQs +
-                    " questions correctly. You met the minimum pass count but not the 60% mastery bar to graduate. You must restart " +
+                var flU = graduationFloorPercent();
+                dismissTitle = "Academic Dismissal — Below Required Mastery";
+                dismissBody = "<strong>Your overall exam performance fell below " + flU + "% correct.</strong><br><br>You answered " + passedCount + "/" + totalQs +
+                    " questions correctly. You met the minimum pass count but not the " + flU + "% mastery bar to graduate. You must restart " +
                     program.degreeName + " from Year 1.<br><br>" + debtLine;
             }
             openModal(
@@ -3017,7 +3178,8 @@
             if (state.yearsInSchool >= program.yearsRequired) {
                 const requiredPasses = getRequiredExamPassesForProgram(program);
                 const totalQs = getExamQuestionsTotalForProgram(program);
-                const graduationTier = computeGraduationTierFromExams(state.examsPassedThisDegree, totalQs);
+                const floorPct = graduationFloorPercent();
+                const graduationTier = computeGraduationTierFromExams(state.examsPassedThisDegree, totalQs, floorPct);
                 if (state.examsPassedThisDegree < requiredPasses) {
                     handleAcademicDismissal(program, requiredPasses);
                 } else if (graduationTier === null) {
@@ -3229,8 +3391,18 @@
                 if (!credOk) {
                     label = job.title + " — Requires " + job.requiredEducation;
                 } else if (!tierOk) {
-                    label = "Locked: Requires Tier " + job.tier + " Degree OR " + job.experienceRequired + " Years Exp. — " +
-                        job.title + " (" + formatMoney(job.salary) + ")";
+                    var glassCeilingLock =
+                        getAlignment() === "Selling Out" &&
+                        job.tier === 1 &&
+                        state.examPerformanceTier === 1 &&
+                        state.totalWorkExperience < job.experienceRequired;
+                    if (glassCeilingLock) {
+                        label = "Locked (Glass Ceiling): Tier 1 blocked while misaligned — need " + job.experienceRequired + "+ yrs exp. — " +
+                            job.title + " (" + formatMoney(job.salary) + ")";
+                    } else {
+                        label = "Locked: Requires Tier " + job.tier + " Degree OR " + job.experienceRequired + " Years Exp. — " +
+                            job.title + " (" + formatMoney(job.salary) + ")";
+                    }
                 } else {
                     label = "Apply: " + job.title + " — " + formatMoney(job.salary);
                 }
@@ -3528,9 +3700,16 @@
             const passed = state.examsPassedThisDegree;
             var pctRounded = totalQs > 0 ? Math.round((passed / totalQs) * 1000) / 10 : 0;
             if (typeof graduationTier === "number") {
-                state.graduationTier = state.graduationTier == null
+                state.examPerformanceTier = state.examPerformanceTier == null
                     ? graduationTier
-                    : Math.min(state.graduationTier, graduationTier);
+                    : Math.min(state.examPerformanceTier, graduationTier);
+                var tierToStore = graduationTier;
+                if (getAlignment() === "Selling Out" && tierToStore === 1) {
+                    tierToStore = 2;
+                }
+                state.graduationTier = state.graduationTier == null
+                    ? tierToStore
+                    : Math.min(state.graduationTier, tierToStore);
             }
 
             addDegreesToHistory(program);
@@ -3595,6 +3774,9 @@
             if (state.graduationTier === 1) {
                 tierLine = "<br><br><strong>GPA tier: Tier 1 (A-Student — " + pctRounded + "% correct)</strong><br>" +
                     "You graduated with Top Honors! Your Tier 1 record proves your mastery, unlocking the highest-paying jobs on your track immediately.";
+            } else if (graduationTier === 1 && getAlignment() === "Selling Out") {
+                tierLine = "<br><br><strong>GPA tier: Exam Tier 1 (" + pctRounded + "% correct) — Career start capped</strong><br>" +
+                    "Your exam scores were elite, but you are working against your natural aptitude. Employers still start you at Tier 2: build 8+ years of career experience to unlock Tier 1 roles.";
             } else if (state.graduationTier === 2) {
                 tierLine = "<br><br><strong>GPA tier: Tier 2 (B-Student — " + pctRounded + "% correct)</strong><br>" +
                     "You graduated with solid performance. Your Tier 2 record opens mid-tier professional roles now; keep building experience to reach the top salaries.";
@@ -3626,7 +3808,8 @@
                 : "You are not currently enrolled in school.";
             const examProgress = program
                 ? "Exam questions (this degree): " + state.examsPassedThisDegree + "/" + state.examsTakenThisDegree +
-                    " (2 per year; need " + getRequiredExamPassesForProgram(program) + "+ correct to graduate)."
+                    " (2 per year; need " + getRequiredExamPassesForProgram(program) + "+ correct to graduate). " +
+                    "Graduation also requires ≥" + graduationFloorPercent() + "% of all exam questions correct (aptitude alignment)."
                 : "";
             const enrollLine = state.currentEnrollment
                 ? "<br><strong>Current enrollment:</strong> " + state.currentEnrollment.degreeName +
@@ -4594,6 +4777,12 @@
                 updateUI();
                 return;
             }
+            maybeTriggerSellingOutCareerIllness();
+            if (state.isDiagnosisOverlayOpen || state.isDead) {
+                yearlyResetMentalSuppression();
+                updateUI();
+                return;
+            }
 
             if (state.happiness <= 0) {
                 state.happinessZeroStreakYears += 1;
@@ -4660,7 +4849,7 @@
                 state.jobTitle !== "Medical Resident" &&
                 state.yearsAtCurrentJob >= 3 &&
                 state.currentJobLevel < 4 &&
-                Math.random() < 0.3
+                Math.random() < getPromotionTriggerChance()
             ) {
                 const promo = generatePromotion(state.jobTitle, state.annualIncome, state.currentJobLevel, state.playerPath);
                 if (promo) {
@@ -4677,33 +4866,53 @@
                 }
             }
 
+            maybeAlignmentCareerToast();
+
             runAgeUpWorkYearAfterPromotion();
             updateUI();
         }
 
         function choosePath(path) {
+            if (state.naturalAptitude == null) {
+                state.naturalAptitude = rollNaturalAptitude();
+            }
             state.playerPath = path;
             state.major = path;
-            state.annualIncome = 0;
-            state.salary = 0;
-            state.jobTitle = "Student";
+            var matchTrack = pathForAptitude(state.naturalAptitude);
+            openModal(
+                "Your Natural Aptitude",
+                "You have discovered your natural aptitude is <strong>" + state.naturalAptitude + "</strong>. " +
+                    "Following a career in <strong>" + matchTrack + "</strong> will bring you fulfillment and rapid success. " +
+                    "Forcing yourself into other tracks for money will lead to severe stress and a higher chance of academic failure.",
+                [
+                    {
+                        label: "Continue",
+                        handler: function () {
+                            closeModal();
+                            state.annualIncome = 0;
+                            state.salary = 0;
+                            state.jobTitle = "Student";
 
-            if (path === "STEM") {
-                enrollInProgram("STEM_BASE");
-            } else if (path === "Humanities") {
-                enrollInProgram("HUMANITIES_BASE");
-            } else {
-                enrollInProgram("TRADES_BASE");
-            }
-            state.happinessZeroStreakYears = 0;
+                            if (path === "STEM") {
+                                enrollInProgram("STEM_BASE");
+                            } else if (path === "Humanities") {
+                                enrollInProgram("HUMANITIES_BASE");
+                            } else {
+                                enrollInProgram("TRADES_BASE");
+                            }
+                            state.happinessZeroStreakYears = 0;
 
-            setupScreen.style.display = "none";
-            gameUI.style.display = "flex";
-            syncFinancialAliases();
-            generateRealEstateMarket();
+                            setupScreen.style.display = "none";
+                            gameUI.style.display = "flex";
+                            syncFinancialAliases();
+                            generateRealEstateMarket();
 
-            logEvent("You chose the " + path + " path. Your education journey begins.");
-            updateUI();
+                            logEvent("You chose the " + path + " path. Your education journey begins.");
+                            updateUI();
+                        }
+                    }
+                ]
+            );
         }
 
         document.querySelectorAll(".major-btn").forEach(function (btn) {
