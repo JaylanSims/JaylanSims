@@ -381,20 +381,17 @@
             <h1 class="title">BitBalance: ROI vs. Passion</h1>
             <p class="subtitle">Choose your path and survive year by year. Build wealth without sacrificing your life.</p>
             <div class="major-grid">
-                <button class="major-btn" data-major="finance">
-                    <strong>Finance</strong>
-                    Debt: $60,000 · Salary: $85,000 · Smarts: 80<br>
-                    Trait: Every year Health -5, Happiness -10
+                <button class="major-btn" data-path="STEM">
+                    <strong>STEM</strong>
+                    Build a technical foundation in science, engineering, and analytics.
                 </button>
-                <button class="major-btn" data-major="arts">
-                    <strong>Arts</strong>
-                    Debt: $40,000 · Salary: $30,000 · Smarts: 60<br>
-                    Trait: Every year Health -2, Happiness -2, and if Happiness &gt; 85 then Salary +10%
+                <button class="major-btn" data-path="Humanities">
+                    <strong>Humanities</strong>
+                    Focus on communication, design, culture, and people-centered careers.
                 </button>
-                <button class="major-btn" data-major="trades">
+                <button class="major-btn" data-path="Trades">
                     <strong>Trades</strong>
-                    Debt: $5,000 · Salary: $55,000 · Smarts: 50<br>
-                    Trait: Every year Health -8, Happiness -3
+                    Train in practical, high-demand skilled work with hands-on expertise.
                 </button>
             </div>
         </div>
@@ -430,10 +427,10 @@
             </div>
 
             <nav id="bottom-nav">
-                <button class="nav-btn" id="career-nav-btn">Career</button>
+                <button class="nav-btn" id="education-nav-btn">Education</button>
+                <button class="nav-btn" id="careers-nav-btn">Careers</button>
                 <button class="nav-btn" id="activities-nav-btn">Activities</button>
                 <button class="nav-btn" id="assets-nav-btn">Assets</button>
-                <button class="nav-btn" id="relationships-nav-btn">Relationships</button>
             </nav>
         </div>
 
@@ -457,10 +454,12 @@
     <script>
         let state = {
             age: 18, health: 100, happiness: 100, smarts: 50,
-            cash: 0, investments: 0, debt: 0, salary: 0, expenses: 25000, annualExpenses: 25000, bankBalance: 0,
+            cash: 5000, investments: 0, debt: 0, salary: 0, expenses: 25000, annualExpenses: 25000, bankBalance: 5000,
             major: null, isDead: false, currentIllnesses: [], illnessYears: {},
             ownedAssets: [], realEstateListings: [], nextPropertyId: 1, nextListingId: 1,
-            currentHousingMarketShift: 0, currentHousingMarketEvent: "stable"
+            currentHousingMarketShift: 0, currentHousingMarketEvent: "stable",
+            playerPath: null, annualIncome: 0, educationLevel: "None", yearsInSchool: 0,
+            currentlyPursuing: null, educationCredentials: [], jobTitle: "Unemployed"
         };
 
         const setupScreen = document.getElementById("setup-screen");
@@ -553,6 +552,76 @@
                 ]
             }
         ];
+
+        const PATH_BASE_PROGRAM = {
+            STEM: "STEM_BASE",
+            Humanities: "HUMANITIES_BASE",
+            Trades: "TRADES_BASE"
+        };
+
+        const EDUCATION_PROGRAMS = {
+            STEM_BASE: { path: "STEM", degreeName: "BS in STEM", yearsRequired: 4, educationLevel: "BS in STEM", credentials: ["Bachelor's Degree"] },
+            HUMANITIES_BASE: { path: "Humanities", degreeName: "BA in Humanities", yearsRequired: 4, educationLevel: "BA in Humanities", credentials: ["Bachelor's Degree"] },
+            TRADES_BASE: { path: "Trades", degreeName: "Trade Certificate", yearsRequired: 4, educationLevel: "Trade Certificate", credentials: ["Trade Certificate"] },
+            STEM_MASTERS: { path: "STEM", degreeName: "Master's Degree", yearsRequired: 2, educationLevel: "Master's Degree", credentials: ["Bachelor's Degree", "Master's Degree"] },
+            STEM_MEDICAL: { path: "STEM", degreeName: "Medical Degree", yearsRequired: 4, educationLevel: "Medical Degree", credentials: ["Bachelor's Degree", "Master's Degree", "Medical Degree", "Doctorate"] },
+            HUMANITIES_MASTERS: { path: "Humanities", degreeName: "Master's Degree", yearsRequired: 2, educationLevel: "Master's Degree", credentials: ["Bachelor's Degree", "Master's Degree"] },
+            HUMANITIES_LAW: { path: "Humanities", degreeName: "Law Degree", yearsRequired: 3, educationLevel: "Law Degree", credentials: ["Bachelor's Degree", "Law Degree"] }
+        };
+
+        const JOB_MARKET = {
+            STEM: [
+                { title: "Neurosurgeon", salary: 239200, requiredEducation: "Medical Degree" },
+                { title: "Physician (General)", salary: 208000, requiredEducation: "Medical Degree" },
+                { title: "Machine Learning Engineer", salary: 167000, requiredEducation: "Master's Degree" },
+                { title: "Software Architect", salary: 158000, requiredEducation: "Master's Degree" },
+                { title: "Aerospace Engineer", salary: 135800, requiredEducation: "Bachelor's Degree" },
+                { title: "Data Scientist", salary: 132000, requiredEducation: "Master's Degree" },
+                { title: "Petroleum Engineer", salary: 131800, requiredEducation: "Bachelor's Degree" },
+                { title: "Pharmacist", salary: 128710, requiredEducation: "Medical Degree/Doctorate" },
+                { title: "Nuclear Engineer", salary: 124300, requiredEducation: "Master's Degree" },
+                { title: "Actuary", salary: 120000, requiredEducation: "Bachelor's Degree" },
+                { title: "Chemical Engineer", salary: 114820, requiredEducation: "Bachelor's Degree" },
+                { title: "Cybersecurity Analyst", salary: 112000, requiredEducation: "Bachelor's Degree" },
+                { title: "Statistician", salary: 108700, requiredEducation: "Master's Degree" },
+                { title: "Environmental Engineer", salary: 103220, requiredEducation: "Bachelor's Degree" },
+                { title: "Biomedical Engineer", salary: 100730, requiredEducation: "Bachelor's Degree" }
+            ],
+            Humanities: [
+                { title: "Entertainment Lawyer", salary: 135000, requiredEducation: "Law Degree" },
+                { title: "Public Relations Manager", salary: 125780, requiredEducation: "Bachelor's Degree" },
+                { title: "Art Director", salary: 106500, requiredEducation: "Bachelor's Degree" },
+                { title: "UX/UI Designer", salary: 99000, requiredEducation: "Bachelor's Degree" },
+                { title: "Technical Writer", salary: 79960, requiredEducation: "Bachelor's Degree" },
+                { title: "Film/TV Producer", salary: 76400, requiredEducation: "Bachelor's Degree" },
+                { title: "Editor (Books/Magazines)", salary: 72150, requiredEducation: "Bachelor's Degree" },
+                { title: "Social Media Manager", salary: 64000, requiredEducation: "Bachelor's Degree" },
+                { title: "Copywriter", salary: 63200, requiredEducation: "Bachelor's Degree" },
+                { title: "High School Teacher", salary: 62360, requiredEducation: "Bachelor's Degree" },
+                { title: "Librarian", salary: 61190, requiredEducation: "Master's Degree" },
+                { title: "Graphic Designer", salary: 58910, requiredEducation: "Bachelor's Degree" },
+                { title: "Museum Curator", salary: 58820, requiredEducation: "Master's Degree" },
+                { title: "Translator/Interpreter", salary: 57090, requiredEducation: "Bachelor's Degree" },
+                { title: "Journalist/Reporter", salary: 55960, requiredEducation: "Bachelor's Degree" }
+            ],
+            Trades: [
+                { title: "Elevator Installer & Repairer", salary: 97860, requiredEducation: "Trade Certificate" },
+                { title: "Electrical Power Line Installer", salary: 85420, requiredEducation: "Trade Certificate" },
+                { title: "Radiation Therapist", salary: 82790, requiredEducation: "Trade Certificate" },
+                { title: "Boilermaker", salary: 66920, requiredEducation: "Trade Certificate" },
+                { title: "Industrial Pipefitter", salary: 63100, requiredEducation: "Trade Certificate" },
+                { title: "Plumber", salary: 61550, requiredEducation: "Trade Certificate" },
+                { title: "Electrician", salary: 60240, requiredEducation: "Trade Certificate" },
+                { title: "Millwright", salary: 59800, requiredEducation: "Trade Certificate" },
+                { title: "Brickmason", salary: 58430, requiredEducation: "Trade Certificate" },
+                { title: "HVAC Technician", salary: 57300, requiredEducation: "Trade Certificate" },
+                { title: "Diesel Mechanic", salary: 54360, requiredEducation: "Trade Certificate" },
+                { title: "Heavy Equipment Operator", salary: 52230, requiredEducation: "Trade Certificate" },
+                { title: "Carpenter", salary: 51390, requiredEducation: "Trade Certificate" },
+                { title: "Welder", salary: 47540, requiredEducation: "Trade Certificate" },
+                { title: "Automotive Technician", salary: 46840, requiredEducation: "Trade Certificate" }
+            ]
+        };
 
         const DISEASES = {
             commonCold: {
@@ -840,6 +909,203 @@
 
         function closeModal() {
             modalOverlay.style.display = "none";
+        }
+
+        function addCredential(credential) {
+            if (!state.educationCredentials.includes(credential)) {
+                state.educationCredentials.push(credential);
+            }
+        }
+
+        function meetsEducationRequirement(requiredEducation) {
+            const creds = state.educationCredentials;
+            if (requiredEducation === "Trade Certificate") {
+                return creds.includes("Trade Certificate");
+            }
+            if (requiredEducation === "Bachelor's Degree") {
+                return creds.includes("Bachelor's Degree") || creds.includes("Master's Degree") || creds.includes("Medical Degree") || creds.includes("Law Degree") || creds.includes("Doctorate");
+            }
+            if (requiredEducation === "Master's Degree") {
+                return creds.includes("Master's Degree") || creds.includes("Medical Degree") || creds.includes("Doctorate");
+            }
+            if (requiredEducation === "Medical Degree") {
+                return creds.includes("Medical Degree") || creds.includes("Doctorate");
+            }
+            if (requiredEducation === "Medical Degree/Doctorate") {
+                return creds.includes("MedicalDegree") || creds.includes("Medical Degree") || creds.includes("Doctorate");
+            }
+            if (requiredEducation === "Law Degree") {
+                return creds.includes("Law Degree");
+            }
+            return state.educationLevel === requiredEducation;
+        }
+
+        function getHireChance() {
+            if (state.playerPath === "Trades") {
+                return 0.75 + Math.random() * 0.15;
+            }
+            if (state.playerPath === "STEM") {
+                return 0.50 + Math.random() * 0.20;
+            }
+            return 0.15 + Math.random() * 0.15;
+        }
+
+        function applyForJob(job) {
+            const chance = getHireChance();
+            if (Math.random() < chance) {
+                state.annualIncome = job.salary;
+                state.jobTitle = job.title;
+                state.salary = job.salary;
+                alert("You were hired as a " + job.title + " earning " + formatMoney(job.salary) + " a year!");
+                logEvent("You were hired as a " + job.title + ".");
+            } else {
+                alert("Your application for the " + job.title + " position was rejected. The job market is tough. Keep trying!");
+                logEvent("Your application was rejected for " + job.title + ".");
+            }
+            closeModal();
+            updateUI();
+        }
+
+        function openJobBoard() {
+            const jobs = JOB_MARKET[state.playerPath] || [];
+            const actions = jobs.map(function (job) {
+                const eligible = meetsEducationRequirement(job.requiredEducation);
+                return {
+                    label: eligible
+                        ? "Apply: " + job.title + " — " + formatMoney(job.salary)
+                        : job.title + " — Requires " + job.requiredEducation,
+                    disabled: !eligible,
+                    handler: function () {
+                        if (!eligible) return;
+                        applyForJob(job);
+                    }
+                };
+            });
+            actions.push({ label: "Close", handler: function () { closeModal(); } });
+            openModal("Find a Job", "Career opportunities for the " + state.playerPath + " path.", actions);
+        }
+
+        function openCareersTab() {
+            openModal(
+                "Careers",
+                "Current Job: " + state.jobTitle + " | Annual Income: " + formatMoney(state.annualIncome),
+                [
+                    { label: "Find a Job", handler: function () { openJobBoard(); } },
+                    { label: "Close", handler: function () { closeModal(); } }
+                ]
+            );
+        }
+
+        function enrollInProgram(programKey) {
+            const program = EDUCATION_PROGRAMS[programKey];
+            if (!program) return;
+            state.currentlyPursuing = programKey;
+            state.yearsInSchool = 0;
+            state.annualIncome = 0;
+            state.salary = 0;
+            state.jobTitle = "Student";
+            logEvent("You enrolled in " + program.degreeName + ".");
+            updateUI();
+        }
+
+        function takeGapYear() {
+            if (state.isDead) return;
+            state.age += 1;
+            state.annualIncome = 0;
+            state.salary = 0;
+            state.bankBalance -= state.annualExpenses;
+            state.cash = state.bankBalance;
+            state.happiness += 10;
+            state.health -= 1;
+            logEvent("You spent a year traveling and discovering yourself.");
+            alert("You spent a year traveling and discovering yourself.");
+            updateUI();
+        }
+
+        function openHigherEducationMenu() {
+            if (state.playerPath === "Trades") return;
+            const actions = [];
+            if (state.playerPath === "STEM") {
+                actions.push({ label: "Master's Degree (2 years)", handler: function () { closeModal(); enrollInProgram("STEM_MASTERS"); } });
+                actions.push({ label: "Medical School / Doctorate (4 years)", handler: function () { closeModal(); enrollInProgram("STEM_MEDICAL"); } });
+            } else {
+                actions.push({ label: "Master's Degree (2 years)", handler: function () { closeModal(); enrollInProgram("HUMANITIES_MASTERS"); } });
+                actions.push({ label: "Law School (3 years)", handler: function () { closeModal(); enrollInProgram("HUMANITIES_LAW"); } });
+            }
+            actions.push({ label: "Cancel", handler: function () { closeModal(); } });
+            openModal("Earn More Education", "Choose your next degree.", actions);
+        }
+
+        function completeProgram(programKey) {
+            const program = EDUCATION_PROGRAMS[programKey];
+            if (!program) return;
+            state.currentlyPursuing = null;
+            state.yearsInSchool = 0;
+            state.educationLevel = program.educationLevel;
+            program.credentials.forEach(addCredential);
+            logEvent("Graduation: You earned " + program.degreeName + ".");
+
+            const actions = [
+                {
+                    label: "Find a Job",
+                    handler: function () {
+                        closeModal();
+                        openCareersTab();
+                    }
+                },
+                {
+                    label: "Take a Gap Year",
+                    handler: function () {
+                        closeModal();
+                        takeGapYear();
+                    }
+                }
+            ];
+            if (state.playerPath !== "Trades") {
+                actions.push({
+                    label: "Earn More Education",
+                    handler: function () {
+                        closeModal();
+                        openHigherEducationMenu();
+                    }
+                });
+            }
+
+            openModal(
+                "Congratulations! 🎉",
+                "After years of hard work, you have officially graduated with your " + program.degreeName + "!",
+                actions
+            );
+            updateUI();
+        }
+
+        function openEducationTab() {
+            const program = state.currentlyPursuing ? EDUCATION_PROGRAMS[state.currentlyPursuing] : null;
+            const progress = program
+                ? "Currently pursuing: " + program.degreeName + " (" + state.yearsInSchool + "/" + program.yearsRequired + " years)"
+                : "You are not currently enrolled in school.";
+
+            const actions = [
+                {
+                    label: "Age Up +1 Year",
+                    handler: function () {
+                        closeModal();
+                        ageUp();
+                    }
+                },
+                {
+                    label: "Close",
+                    handler: function () {
+                        closeModal();
+                    }
+                }
+            ];
+
+            openModal(
+                "Education",
+                "Path: " + state.playerPath + " | Education Level: " + state.educationLevel + ". " + progress,
+                actions
+            );
         }
 
         function syncFinancialAliases() {
@@ -1578,43 +1844,55 @@
         }
 
         function ageUp() {
-            if (state.isDead || !state.major) return;
+            if (state.isDead || !state.playerPath) return;
 
-            state.age++;
+            state.age += 1;
+            state.cash -= state.annualExpenses;
+            state.health -= 1;
+            state.happiness -= 1;
 
-            if (state.major === "finance") {
-                state.health -= 5;
-                state.happiness -= 10;
-            } else if (state.major === "arts") {
-                state.health -= 2;
-                state.happiness -= 2;
-                if (state.happiness > 85) {
-                    state.salary *= 1.10;
+            if (state.currentlyPursuing) {
+                const program = EDUCATION_PROGRAMS[state.currentlyPursuing];
+                state.annualIncome = 0;
+                state.salary = 0;
+                state.jobTitle = "Student";
+                state.yearsInSchool += 1;
+                state.smarts += 2;
+                state.happiness -= 1;
+
+                logEvent(
+                    "Age " + state.age + ": School year " + state.yearsInSchool + "/" +
+                    program.yearsRequired + " in " + program.degreeName + "."
+                );
+
+                syncFinancialAliases();
+                if (state.health <= 0) {
+                    onPlayerDeath(GENERIC_HEALTH_DEATH_MESSAGE);
+                    return;
                 }
-            } else if (state.major === "trades") {
-                state.health -= 8;
-                state.happiness -= 3;
+
+                if (state.yearsInSchool >= program.yearsRequired) {
+                    completeProgram(state.currentlyPursuing);
+                    return;
+                }
+
+                updateUI();
+                return;
             }
 
-            let netIncome = state.salary * 0.75;
-
-            state.debt *= 1.06;
-            if (state.debt > 0) {
-                let payment = netIncome * 0.15;
-                state.debt -= payment;
-                netIncome -= payment;
-                if (state.debt < 0) {
-                    state.debt = 0;
-                }
-            }
-
-            state.cash += (netIncome - state.annualExpenses);
+            const netIncome = state.annualIncome * 0.75;
+            state.cash += netIncome;
+            state.salary = state.annualIncome;
             syncFinancialAliases();
+
+            if (state.annualIncome > 0) {
+                logEvent("Age " + state.age + ": You worked as " + state.jobTitle + " and took home " + formatMoney(netIncome) + " after taxes.");
+            } else {
+                logEvent("Age " + state.age + ": You had no income this year.");
+            }
 
             state.investments *= (1 + (Math.random() * 0.25 - 0.10));
             applyHousingMarketForYear();
-
-            logEvent("Age " + state.age + ": You lived another year.");
 
             if (processIllnessesForYear()) {
                 return;
@@ -1622,28 +1900,26 @@
             maybeContractDisease();
 
             if (state.health <= 0) {
-                onPlayerDeath();
+                onPlayerDeath(GENERIC_HEALTH_DEATH_MESSAGE);
                 return;
             }
 
             triggerProceduralYearEvents();
         }
 
-        function chooseMajor(major) {
-            state.major = major;
+        function choosePath(path) {
+            state.playerPath = path;
+            state.major = path;
+            state.annualIncome = 0;
+            state.salary = 0;
+            state.jobTitle = "Student";
 
-            if (major === "finance") {
-                state.debt = 60000;
-                state.salary = 85000;
-                state.smarts = 80;
-            } else if (major === "arts") {
-                state.debt = 40000;
-                state.salary = 30000;
-                state.smarts = 60;
-            } else if (major === "trades") {
-                state.debt = 5000;
-                state.salary = 55000;
-                state.smarts = 50;
+            if (path === "STEM") {
+                enrollInProgram("STEM_BASE");
+            } else if (path === "Humanities") {
+                enrollInProgram("HUMANITIES_BASE");
+            } else {
+                enrollInProgram("TRADES_BASE");
             }
 
             setupScreen.style.display = "none";
@@ -1651,28 +1927,28 @@
             syncFinancialAliases();
             generateRealEstateMarket();
 
-            logEvent("You chose " + major.charAt(0).toUpperCase() + major.slice(1) + ". Your adult life begins at age 18.");
+            logEvent("You chose the " + path + " path. Your education journey begins.");
             updateUI();
         }
 
         document.querySelectorAll(".major-btn").forEach(function (btn) {
             btn.addEventListener("click", function () {
-                chooseMajor(btn.dataset.major);
+                choosePath(btn.dataset.path);
             });
         });
 
         document.getElementById("age-up-btn").addEventListener("click", ageUp);
-        document.getElementById("career-nav-btn").addEventListener("click", function () {
-            if (!state.isDead && state.major) openCareerMenu();
+        document.getElementById("education-nav-btn").addEventListener("click", function () {
+            if (!state.isDead && state.playerPath) openEducationTab();
+        });
+        document.getElementById("careers-nav-btn").addEventListener("click", function () {
+            if (!state.isDead && state.playerPath) openCareersTab();
         });
         document.getElementById("activities-nav-btn").addEventListener("click", function () {
-            if (!state.isDead && state.major) openActivitiesMenu();
+            if (!state.isDead && state.playerPath) openActivitiesMenu();
         });
         document.getElementById("assets-nav-btn").addEventListener("click", function () {
-            if (!state.isDead && state.major) openAssetsMenu();
-        });
-        document.getElementById("relationships-nav-btn").addEventListener("click", function () {
-            if (!state.isDead && state.major) openRelationshipsMenu();
+            if (!state.isDead && state.playerPath) openAssetsMenu();
         });
         document.getElementById("play-again-btn").addEventListener("click", function () {
             location.reload();
