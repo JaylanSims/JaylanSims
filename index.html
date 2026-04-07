@@ -425,6 +425,20 @@
             background: #666;
         }
 
+        .modal-actions-scroll--activities {
+            max-height: 60vh;
+        }
+
+        .modal-activity-header {
+            margin: 6px 0 4px;
+            padding: 6px 0 4px;
+            font-size: 0.82rem;
+            font-weight: 700;
+            color: #90caf9;
+            border-bottom: 1px solid #333;
+            text-align: left;
+        }
+
         .modal-actions-footer {
             display: flex;
             flex-direction: column;
@@ -997,6 +1011,80 @@
             background: #3d1a1a;
         }
 
+        #date-trivia-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 10010;
+            background: rgba(28, 12, 32, 0.97);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        #date-trivia-overlay.open {
+            display: flex;
+        }
+
+        .date-trivia-desk {
+            width: 100%;
+            max-width: 520px;
+            border-radius: 16px;
+            border: 1px solid #ad1457;
+            background: linear-gradient(180deg, #2d1a2e 0%, #1a1220 100%);
+            box-shadow: 0 20px 50px rgba(173, 20, 87, 0.2);
+            padding: 20px 18px;
+        }
+
+        .date-trivia-desk h2 {
+            margin: 0 0 6px;
+            font-size: 1.15rem;
+            color: #f48fb1;
+            text-align: center;
+        }
+
+        .date-trivia-desk .date-trivia-sub {
+            text-align: center;
+            font-size: 0.8rem;
+            color: #ce93d8;
+            margin-bottom: 14px;
+        }
+
+        .date-trivia-desk .date-trivia-q {
+            margin: 0 0 14px;
+            line-height: 1.45;
+            color: #fce4ec;
+            font-size: 0.96rem;
+        }
+
+        .date-trivia-option {
+            width: 100%;
+            text-align: left;
+            padding: 11px 13px;
+            margin-bottom: 8px;
+            border-radius: 10px;
+            border: 1px solid #6a1b9a;
+            background: #251428;
+            color: #fff;
+            font-size: 0.9rem;
+            cursor: pointer;
+        }
+
+        .date-trivia-option.correct {
+            border-color: #43a047;
+            background: #1b3d1f;
+        }
+
+        .date-trivia-option.wrong {
+            border-color: #c62828;
+            background: #3d1a1a;
+        }
+
         #fired-overlay {
             position: fixed;
             top: 0;
@@ -1305,6 +1393,7 @@
     <div id="career-exam-react-root"></div>
     <div id="fired-overlay-root"></div>
     <div id="retirement-overlay-root"></div>
+    <div id="date-trivia-react-root"></div>
     <div id="eviction-overlay-root"></div>
     <div id="app-container">
         <div id="intro-screen">
@@ -1475,7 +1564,11 @@
             hasDeclinedRetirement: false,
             isRetirementOverlayOpen: false,
             pendingRetirementPensionOffer: 0,
-            retirementInterceptSkipsAgeTick: false
+            retirementInterceptSkipsAgeTick: false,
+            isDateTriviaOpen: false,
+            currentDateTriviaQuestion: null,
+            dateTriviaSelectedIndex: null,
+            dateTriviaShowFeedback: false
         };
 
         const RENTAL_LISTINGS = [
@@ -1519,6 +1612,8 @@
         let firedOverlayReactRoot = null;
         const retirementOverlayMount = document.getElementById("retirement-overlay-root");
         let retirementOverlayReactRoot = null;
+        const dateTriviaReactMount = document.getElementById("date-trivia-react-root");
+        let dateTriviaReactRoot = null;
         const evictionOverlayMount = document.getElementById("eviction-overlay-root");
         let evictionOverlayReactRoot = null;
         let higherEdCatalogRoot = null;
@@ -2075,6 +2170,31 @@
         Object.keys(CAREER_EXAM_BANKS_RAW).forEach(function (pathKey) {
             CAREER_EXAM_BANKS[pathKey] = CAREER_EXAM_BANKS_RAW[pathKey].map(normalizeExamQuestionEntry);
         });
+
+        const DATE_TRIVIA_BANK_RAW = [
+            { question: "Sustained eye contact during conversation on a first date most often signals what?", options: ["Mutual interest and engagement", "Boredom and distraction", "Aggression", "Sleepiness"], correctAnswer: "Mutual interest and engagement" },
+            { question: "In the 'Five Love Languages,' what does 'Physical Touch' primarily refer to?", options: ["Expressing affection through hugs, hand-holding, and closeness", "Buying expensive gifts", "Doing chores silently", "Only texting good morning"], correctAnswer: "Expressing affection through hugs, hand-holding, and closeness" },
+            { question: "In modern dating, what does 'ghosting' mean?", options: ["Suddenly ending all communication without explanation", "Planning a surprise party", "Introducing you to parents", "Going on a hiking date"], correctAnswer: "Suddenly ending all communication without explanation" },
+            { question: "Which statement about who pays on a first date is most reasonable?", options: ["There is no universal rule—communication and context matter", "The taller person always pays", "Whoever speaks first pays", "Only cryptocurrency is acceptable"], correctAnswer: "There is no universal rule—communication and context matter" },
+            { question: "A healthy sign that both people want a second date is usually what?", options: ["Both clearly express interest in meeting again", "One person leaves without a word", "They argue about politics loudly", "They block each other online"], correctAnswer: "Both clearly express interest in meeting again" },
+            { question: "If your date crosses their arms tightly across their chest, what does this body language usually imply?", options: ["They feel defensive, closed off, or uncomfortable", "They are cold and need a jacket only", "They are ready to hug you", "They are calculating the tip"], correctAnswer: "They feel defensive, closed off, or uncomfortable" },
+            { question: "What is considered a major 'red flag' regarding how a date treats service staff?", options: ["Being rude or condescending to the waiter", "Saying please and thank you", "Ordering water first", "Asking for substitutions politely"], correctAnswer: "Being rude or condescending to the waiter" },
+            { question: "In relationship psychology, what does 'mirroring' refer to?", options: ["Subconsciously copying the other person's posture to build rapport", "Copying their order exactly", "Wearing matching outfits", "Repeating everything they say word for word"], correctAnswer: "Subconsciously copying the other person's posture to build rapport" },
+            { question: "When resolving a conflict, it is healthier to use statements starting with which word?", options: ['"I" — e.g., "I feel upset when..."', '"You" — e.g., "You always..."', '"They" — blaming a third party', '"Whatever" — dismissive'], correctAnswer: '"I" — e.g., "I feel upset when..."' },
+            { question: "What is 'phubbing' on a date?", options: ["Ignoring your date to look at your phone", "Public hugging", "Paying the bill secretly", "Bringing a friend without notice"], correctAnswer: "Ignoring your date to look at your phone" },
+            { question: "According to attachment theory, someone who constantly fears abandonment has which attachment style?", options: ["Anxious", "Secure", "Dismissive-avoidant only if happy", "Food-motivated"], correctAnswer: "Anxious" },
+            { question: "What is the traditional gift material for a 1st wedding anniversary?", options: ["Paper", "Gold", "Diamond", "Leather (always wrong for year one)"], correctAnswer: "Paper" },
+            { question: "If your date says they need to 'powder their nose', where are they going?", options: ["To the restroom", "To the kitchen", "To buy powder", "To call their ex"], correctAnswer: "To the restroom" },
+            { question: "What is the term for showering someone with excessive affection early on to manipulate them later?", options: ["Love bombing", "Slow dating", "Benching", "Cushioning"], correctAnswer: "Love bombing" },
+            { question: "Which of these is generally considered a safe, engaging topic for a first date?", options: ["Travel and hobbies", "Your entire relationship history in detail", "Controversial conspiracy theories", "Criticizing their family"], correctAnswer: "Travel and hobbies" },
+            { question: "What does it mean if someone asks for a 'rain check' on a date?", options: ["They are canceling but want to reschedule", "They want to meet in the rain", "They dislike umbrellas", "They are moving away forever"], correctAnswer: "They are canceling but want to reschedule" },
+            { question: "In conversation, what is the best way to show you are actively listening?", options: ["Asking relevant follow-up questions", "Staring at the wall", "Interrupting with your story immediately", "Checking stocks on your watch"], correctAnswer: "Asking relevant follow-up questions" },
+            { question: "If you are dining out, on which side of the plate do the forks go?", options: ["The left side", "The right side", "Above the plate only", "Under the table"], correctAnswer: "The left side" },
+            { question: "What is 'gaslighting' in a relationship?", options: ["Manipulating someone into doubting their own reality", "Cooking dinner together", "Sharing gas money", "Honest feedback"], correctAnswer: "Manipulating someone into doubting their own reality" },
+            { question: "If you want to casually break the touch barrier on a date, what is the safest approach?", options: ["A brief touch on the forearm while laughing", "A surprise hug from behind", "Tickling aggressively", "Holding their phone"], correctAnswer: "A brief touch on the forearm while laughing" }
+        ];
+
+        const DATE_TRIVIA_BANK = DATE_TRIVIA_BANK_RAW.map(normalizeExamQuestionEntry);
 
         const DISEASES = {
             commonCold: {
@@ -2739,6 +2859,9 @@
             if (typeof effects.happiness === "number" && effects.happiness !== 0) {
                 parts.push((effects.happiness > 0 ? "+" : "") + effects.happiness + " Happiness");
             }
+            if (typeof effects.smarts === "number" && effects.smarts !== 0) {
+                parts.push((effects.smarts > 0 ? "+" : "") + effects.smarts + " Smarts");
+            }
             if (effects.death === true) {
                 parts.push("Fatal");
             }
@@ -2747,7 +2870,7 @@
 
         function openModal(title, description, actions, options) {
             options = options || {};
-            if (state.isExamModalOpen || state.isExamActive || state.isDiagnosisOverlayOpen || state.isPromotionOverlayOpen || state.isPerformanceReviewOverlayOpen || state.isCareerExamOpen || state.isFiredOverlayOpen || state.isRetirementOverlayOpen || state.isEvictionOverlayOpen) return;
+            if (state.isExamModalOpen || state.isExamActive || state.isDiagnosisOverlayOpen || state.isPromotionOverlayOpen || state.isPerformanceReviewOverlayOpen || state.isCareerExamOpen || state.isFiredOverlayOpen || state.isRetirementOverlayOpen || state.isDateTriviaOpen || state.isEvictionOverlayOpen) return;
             if (higherEdCatalogRoot) {
                 higherEdCatalogRoot.render(null);
             }
@@ -2756,11 +2879,12 @@
             modalActions.innerHTML = "";
 
             var scrollJobList = options.scrollJobActions === true;
+            var scrollActivities = options.scrollActivities === true;
             var scrollHost = modalActions;
             var footerHost = null;
-            if (scrollJobList && actions.length > 1) {
+            if ((scrollJobList || scrollActivities) && actions.length > 1) {
                 var scrollWrap = document.createElement("div");
-                scrollWrap.className = "modal-actions-scroll";
+                scrollWrap.className = "modal-actions-scroll" + (scrollActivities ? " modal-actions-scroll--activities" : "");
                 var footerWrap = document.createElement("div");
                 footerWrap.className = "modal-actions-footer";
                 modalActions.appendChild(scrollWrap);
@@ -2770,6 +2894,14 @@
             }
 
             actions.forEach(function (action, idx) {
+                if (action.sectionHeader) {
+                    var hdr = document.createElement("div");
+                    hdr.className = "modal-activity-header";
+                    hdr.textContent = action.label;
+                    var hTarget = footerHost ? scrollHost : modalActions;
+                    hTarget.appendChild(hdr);
+                    return;
+                }
                 const btn = document.createElement("button");
                 btn.className = "modal-btn";
                 if (action.buttonVariant === "buyAfford") {
@@ -5246,6 +5378,107 @@
             closeModal();
         }
 
+        function closeDateTriviaOverlay() {
+            state.isDateTriviaOpen = false;
+            state.currentDateTriviaQuestion = null;
+            state.dateTriviaSelectedIndex = null;
+            state.dateTriviaShowFeedback = false;
+            if (dateTriviaReactRoot) {
+                dateTriviaReactRoot.render(null);
+            }
+        }
+
+        function renderDateTriviaOverlay() {
+            if (!dateTriviaReactMount) return;
+            if (!state.isDateTriviaOpen || !state.currentDateTriviaQuestion) {
+                if (dateTriviaReactRoot) dateTriviaReactRoot.render(null);
+                return;
+            }
+            if (!dateTriviaReactRoot) {
+                dateTriviaReactRoot = ReactDOM.createRoot(dateTriviaReactMount);
+            }
+            dateTriviaReactRoot.render(
+                <DateTriviaOverlay
+                    question={state.currentDateTriviaQuestion}
+                    selectedIndex={state.dateTriviaSelectedIndex}
+                    showFeedback={state.dateTriviaShowFeedback}
+                    onSelect={handleDateTriviaAnswer}
+                />
+            );
+        }
+
+        function DateTriviaOverlay(props) {
+            var q = props.question;
+            if (!q) return null;
+            return (
+                <div id="date-trivia-overlay" className="open" role="dialog" aria-modal="true" aria-label="Date trivia">
+                    <div className="date-trivia-desk">
+                        <h2>DATE NIGHT TRIVIA 💕</h2>
+                        <div className="date-trivia-sub">Charm your date — answer thoughtfully!</div>
+                        <p className="date-trivia-q">{q.question}</p>
+                        <div>
+                            {q.options.map(function (opt, i) {
+                                var cls = "date-trivia-option";
+                                if (props.showFeedback) {
+                                    if (i === q.correctAnswerIndex) cls += " correct";
+                                    else if (i === props.selectedIndex) cls += " wrong";
+                                }
+                                return (
+                                    <button
+                                        key={i}
+                                        type="button"
+                                        className={cls}
+                                        disabled={props.showFeedback}
+                                        onClick={function () { props.onSelect(i); }}
+                                    >
+                                        {opt}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        function openDateTriviaAfterDateNightPayment() {
+            if (!DATE_TRIVIA_BANK.length) return;
+            var q = DATE_TRIVIA_BANK[Math.floor(Math.random() * DATE_TRIVIA_BANK.length)];
+            state.currentDateTriviaQuestion = {
+                question: q.question,
+                options: q.options.slice(),
+                correctAnswerIndex: q.correctAnswerIndex
+            };
+            state.dateTriviaSelectedIndex = null;
+            state.dateTriviaShowFeedback = false;
+            state.isDateTriviaOpen = true;
+            renderDateTriviaOverlay();
+            updateUI();
+        }
+
+        function handleDateTriviaAnswer(selectedIndex) {
+            if (!state.isDateTriviaOpen || !state.currentDateTriviaQuestion) return;
+            var q = state.currentDateTriviaQuestion;
+            var correct = selectedIndex === q.correctAnswerIndex;
+            state.dateTriviaSelectedIndex = selectedIndex;
+            state.dateTriviaShowFeedback = true;
+            renderDateTriviaOverlay();
+            window.setTimeout(function () {
+                if (correct) {
+                    state.happiness += 25;
+                    showPurchaseToastMessage("They are impressed — sparks are flying!");
+                    logEvent("Date trivia: great answer (+25 Happiness).");
+                } else {
+                    state.happiness += 10;
+                    showPurchaseToastMessage("Awkward moment, but the night still had its moments.");
+                    logEvent("Date trivia: miss (+10 Happiness).");
+                }
+                closeDateTriviaOverlay();
+                state.happiness = clampStat(state.happiness);
+                updateUI();
+            }, EXAM_FEEDBACK_DELAY_MS);
+        }
+
         function getCureRecoveryAmount(disease) {
             const base = Math.max(2, disease.annualHealthDrain);
             const minRecovery = Math.max(2, Math.floor(base * 0.8));
@@ -5442,41 +5675,148 @@
             ]);
         }
 
+        function runLifestyleActivity(cost, effects, logMessage) {
+            if (state.isDead) return;
+            var c = typeof cost === "number" ? cost : 0;
+            if (c > 0 && state.cash < c) {
+                logEvent("You couldn't afford that activity.");
+                return;
+            }
+            if (c > 0) {
+                state.cash -= c;
+            }
+            if (effects && typeof effects.health === "number") {
+                state.health += effects.health;
+            }
+            if (effects && typeof effects.happiness === "number") {
+                state.happiness += effects.happiness;
+            }
+            if (effects && typeof effects.smarts === "number") {
+                state.smarts += effects.smarts;
+            }
+            logEvent(logMessage);
+            state.health = clampStat(state.health);
+            state.happiness = clampStat(state.happiness);
+            state.smarts = clampStat(state.smarts);
+            syncFinancialAliases();
+            if (state.health <= 0) {
+                onPlayerDeath();
+                return;
+            }
+            updateUI();
+            closeModal();
+        }
+
+        function lifestyleActionLabel(title, cost, effects) {
+            var e = Object.assign({}, effects || {});
+            if (cost > 0) {
+                e.cash = -cost;
+            }
+            var summary = describeEffects(e);
+            var price = cost > 0 ? formatMoney(cost) : "Free";
+            return title + " (" + price + ")" + (summary !== "No immediate change" ? " — " + summary : "");
+        }
+
         function openActivitiesMenu() {
-            openModal("Activities", "Spend resources to recover your life stats.", [
+            var actions = [
+                { sectionHeader: true, label: "Health & Wellness" },
                 {
-                    label: "Therapy ($2k)",
+                    label: lifestyleActionLabel("Go Bouldering", 40, { health: 15, happiness: 5 }),
                     handler: function () {
-                        applyActionWithRefresh("You invested in therapy.", function () {
-                            if (state.cash >= 2000) {
-                                state.cash -= 2000;
-                                state.happiness += 25;
-                            } else {
-                                state.happiness += 5;
-                                logEvent("You couldn't afford a full session, but deciding to seek help still improved your mood.");
-                            }
-                        });
+                        runLifestyleActivity(40, { health: 15, happiness: 5 }, "Go Bouldering: a challenging full-body workout.");
                     }
                 },
                 {
-                    label: "Gym ($500)",
+                    label: lifestyleActionLabel("Book a Spa Day", 250, { health: 5, happiness: 30 }),
                     handler: function () {
-                        applyActionWithRefresh("You spent time at the gym.", function () {
-                            if (state.cash >= 500) {
-                                state.cash -= 500;
-                                state.health += 15;
-                            } else {
-                                logEvent("You couldn't afford the gym.");
-                            }
-                        });
+                        runLifestyleActivity(250, { health: 5, happiness: 30 }, "Spa day: deep tissue massage and sauna recovery.");
                     }
                 },
                 {
-                    label: "Read (Free)",
+                    label: lifestyleActionLabel("Try Acupuncture", 80, { health: 10 }),
                     handler: function () {
-                        applyActionWithRefresh("You read and learned something new.", function () {
-                            state.smarts += 5;
-                        });
+                        runLifestyleActivity(80, { health: 10 }, "Acupuncture: alternative medicine to relieve chronic tension.");
+                    }
+                },
+                {
+                    label: lifestyleActionLabel("Do a 3-Day Juice Cleanse", 150, { health: 15, happiness: -10 }),
+                    handler: function () {
+                        runLifestyleActivity(150, { health: 15, happiness: -10 }, "Juice cleanse: you feel purified, but you are incredibly cranky.");
+                    }
+                },
+                {
+                    label: lifestyleActionLabel("See a Therapist", 200, { health: 5, happiness: 25 }),
+                    handler: function () {
+                        runLifestyleActivity(200, { health: 5, happiness: 25 }, "Therapy: working through stress and trauma.");
+                    }
+                },
+                { sectionHeader: true, label: "Smarts & Enrichment" },
+                {
+                    label: lifestyleActionLabel("Attend a TED Talk", 100, { smarts: 20 }),
+                    handler: function () {
+                        runLifestyleActivity(100, { smarts: 20 }, "TED Talk: industry leaders expanded your mind.");
+                    }
+                },
+                {
+                    label: lifestyleActionLabel("Buy a Language App Subscription", 60, { smarts: 15 }),
+                    handler: function () {
+                        runLifestyleActivity(60, { smarts: 15 }, "Language app: practicing Spanish 15 minutes a day.");
+                    }
+                },
+                {
+                    label: lifestyleActionLabel("Go to an Escape Room", 40, { smarts: 10, happiness: 15 }),
+                    handler: function () {
+                        runLifestyleActivity(40, { smarts: 10, happiness: 15 }, "Escape room: puzzles under pressure.");
+                    }
+                },
+                {
+                    label: lifestyleActionLabel("Visit a Planetarium", 25, { smarts: 10, happiness: 5 }),
+                    handler: function () {
+                        runLifestyleActivity(25, { smarts: 10, happiness: 5 }, "Planetarium: astrophysics and the cosmos.");
+                    }
+                },
+                {
+                    label: lifestyleActionLabel("Take a Masterclass", 180, { smarts: 25 }),
+                    handler: function () {
+                        runLifestyleActivity(180, { smarts: 25 }, "Masterclass: specialized skill from an expert.");
+                    }
+                },
+                { sectionHeader: true, label: "Happiness & Leisure" },
+                {
+                    label: lifestyleActionLabel("Go Skydiving", 400, { happiness: 50, health: -5 }),
+                    handler: function () {
+                        runLifestyleActivity(400, { happiness: 50, health: -5 }, "Skydiving: adrenaline rush — hard on the joints.");
+                    }
+                },
+                {
+                    label: lifestyleActionLabel("Attend a Comedy Club", 50, { happiness: 20 }),
+                    handler: function () {
+                        runLifestyleActivity(50, { happiness: 20 }, "Comedy club: laughing off workweek stress.");
+                    }
+                },
+                {
+                    label: lifestyleActionLabel("Go to a Wine Tasting", 75, { happiness: 15, health: -5 }),
+                    handler: function () {
+                        runLifestyleActivity(75, { happiness: 15, health: -5 }, "Wine tasting: new vintages (and a mild hangover).");
+                    }
+                },
+                {
+                    label: lifestyleActionLabel("Volunteer at an Animal Shelter", 0, { happiness: 25 }),
+                    handler: function () {
+                        runLifestyleActivity(0, { happiness: 25 }, "Animal shelter: puppies are good for the soul.");
+                    }
+                },
+                {
+                    label: lifestyleActionLabel("Go to a Music Festival", 350, { happiness: 40, health: -10 }),
+                    handler: function () {
+                        runLifestyleActivity(350, { happiness: 40, health: -10 }, "Music festival: three days of music, dancing, and no sleep.");
+                    }
+                },
+                { sectionHeader: true, label: "Care" },
+                {
+                    label: "Read (Free) — " + describeEffects({ smarts: 5 }),
+                    handler: function () {
+                        runLifestyleActivity(0, { smarts: 5 }, "You read and learned something new.");
                     }
                 },
                 {
@@ -5491,7 +5831,13 @@
                         closeModal();
                     }
                 }
-            ]);
+            ];
+            openModal(
+                "Activities",
+                "Unique lifestyle options to boost Health, Smarts, and Happiness. Prices and outcomes are shown on each button.",
+                actions,
+                { scrollActivities: true }
+            );
         }
 
         function openAssetsMenu(focusPsychiatrist) {
@@ -5643,16 +5989,19 @@
         function openRelationshipsMenu() {
             openModal("Relationships", "Invest in your connections to improve quality of life.", [
                 {
-                    label: "Date Night ($1.5k)",
+                    label: "Date Night ($1.5k) + trivia",
                     handler: function () {
-                        applyActionWithRefresh("You invested in a date night.", function () {
-                            if (state.cash >= 1500) {
-                                state.cash -= 1500;
-                                state.happiness += 18;
-                            } else {
-                                logEvent("You couldn't afford date night.");
-                            }
-                        });
+                        if (state.isDead) return;
+                        if (state.cash < 1500) {
+                            logEvent("You couldn't afford date night.");
+                            return;
+                        }
+                        closeModal();
+                        state.cash -= 1500;
+                        logEvent("You invested in a date night — now answer a trivia question to charm your date.");
+                        syncFinancialAliases();
+                        updateUI();
+                        openDateTriviaAfterDateNightPayment();
                     }
                 },
                 {
@@ -5724,6 +6073,7 @@
             closeCareerExamOverlay();
             closeFiredOverlay();
             closeRetirementOverlay();
+            closeDateTriviaOverlay();
             closeEvictionOverlay();
             closeDiagnosisOverlay();
             gameUI.style.display = "none";
@@ -5826,7 +6176,7 @@
         }
 
         function ageUp() {
-            if (state.isDead || !state.playerPath || state.isExamModalOpen || state.isExamActive || state.isDiagnosisOverlayOpen || state.isPromotionOverlayOpen || state.isPerformanceReviewOverlayOpen || state.isCareerExamOpen || state.isFiredOverlayOpen || state.isRetirementOverlayOpen || state.isEvictionOverlayOpen) return;
+            if (state.isDead || !state.playerPath || state.isExamModalOpen || state.isExamActive || state.isDiagnosisOverlayOpen || state.isPromotionOverlayOpen || state.isPerformanceReviewOverlayOpen || state.isCareerExamOpen || state.isFiredOverlayOpen || state.isRetirementOverlayOpen || state.isDateTriviaOpen || state.isEvictionOverlayOpen) return;
 
             if (state.isInSchool && state.currentlyPursuing) {
                 openYearlyExamOverlay();
@@ -5901,16 +6251,16 @@
 
         document.getElementById("age-up-btn").addEventListener("click", ageUp);
         document.getElementById("education-nav-btn").addEventListener("click", function () {
-            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isPerformanceReviewOverlayOpen && !state.isCareerExamOpen && !state.isFiredOverlayOpen && !state.isRetirementOverlayOpen && !state.isEvictionOverlayOpen) openEducationTab();
+            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isPerformanceReviewOverlayOpen && !state.isCareerExamOpen && !state.isFiredOverlayOpen && !state.isRetirementOverlayOpen && !state.isDateTriviaOpen && !state.isEvictionOverlayOpen) openEducationTab();
         });
         document.getElementById("careers-nav-btn").addEventListener("click", function () {
-            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isPerformanceReviewOverlayOpen && !state.isCareerExamOpen && !state.isFiredOverlayOpen && !state.isRetirementOverlayOpen && !state.isEvictionOverlayOpen) openCareersTab();
+            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isPerformanceReviewOverlayOpen && !state.isCareerExamOpen && !state.isFiredOverlayOpen && !state.isRetirementOverlayOpen && !state.isDateTriviaOpen && !state.isEvictionOverlayOpen) openCareersTab();
         });
         document.getElementById("activities-nav-btn").addEventListener("click", function () {
-            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isPerformanceReviewOverlayOpen && !state.isCareerExamOpen && !state.isFiredOverlayOpen && !state.isRetirementOverlayOpen && !state.isEvictionOverlayOpen) openActivitiesMenu();
+            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isPerformanceReviewOverlayOpen && !state.isCareerExamOpen && !state.isFiredOverlayOpen && !state.isRetirementOverlayOpen && !state.isDateTriviaOpen && !state.isEvictionOverlayOpen) openActivitiesMenu();
         });
         document.getElementById("assets-nav-btn").addEventListener("click", function () {
-            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isPerformanceReviewOverlayOpen && !state.isCareerExamOpen && !state.isFiredOverlayOpen && !state.isRetirementOverlayOpen && !state.isEvictionOverlayOpen) openAssetsMenu();
+            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isPerformanceReviewOverlayOpen && !state.isCareerExamOpen && !state.isFiredOverlayOpen && !state.isRetirementOverlayOpen && !state.isDateTriviaOpen && !state.isEvictionOverlayOpen) openAssetsMenu();
         });
         document.getElementById("play-again-btn").addEventListener("click", function () {
             location.reload();
