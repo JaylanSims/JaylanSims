@@ -451,7 +451,7 @@
         let state = {
             age: 18, health: 100, happiness: 100, smarts: 50,
             cash: 0, investments: 0, debt: 0, salary: 0, expenses: 25000,
-            major: null, isDead: false
+            major: null, isDead: false, currentIllnesses: [], illnessYears: {}
         };
 
         const setupScreen = document.getElementById("setup-screen");
@@ -538,6 +538,65 @@
             }
         ];
 
+        const DISEASES = {
+            commonCold: { name: "Common Cold", cureCost: 30, curable: true, annualHealthDrain: 2 },
+            flu: { name: "Flu", cureCost: 150, curable: true, annualHealthDrain: 5 },
+            foodPoisoning: { name: "Food Poisoning", cureCost: 800, curable: true, annualHealthDrain: 10 },
+            diarrhea: { name: "Diarrhea", cureCost: 20, curable: true, annualHealthDrain: 2 },
+            acne: { name: "Acne", cureCost: 400, curable: false, annualHealthDrain: 0, annualHappinessDrain: 2 },
+            migraines: { name: "Migraines", cureCost: 1500, curable: false, annualHealthDrain: 4, annualHappinessDrain: 2 },
+
+            chickenPox: { name: "Chicken Pox", cureCost: 150, curable: true, annualHealthDrain: 5 },
+            measles: { name: "Measles", cureCost: 5000, curable: true, annualHealthDrain: 15 },
+            mumps: { name: "Mumps", cureCost: 3000, curable: true, annualHealthDrain: 10 },
+            scarletFever: { name: "Scarlet Fever", cureCost: 200, curable: true, annualHealthDrain: 20 },
+            whoopingCough: { name: "Whooping Cough (Pertussis)", cureCost: 8000, curable: true, annualHealthDrain: 15 },
+
+            cancer: { name: "Cancer", cureCost: 150000, curable: true, annualHealthDrain: 30 },
+            heartDisease: { name: "Heart Disease", cureCost: 85000, curable: false, annualHealthDrain: 15 },
+            ebola: { name: "Ebola", cureCost: 250000, curable: true, annualHealthDrain: 90 },
+            tuberculosis: { name: "Tuberculosis (TB)", cureCost: 15000, curable: true, annualHealthDrain: 25 },
+            rabies: { name: "Rabies", cureCost: 10000, curable: true, annualHealthDrain: 100 },
+            bubonicPlague: { name: "Bubonic Plague", cureCost: 35000, curable: true, annualHealthDrain: 75 },
+            malaria: { name: "Malaria", cureCost: 8000, curable: true, annualHealthDrain: 40 },
+
+            depression: { name: "Depression", cureCost: 3000, curable: false, annualHealthDrain: 5, annualHappinessDrain: 8 },
+            anxiety: { name: "Anxiety", cureCost: 2500, curable: false, annualHealthDrain: 3, annualHappinessDrain: 6 },
+            ptsd: { name: "PTSD", cureCost: 5000, curable: false, annualHealthDrain: 5, annualHappinessDrain: 5 },
+            schizophrenia: { name: "Schizophrenia", cureCost: 45000, curable: false, annualHealthDrain: 8, annualHappinessDrain: 5 },
+            epilepsy: { name: "Epilepsy", cureCost: 25000, curable: false, annualHealthDrain: 10 },
+
+            hiv: { name: "HIV", cureCost: 350000, curable: false, annualHealthDrain: 15 },
+            genitalHerpes: { name: "Genital Herpes", cureCost: 1200, curable: false, annualHealthDrain: 2, annualHappinessDrain: 2 },
+            chlamydia: { name: "Chlamydia", cureCost: 150, curable: true, annualHealthDrain: 4 },
+            gonorrhea: { name: "Gonorrhea", cureCost: 250, curable: true, annualHealthDrain: 5 },
+            hepatitisB: { name: "Hepatitis B", cureCost: 15000, curable: false, annualHealthDrain: 8 },
+            hepatitisC: { name: "Hepatitis C", cureCost: 85000, curable: true, annualHealthDrain: 10 },
+
+            diabetes: { name: "Diabetes", cureCost: 120000, curable: false, annualHealthDrain: 10 },
+            alzheimers: { name: "Alzheimer’s Disease", cureCost: 350000, curable: false, annualHealthDrain: 15, annualSmartsDrain: 6 },
+            yellowFever: { name: "Yellow Fever", cureCost: 12000, curable: true, annualHealthDrain: 35 },
+            lactoseIntolerance: { name: "Lactose Intolerance", cureCost: 50, curable: false, annualHealthDrain: 2, conditionalTriggerChance: 0.35 },
+            stroke: { name: "Stroke", cureCost: 65000, curable: false, annualHealthDrain: 5, oneTimeHealthHit: 50 }
+        };
+
+        const ILLNESS_ROLL_TABLE = [
+            { key: "commonCold", weight: 26 }, { key: "flu", weight: 14 }, { key: "diarrhea", weight: 11 },
+            { key: "foodPoisoning", weight: 8 }, { key: "acne", weight: 8 }, { key: "migraines", weight: 6 },
+            { key: "chickenPox", weight: 5 }, { key: "mumps", weight: 4 }, { key: "scarletFever", weight: 2 },
+            { key: "measles", weight: 2 }, { key: "whoopingCough", weight: 2 }, { key: "tuberculosis", weight: 2 },
+            { key: "malaria", weight: 2 }, { key: "yellowFever", weight: 1.5 }, { key: "chlamydia", weight: 4 },
+            { key: "gonorrhea", weight: 3 }, { key: "genitalHerpes", weight: 2 }, { key: "hepatitisB", weight: 1.2 },
+            { key: "hepatitisC", weight: 1 }, { key: "depression", weight: 6 }, { key: "anxiety", weight: 7 },
+            { key: "ptsd", weight: 2 }, { key: "schizophrenia", weight: 0.6 }, { key: "epilepsy", weight: 0.9 },
+            { key: "diabetes", weight: 2 }, { key: "heartDisease", weight: 1.2 }, { key: "cancer", weight: 1.2 },
+            { key: "alzheimers", weight: 0.4 }, { key: "stroke", weight: 0.7 }, { key: "hiv", weight: 0.6 },
+            { key: "ebola", weight: 0.15 }, { key: "rabies", weight: 0.08 }, { key: "bubonicPlague", weight: 0.05 },
+            { key: "lactoseIntolerance", weight: 3 }
+        ];
+
+        const HAPPINESS_PENALTY_ON_DIAGNOSIS = 4;
+
         function formatMoney(num) {
             return "$" + Math.round(num).toLocaleString("en-US");
         }
@@ -593,6 +652,132 @@
 
         function closeModal() {
             modalOverlay.style.display = "none";
+        }
+
+        function getActiveIllnessSummary() {
+            if (!state.currentIllnesses.length) return "No active illnesses.";
+            return state.currentIllnesses.map(function (key) {
+                const disease = DISEASES[key];
+                if (!disease) return "";
+                const status = disease.curable ? "Curable" : "Incurable";
+                return disease.name + " (" + status + ", -" + disease.annualHealthDrain + " HP/yr)";
+            }).filter(Boolean).join(" | ");
+        }
+
+        function applyYearlyIllnessEffects() {
+            if (!state.currentIllnesses.length) return false;
+
+            for (let i = 0; i < state.currentIllnesses.length; i++) {
+                const key = state.currentIllnesses[i];
+                const disease = DISEASES[key];
+                if (!disease) continue;
+
+                state.illnessYears[key] = (state.illnessYears[key] || 0) + 1;
+                let healthDrain = disease.annualHealthDrain;
+
+                if (key === "hiv") {
+                    const years = state.illnessYears[key];
+                    healthDrain += Math.floor((years - 1) / 3) * 2;
+                }
+
+                if (disease.conditionalTriggerChance && Math.random() > disease.conditionalTriggerChance) {
+                    healthDrain = 0;
+                }
+
+                if (healthDrain > 0) {
+                    state.health -= healthDrain;
+                }
+                if (disease.annualHappinessDrain) {
+                    state.happiness -= disease.annualHappinessDrain;
+                }
+                if (disease.annualSmartsDrain) {
+                    state.smarts -= disease.annualSmartsDrain;
+                }
+
+                logEvent(disease.name + " effect: -" + healthDrain + " HP this year.");
+
+                if (state.health <= 0) {
+                    onPlayerDeath();
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        function maybeContractIllness() {
+            if (state.currentIllnesses.length >= 4) return;
+            if (Math.random() >= 0.26) return;
+
+            const available = ILLNESS_ROLL_TABLE.filter(function (entry) {
+                return !state.currentIllnesses.includes(entry.key);
+            });
+            if (!available.length) return;
+
+            const total = available.reduce(function (sum, entry) { return sum + entry.weight; }, 0);
+            let roll = Math.random() * total;
+            let selected = available[0].key;
+            for (let i = 0; i < available.length; i++) {
+                roll -= available[i].weight;
+                if (roll <= 0) {
+                    selected = available[i].key;
+                    break;
+                }
+            }
+
+            const disease = DISEASES[selected];
+            state.currentIllnesses.push(selected);
+            state.illnessYears[selected] = 0;
+            state.happiness -= HAPPINESS_PENALTY_ON_DIAGNOSIS;
+
+            if (disease.oneTimeHealthHit) {
+                state.health -= disease.oneTimeHealthHit;
+                logEvent("You were diagnosed with " + disease.name + ". Immediate health impact: -" + disease.oneTimeHealthHit + " HP.");
+            } else {
+                logEvent("You were diagnosed with " + disease.name + ". Happiness dropped slightly.");
+            }
+        }
+
+        function openDoctorMenu() {
+            if (!state.currentIllnesses.length) {
+                openModal("Doctor", "No active illnesses. Stay healthy.", [
+                    { label: "Close", handler: function () { closeModal(); } }
+                ]);
+                return;
+            }
+
+            const actions = state.currentIllnesses.map(function (key) {
+                const disease = DISEASES[key];
+                const status = disease.curable ? "Curable" : "Incurable";
+                return {
+                    label: disease.name + " (" + formatMoney(disease.cureCost) + ", " + status + ")",
+                    handler: function () {
+                        if (state.cash < disease.cureCost) {
+                            logEvent("You couldn't afford treatment for " + disease.name + ".");
+                            closeModal();
+                            updateUI();
+                            return;
+                        }
+
+                        state.cash -= disease.cureCost;
+                        if (disease.curable) {
+                            state.currentIllnesses = state.currentIllnesses.filter(function (illnessKey) {
+                                return illnessKey !== key;
+                            });
+                            delete state.illnessYears[key];
+                            logEvent("Doctor treated and cured " + disease.name + " for " + formatMoney(disease.cureCost) + ".");
+                        } else {
+                            logEvent("Doctor visit for " + disease.name + " cost " + formatMoney(disease.cureCost) + ", but it remains incurable.");
+                        }
+
+                        closeModal();
+                        updateUI();
+                    }
+                };
+            });
+
+            actions.push({ label: "Close", handler: function () { closeModal(); } });
+            openModal("Doctor", "Active illnesses: " + getActiveIllnessSummary(), actions);
         }
 
         function applyActionWithRefresh(actionText, fn) {
@@ -676,6 +861,12 @@
                         applyActionWithRefresh("You read and learned something new.", function () {
                             state.smarts += 5;
                         });
+                    }
+                },
+                {
+                    label: "Visit Doctor",
+                    handler: function () {
+                        openDoctorMenu();
                     }
                 },
                 {
@@ -790,6 +981,11 @@
             state.investments *= (1 + (Math.random() * 0.25 - 0.10));
 
             logEvent("Age " + state.age + ": You lived another year.");
+
+            if (applyYearlyIllnessEffects()) {
+                return;
+            }
+            maybeContractIllness();
 
             if (state.health <= 0) {
                 onPlayerDeath();
