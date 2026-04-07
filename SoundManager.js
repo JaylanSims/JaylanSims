@@ -1,6 +1,6 @@
 /**
- * Global sound manager: Howler.js when available, Web Audio fallbacks for SFX/loops.
- * Place audio files under /public/sounds/ (see SOUND_URLS). Missing files fall back to synthesized cues.
+ * Global AudioManager / SoundManager: Howler.js + Web Audio fallbacks.
+ * Place files in /public/sounds/ (see SOUND_URLS). Missing files use synth fallbacks where implemented.
  */
 (function (global) {
     "use strict";
@@ -12,9 +12,18 @@
         ui_click: ["/sounds/ui_click.mp3", "/sounds/ui_click.ogg"],
         money_gain: ["/sounds/money_gain.mp3", "/sounds/money_gain.ogg"],
         money_loss: ["/sounds/money_loss.mp3", "/sounds/money_loss.ogg"],
-        heart_beat: ["/sounds/heart_beat.mp3", "/sounds/heart_beat.ogg"],
-        heart_attack: ["/sounds/heart_attack.mp3", "/sounds/heart_attack.ogg"],
-        intro_ambience: ["/sounds/intro_ambience.mp3", "/sounds/intro_ambience.ogg"]
+        heart_attack: ["/sounds/EKG_Flatline.mp3", "/sounds/heart_attack.mp3", "/sounds/heart_attack.ogg"],
+        heart_beat: ["/sounds/Heartbeat_Fast.wav", "/sounds/heart_beat.mp3", "/sounds/heart_beat.ogg"],
+        cash_register_subtract: ["/sounds/Cash_Register_Subtract.mp3", "/sounds/cash_register_subtract.mp3"],
+        stamp_thud: ["/sounds/Stamp_Thud.wav", "/sounds/stamp_thud.wav", "/sounds/stamp_thud.mp3"],
+        metal_creak: ["/sounds/Metal_Creak.mp3", "/sounds/metal_creak.mp3"],
+        junkyard_crush: ["/sounds/Junkyard_Crush.wav", "/sounds/junkyard_crush.wav", "/sounds/junkyard_crush.mp3"],
+        intro_ambience: [
+            "/sounds/Intro_Cinematic_Ambient.mp3",
+            "/sounds/intro_cinematic_ambient.mp3",
+            "/sounds/intro_ambience.mp3",
+            "/sounds/intro_ambience.ogg"
+        ]
     };
 
     var muted = false;
@@ -23,6 +32,7 @@
     var howlLoadFailed = {};
     var ctx = null;
     var heartbeatTimer = null;
+    var lastStressHeartbeatLevel = null;
     var introHowl = null;
     var introSoundId = null;
     var introFadeTimer = null;
@@ -95,17 +105,36 @@
         return Math.max(0, Math.min(1, v * masterVolume));
     }
 
-    function synthFallback(id, opts) {
+    function stressToHeartbeatVolume(stressLevel) {
+        var s = Math.max(81, Math.min(100, stressLevel));
+        return 0.22 + ((s - 81) / 19) * 0.78;
+    }
+
+    function stressToPlaybackRate(stressLevel) {
+        var s = Math.max(81, Math.min(100, stressLevel));
+        return 1 + ((s - 81) / 19) * 0.35;
+    }
+
+    function synthFallback(id) {
         var c = getAudioContext();
         if (!c || muted) return;
         if (id === "ui_click") {
             playClickSynth(c, effectiveVolume(0.35));
         } else if (id === "money_gain") {
             playChimeSynth(c, effectiveVolume(0.25));
-        } else if (id === "money_loss") {
-            playNoiseBurst(c, effectiveVolume(0.2), 0.12);
+        } else if (id === "money_loss" || id === "cash_register_subtract") {
+            playNoiseBurst(c, effectiveVolume(0.18), 0.1);
+        } else if (id === "stamp_thud") {
+            playThump(c, effectiveVolume(0.45));
         } else if (id === "heart_attack") {
             playFlatlineSynth(c, effectiveVolume(0.4));
+        } else if (id === "metal_creak") {
+            playCreakSynth(c, effectiveVolume(0.35));
+        } else if (id === "junkyard_crush") {
+            playThump(c, effectiveVolume(0.55));
+            setTimeout(function () {
+                playNoiseBurst(c, effectiveVolume(0.25), 0.2);
+            }, 80);
         }
     }
 
@@ -194,6 +223,28 @@
         }
     }
 
+    function playCreakSynth(c, g) {
+        var t = c.currentTime;
+        var osc = c.createOscillator();
+        var gn = c.createGain();
+        var filter = c.createBiquadFilter();
+        osc.type = "sawtooth";
+        osc.frequency.setValueAtTime(120, t);
+        osc.frequency.linearRampToValueAtTime(85, t + 0.35);
+        filter.type = "bandpass";
+        filter.frequency.setValueAtTime(400, t);
+        filter.frequency.exponentialRampToValueAtTime(200, t + 0.35);
+        filter.Q.value = 6;
+        gn.gain.setValueAtTime(0, t);
+        gn.gain.linearRampToValueAtTime(g, t + 0.05);
+        gn.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
+        osc.connect(filter);
+        filter.connect(gn);
+        gn.connect(c.destination);
+        osc.start(t);
+        osc.stop(t + 0.42);
+    }
+
     function playThump(c, gainVal) {
         var t = c.currentTime;
         var osc = c.createOscillator();
@@ -216,7 +267,9 @@
         }
         var h = howls.heart_beat;
         if (h) {
-            h.stop();
+            try {
+                h.stop();
+            } catch (e) {}
         }
     }
 
@@ -230,9 +283,22 @@
         }, intervalMs);
     }
 
+    function playOneShot(id, volMult) {
+        unlockAudio();
+        volMult = typeof volMult === "number" ? volMult : 1;
+        var h = ensureHowl(id);
+        if (h && !howlLoadFailed[id]) {
+            h.loop(false);
+            h.volume(effectiveVolume(volMult));
+            h.play();
+            return;
+        }
+        synthFallback(id);
+    }
+
     readStorage();
 
-    var SoundManager = {
+    var api = {
         play: function (id, opts) {
             unlockAudio();
             opts = opts || {};
@@ -244,23 +310,59 @@
                 this.startIntroAmbience(opts);
                 return;
             }
+            if (id === "tax_reaper") {
+                this.playTaxReaperSequence();
+                return;
+            }
             var loop = !!opts.loop;
             var h = ensureHowl(id);
-            if (h) {
+            if (h && !howlLoadFailed[id]) {
                 h.loop(loop);
                 h.volume(effectiveVolume(typeof opts.volume === "number" ? opts.volume : 1));
-                var sid = h.play();
-                return { howl: h, soundId: sid };
+                h.play();
+                return;
             }
-            synthFallback(id, opts);
-            return null;
+            synthFallback(id);
+        },
+
+        playTaxReaperSequence: function () {
+            unlockAudio();
+            if (muted) return;
+            var playedStamp = false;
+            function doStamp() {
+                if (playedStamp) return;
+                playedStamp = true;
+                var hs = ensureHowl("stamp_thud");
+                if (hs && !howlLoadFailed.stamp_thud) {
+                    hs.loop(false);
+                    hs.volume(effectiveVolume(0.92));
+                    hs.play();
+                } else {
+                    synthFallback("stamp_thud");
+                }
+            }
+            var reg = ensureHowl("cash_register_subtract");
+            if (reg && !howlLoadFailed.cash_register_subtract) {
+                reg.loop(false);
+                reg.volume(effectiveVolume(0.88));
+                reg.play();
+                global.setTimeout(doStamp, 420);
+                return;
+            }
+            synthFallback("cash_register_subtract");
+            global.setTimeout(doStamp, 180);
         },
 
         stop: function (id) {
             if (id === "heart_beat") {
                 stopHeartbeatLoop();
+                lastStressHeartbeatLevel = null;
                 var hb = howls.heart_beat;
-                if (hb) hb.stop();
+                if (hb) {
+                    try {
+                        hb.stop();
+                    } catch (e) {}
+                }
                 return;
             }
             if (id === "intro_ambience") {
@@ -280,6 +382,7 @@
             persistMuted();
             if (muted) {
                 stopHeartbeatLoop();
+                lastStressHeartbeatLevel = null;
                 Object.keys(howls).forEach(function (k) {
                     try {
                         howls[k].stop();
@@ -292,6 +395,9 @@
             if (typeof global.onSoundManagerMuteChange === "function") {
                 global.onSoundManagerMuteChange(muted);
             }
+            if (typeof global.onAudioManagerMuteChange === "function") {
+                global.onAudioManagerMuteChange(muted);
+            }
         },
 
         isMuted: function () {
@@ -303,7 +409,11 @@
             persistVolume();
             Object.keys(howls).forEach(function (k) {
                 try {
-                    howls[k].volume(effectiveVolume(1));
+                    if (k === "heart_beat" && lastStressHeartbeatLevel != null) {
+                        api.updateStressHeartbeat(lastStressHeartbeatLevel);
+                    } else {
+                        howls[k].volume(effectiveVolume(1));
+                    }
                 } catch (e) {}
             });
         },
@@ -320,25 +430,30 @@
         updateStressHeartbeat: function (stressLevel) {
             unlockAudio();
             if (muted || stressLevel == null || stressLevel <= 80) {
+                lastStressHeartbeatLevel = null;
                 stopHeartbeatLoop();
                 var hh = howls.heart_beat;
-                if (hh) hh.stop();
+                if (hh) {
+                    try {
+                        hh.stop();
+                    } catch (e) {}
+                }
                 return;
             }
-            var highStress = stressLevel >= 95;
-            var interval = highStress ? 400 : 600;
-            var gainBase = highStress ? 0.55 : 0.35;
+            lastStressHeartbeatLevel = stressLevel;
+            var vol = stressToHeartbeatVolume(stressLevel);
+            var rate = stressToPlaybackRate(stressLevel);
             var h = ensureHowl("heart_beat");
             if (h && !howlLoadFailed.heart_beat) {
                 stopHeartbeatLoop();
-                h.stop();
                 h.loop(true);
-                h.rate(highStress ? 1.25 : 1);
-                h.volume(effectiveVolume(highStress ? 0.85 : 0.55));
+                h.rate(rate);
+                h.volume(effectiveVolume(vol));
                 h.play();
                 return;
             }
-            startHeartbeatWebLoop(interval, gainBase);
+            var interval = Math.max(280, Math.round(520 - (stressLevel - 80) * 12));
+            startHeartbeatWebLoop(interval, vol);
         },
 
         startIntroAmbience: function (opts) {
@@ -349,11 +464,11 @@
             var h = ensureHowl("intro_ambience");
             if (h && !howlLoadFailed.intro_ambience) {
                 h.loop(true);
-                var targetVol = effectiveVolume(typeof opts.volume === "number" ? opts.volume : 0.35);
+                var targetVol = effectiveVolume(typeof opts.volume === "number" ? opts.volume : 0.38);
                 h.volume(0);
                 introSoundId = h.play();
                 if (introSoundId != null && typeof h.fade === "function") {
-                    h.fade(0, targetVol, opts.fadeInMs || 800, introSoundId);
+                    h.fade(0, targetVol, opts.fadeInMs || 900, introSoundId);
                 } else {
                     h.volume(targetVol);
                 }
@@ -402,6 +517,14 @@
                 }
                 return;
             }
+        },
+
+        playVehicleDegrade: function () {
+            playOneShot("metal_creak", 0.85);
+        },
+
+        playVehicleScrapped: function () {
+            playOneShot("junkyard_crush", 1);
         }
     };
 
@@ -435,7 +558,8 @@
         introSynthTimer = setInterval(tick, 280 + Math.random() * 120);
     }
 
-    global.SoundManager = SoundManager;
+    global.SoundManager = api;
+    global.AudioManager = api;
     global.addEventListener("click", unlockAudio, { once: true });
     global.addEventListener("keydown", unlockAudio, { once: true });
 })(typeof window !== "undefined" ? window : this);

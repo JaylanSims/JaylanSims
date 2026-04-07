@@ -1,10 +1,19 @@
-Optional audio files (Howler will use Web Audio fallbacks if missing):
+Place audio files in this folder. Game paths use /sounds/...
 
-  ui_click.mp3 / ui_click.ogg
-  money_gain.mp3 / money_gain.ogg
-  money_loss.mp3 / money_loss.ogg
-  heart_beat.mp3 / heart_beat.ogg   (looping bass thump)
-  heart_attack.mp3 / heart_attack.ogg
-  intro_ambience.mp3 / intro_ambience.ogg
+Required / preferred filenames (Howler tries fallbacks in SoundManager.js):
 
-Place files in this folder (public/sounds/). Paths in game: /sounds/...
+  EKG_Flatline.mp3          — heart attack overlay (flatline)
+  Heartbeat_Fast.wav        — stress loop when stressLevel > 80 (volume scales 81–100)
+  Cash_Register_Subtract.mp3 — tax season (first in sequence)
+  Stamp_Thud.wav            — tax season (follows register ~420ms later)
+  Metal_Creak.mp3           — car maintenance skipped / degradation
+  Junkyard_Crush.wav        — car scrapped overlay
+  Intro_Cinematic_Ambient.mp3 — advisor intro; fades out over 2s on "Choose wisely"
+
+Optional legacy / extras:
+  ui_click.mp3, money_gain.mp3, money_loss.mp3, heart_beat.mp3, intro_ambience.mp3
+
+Global API: window.AudioManager === window.SoundManager
+  AudioManager.play('ui_click')
+  AudioManager.play('tax_reaper')
+  AudioManager.stop('heart_beat')

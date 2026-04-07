@@ -83,6 +83,50 @@
             animation: slideAndFade 4s ease-in-out forwards;
         }
 
+        #intro-advisor-panel {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 24px 20px;
+            max-width: 400px;
+            text-align: center;
+            gap: 16px;
+        }
+
+        #intro-advisor-panel.visible {
+            display: flex;
+        }
+
+        #intro-advisor-panel h2 {
+            margin: 0;
+            font-size: 1.25rem;
+            color: #e3f2fd;
+        }
+
+        #intro-advisor-panel .intro-advisor-body {
+            margin: 0;
+            color: #b0bec5;
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+
+        #intro-choose-wisely-btn {
+            margin-top: 8px;
+            padding: 14px 28px;
+            border-radius: 12px;
+            border: 1px solid #546e7a;
+            background: linear-gradient(180deg, #37474f, #263238);
+            color: #eceff1;
+            font-size: 1rem;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        #intro-choose-wisely-btn:hover {
+            filter: brightness(1.08);
+        }
+
         @keyframes slideAndFade {
             0% {
                 transform: translateY(100vh);
@@ -1982,6 +2026,14 @@
     <div id="app-container">
         <div id="intro-screen">
             <img src="/images/js-games-logo.png" alt="JS Games" id="intro-logo" onerror="this.onerror=null;this.src='/images/js-games-logo.png';">
+            <div id="intro-advisor-panel" aria-live="polite">
+                <h2>Career Advisor</h2>
+                <p class="intro-advisor-body">
+                    Your twenties will ask for ambition. Your forties will ask for meaning. This simulation is a mirror — not of markets, but of tradeoffs.
+                    Listen closely: every year you age up, the world will tax your time, your health, and your relationships. Choose wisely.
+                </p>
+                <button type="button" id="intro-choose-wisely-btn">Choose wisely</button>
+            </div>
         </div>
 
         <div id="setup-screen">
@@ -2250,6 +2302,8 @@
         const setupScreen = document.getElementById("setup-screen");
         const introScreen = document.getElementById("intro-screen");
         const introLogo = document.getElementById("intro-logo");
+        const introAdvisorPanel = document.getElementById("intro-advisor-panel");
+        const introChooseWiselyBtn = document.getElementById("intro-choose-wisely-btn");
         const gameUI = document.getElementById("game-ui");
         const eventLog = document.getElementById("event-log");
         const modalOverlay = document.getElementById("modal-overlay");
@@ -3799,6 +3853,9 @@
             }
             v.condition = Math.max(0, Math.round((v.condition != null ? v.condition : 100) - 25));
             showPurchaseToastMessage("You couldn't afford car maintenance. Your " + v.name + " is starting to fall apart.");
+            if (typeof AudioManager !== "undefined" && AudioManager.playVehicleDegrade) {
+                AudioManager.playVehicleDegrade();
+            }
             logEvent("Vehicle maintenance skipped (insufficient funds). " + v.name + " condition -25.");
             if (v.condition <= 0) {
                 state._pendingCarScrappedName = v.name;
@@ -3876,6 +3933,11 @@
             carScrappedOverlayReactRoot.render(
                 <CarScrappedOverlay vehicleName={state._pendingCarScrappedName || "vehicle"} onAcknowledge={handleCarScrappedAcknowledge} />
             );
+            window.requestAnimationFrame(function () {
+                if (typeof AudioManager !== "undefined" && AudioManager.playVehicleScrapped) {
+                    AudioManager.playVehicleScrapped();
+                }
+            });
         }
 
         function closeCarScrappedOverlay() {
@@ -3932,16 +3994,16 @@
                 <HeartAttackOverlay fatalOutcome={state._heartAttackOutcomeDeath === true} onAcknowledge={handleHeartAttackAcknowledge} />
             );
             window.requestAnimationFrame(function () {
-                if (typeof SoundManager !== "undefined" && SoundManager.play) {
-                    SoundManager.play("heart_attack");
+                if (typeof AudioManager !== "undefined" && AudioManager.play) {
+                    AudioManager.play("heart_attack");
                 }
             });
         }
 
         function closeHeartAttackOverlay() {
             state.isHeartAttackOverlayOpen = false;
-            if (typeof SoundManager !== "undefined" && SoundManager.stop) {
-                SoundManager.stop("heart_attack");
+            if (typeof AudioManager !== "undefined" && AudioManager.stop) {
+                AudioManager.stop("heart_attack");
             }
             if (heartAttackOverlayReactRoot) {
                 heartAttackOverlayReactRoot.render(null);
@@ -4489,27 +4551,27 @@
                 }
             }
 
-            if (typeof SoundManager !== "undefined" && SoundManager.updateStressHeartbeat) {
+            if (typeof AudioManager !== "undefined" && AudioManager.updateStressHeartbeat) {
                 if (!state.isDead) {
-                    SoundManager.updateStressHeartbeat(state.stressLevel);
+                    AudioManager.updateStressHeartbeat(state.stressLevel);
                 } else {
-                    SoundManager.stop("heart_beat");
+                    AudioManager.stop("heart_beat");
                 }
             }
 
             var taxNow = state.lastTaxesPaid || 0;
             var taxPrev = state._previousLastTaxesPaid || 0;
             if (
-                typeof SoundManager !== "undefined" &&
-                SoundManager.play &&
+                typeof AudioManager !== "undefined" &&
+                AudioManager.play &&
                 taxNow > 0 &&
                 taxNow !== taxPrev &&
                 state.hudDebtSalaryUnlocked &&
                 statsBarDebtSalary &&
                 !statsBarDebtSalary.classList.contains("hud-extra-hidden")
             ) {
-                SoundManager.play("money_loss");
-                showPurchaseToastMessage("Tax reaper: you paid " + formatMoney(taxNow) + " in taxes last year.");
+                AudioManager.play("tax_reaper");
+                showPurchaseToastMessage("Tax Season: you paid " + formatMoney(taxNow) + " in taxes last year.");
             }
             state._previousLastTaxesPaid = taxNow;
 
@@ -5402,8 +5464,8 @@
         }
 
         function handleDestructiveCopingSwipeCard() {
-            if (typeof SoundManager !== "undefined" && SoundManager.play) {
-                SoundManager.play("money_loss");
+            if (typeof AudioManager !== "undefined" && AudioManager.play) {
+                AudioManager.play("money_loss");
             }
             handleDestructiveCopingAcknowledge();
         }
@@ -8794,8 +8856,8 @@
         });
 
         document.getElementById("age-up-btn").addEventListener("click", function () {
-            if (typeof SoundManager !== "undefined" && SoundManager.play) {
-                SoundManager.play("ui_click");
+            if (typeof AudioManager !== "undefined" && AudioManager.play) {
+                AudioManager.play("ui_click");
             }
             ageUp();
         });
@@ -8803,23 +8865,21 @@
         (function initHudVolumeAndIntroAudio() {
             var volBtn = document.getElementById("hud-volume-btn");
             function syncVolBtn() {
-                if (!volBtn || typeof SoundManager === "undefined") return;
-                var m = SoundManager.isMuted();
+                if (!volBtn || typeof AudioManager === "undefined") return;
+                var m = AudioManager.isMuted();
                 volBtn.textContent = m ? "🔇" : "🔊";
                 volBtn.setAttribute("aria-pressed", m ? "true" : "false");
                 volBtn.setAttribute("aria-label", m ? "Unmute sound" : "Mute sound");
             }
             window.onSoundManagerMuteChange = syncVolBtn;
-            if (volBtn && typeof SoundManager !== "undefined") {
+            window.onAudioManagerMuteChange = syncVolBtn;
+            if (volBtn && typeof AudioManager !== "undefined") {
                 syncVolBtn();
                 volBtn.addEventListener("click", function (e) {
                     e.stopPropagation();
-                    SoundManager.toggleMute();
+                    AudioManager.toggleMute();
                     syncVolBtn();
                 });
-            }
-            if (typeof SoundManager !== "undefined" && SoundManager.startIntroAmbience) {
-                SoundManager.startIntroAmbience({ fadeInMs: 900, volume: 0.32 });
             }
         })();
         document.getElementById("education-nav-btn").addEventListener("click", function () {
@@ -8853,15 +8913,29 @@
         });
 
         introLogo.addEventListener("animationend", function () {
-            if (typeof SoundManager !== "undefined" && SoundManager.stopIntroAmbienceFade) {
-                SoundManager.stopIntroAmbienceFade(1400);
+            if (introLogo) introLogo.style.display = "none";
+            if (introAdvisorPanel) {
+                introAdvisorPanel.classList.add("visible");
             }
-            introScreen.style.display = "none";
-            setupScreen.style.display = "flex";
-            requestAnimationFrame(function () {
-                setupScreen.style.opacity = "1";
-            });
+            if (typeof AudioManager !== "undefined" && AudioManager.startIntroAmbience) {
+                AudioManager.startIntroAmbience({ fadeInMs: 1000, volume: 0.4 });
+            }
         }, { once: true });
+
+        if (introChooseWiselyBtn) {
+            introChooseWiselyBtn.addEventListener("click", function () {
+                if (typeof AudioManager !== "undefined" && AudioManager.stopIntroAmbienceFade) {
+                    AudioManager.stopIntroAmbienceFade(2000);
+                }
+                if (introScreen) introScreen.style.display = "none";
+                if (setupScreen) {
+                    setupScreen.style.display = "flex";
+                    requestAnimationFrame(function () {
+                        setupScreen.style.opacity = "1";
+                    });
+                }
+            });
+        }
     </script>
 </body>
 </html>
