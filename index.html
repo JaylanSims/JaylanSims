@@ -1085,6 +1085,75 @@
             background: #3d1a1a;
         }
 
+        #coping-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 10011;
+            background: linear-gradient(165deg, #1a0505 0%, #0d0d0d 55%, #120808 100%);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: #fff;
+            padding: 24px;
+            box-sizing: border-box;
+        }
+
+        .coping-card {
+            max-width: 520px;
+            width: 100%;
+            background: rgba(40, 10, 10, 0.92);
+            border: 2px solid #b71c1c;
+            border-radius: 16px;
+            padding: 26px 22px;
+            box-shadow: 0 24px 60px rgba(0, 0, 0, 0.65);
+        }
+
+        .coping-card h2 {
+            margin: 0 0 16px;
+            color: #ff8a80;
+            font-size: 1.2rem;
+            text-align: center;
+        }
+
+        .coping-card .coping-name {
+            margin: 0 0 10px;
+            font-size: 0.85rem;
+            color: #e57373;
+            text-align: center;
+        }
+
+        .coping-card .coping-body {
+            margin: 0 0 14px;
+            line-height: 1.5;
+            color: #ffcdd2;
+            font-size: 0.96rem;
+        }
+
+        .coping-card .coping-impact {
+            margin: 0 0 20px;
+            padding: 12px;
+            background: rgba(0, 0, 0, 0.35);
+            border-radius: 10px;
+            font-size: 0.88rem;
+            color: #ffab91;
+            line-height: 1.45;
+        }
+
+        .coping-ack-btn {
+            width: 100%;
+            padding: 14px;
+            border-radius: 12px;
+            border: 1px solid #e57373;
+            background: linear-gradient(180deg, #c62828, #8b0000);
+            color: #fff;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
         #fired-overlay {
             position: fixed;
             top: 0;
@@ -1394,6 +1463,7 @@
     <div id="fired-overlay-root"></div>
     <div id="retirement-overlay-root"></div>
     <div id="date-trivia-react-root"></div>
+    <div id="coping-overlay-root"></div>
     <div id="eviction-overlay-root"></div>
     <div id="app-container">
         <div id="intro-screen">
@@ -1568,7 +1638,10 @@
             isDateTriviaOpen: false,
             currentDateTriviaQuestion: null,
             dateTriviaSelectedIndex: null,
-            dateTriviaShowFeedback: false
+            dateTriviaShowFeedback: false,
+            isCopingOverlayOpen: false,
+            pendingCopingEvent: null,
+            _copingCheckedThisAgeTick: false
         };
 
         const RENTAL_LISTINGS = [
@@ -1614,6 +1687,8 @@
         let retirementOverlayReactRoot = null;
         const dateTriviaReactMount = document.getElementById("date-trivia-react-root");
         let dateTriviaReactRoot = null;
+        const copingOverlayMount = document.getElementById("coping-overlay-root");
+        let copingOverlayReactRoot = null;
         const evictionOverlayMount = document.getElementById("eviction-overlay-root");
         let evictionOverlayReactRoot = null;
         let higherEdCatalogRoot = null;
@@ -2195,6 +2270,52 @@
         ];
 
         const DATE_TRIVIA_BANK = DATE_TRIVIA_BANK_RAW.map(normalizeExamQuestionEntry);
+
+        const DESTRUCTIVE_COPING_EVENTS = [
+            {
+                name: "Luxury Car Lease",
+                cost: 25000,
+                happinessBoost: 15,
+                message:
+                    "The daily commute to a job you despise broke you. You leased a sports car you don't need just to feel something."
+            },
+            {
+                name: "Impulsive Designer Wardrobe",
+                cost: 8000,
+                happinessBoost: 10,
+                message: "You hate your life, so you tried to buy a new identity. You maxed out a card on designer clothes."
+            },
+            {
+                name: "Heavy Drinking Habit",
+                cost: 4000,
+                happinessBoost: 15,
+                healthPenalty: 15,
+                message:
+                    "You've started hitting the bar every single night after work just to numb your brain. Your liver is suffering."
+            },
+            {
+                name: "High-Stakes Gambling Bender",
+                cost: 35000,
+                happinessBoost: 20,
+                healthPenalty: 5,
+                message: "Desperate for a dopamine rush, you blew a massive portion of your savings at the casino."
+            },
+            {
+                name: "Desperate Spiritual Retreat",
+                cost: 15000,
+                happinessBoost: 20,
+                message:
+                    "You had a minor breakdown and paid a guru in Costa Rica an absurd amount of money to help you 'find yourself'."
+            },
+            {
+                name: "Overpriced VIP Clubbing",
+                cost: 10000,
+                happinessBoost: 10,
+                healthPenalty: 10,
+                message:
+                    "You spent the weekend buying VIP bottle service for people you don't even like, desperately trying to feel successful."
+            }
+        ];
 
         const DISEASES = {
             commonCold: {
@@ -2870,7 +2991,7 @@
 
         function openModal(title, description, actions, options) {
             options = options || {};
-            if (state.isExamModalOpen || state.isExamActive || state.isDiagnosisOverlayOpen || state.isPromotionOverlayOpen || state.isPerformanceReviewOverlayOpen || state.isCareerExamOpen || state.isFiredOverlayOpen || state.isRetirementOverlayOpen || state.isDateTriviaOpen || state.isEvictionOverlayOpen) return;
+            if (state.isExamModalOpen || state.isExamActive || state.isDiagnosisOverlayOpen || state.isPromotionOverlayOpen || state.isPerformanceReviewOverlayOpen || state.isCareerExamOpen || state.isFiredOverlayOpen || state.isRetirementOverlayOpen || state.isDateTriviaOpen || state.isCopingOverlayOpen || state.isEvictionOverlayOpen) return;
             if (higherEdCatalogRoot) {
                 higherEdCatalogRoot.render(null);
             }
@@ -3077,7 +3198,25 @@
             return false;
         }
 
+        function maybeInterceptDestructiveCoping() {
+            if (state._copingCheckedThisAgeTick) return false;
+            state._copingCheckedThisAgeTick = true;
+            if (!state.isEmployed || state.isRetired) return false;
+            if (state.happiness > 30) return false;
+            if (Math.random() > 0.6) return false;
+            if (!DESTRUCTIVE_COPING_EVENTS.length) return false;
+            var ev = DESTRUCTIVE_COPING_EVENTS[Math.floor(Math.random() * DESTRUCTIVE_COPING_EVENTS.length)];
+            state.pendingCopingEvent = ev;
+            state.isCopingOverlayOpen = true;
+            renderCopingOverlay();
+            return true;
+        }
+
         function finishWorkYearCareerPhase() {
+            if (maybeInterceptDestructiveCoping()) {
+                updateUI();
+                return;
+            }
             if (attemptCareerPromotionOrExam()) {
                 updateUI();
                 return;
@@ -3449,6 +3588,91 @@
             continueAgeUpAfterRoommateEviction();
         }
 
+        function CopingMechanismOverlay(props) {
+            var ev = props.event;
+            if (!ev) return null;
+            var hp = typeof ev.healthPenalty === "number" ? ev.healthPenalty : 0;
+            var impact =
+                "Bank Balance: -" +
+                formatMoney(ev.cost) +
+                " | Happiness: +" +
+                ev.happinessBoost +
+                (hp > 0 ? " | Health: -" + hp : "");
+            return (
+                <div id="coping-overlay" role="dialog" aria-modal="true" aria-label="Destructive coping">
+                    <div className="coping-card">
+                        <h2>DESPERATE COPING MECHANISM ⚠️</h2>
+                        <p className="coping-name">{ev.name}</p>
+                        <p className="coping-body">{ev.message}</p>
+                        <p className="coping-impact">{impact}</p>
+                        <button type="button" className="coping-ack-btn" onClick={props.onAcknowledge}>
+                            Accept the Consequences
+                        </button>
+                    </div>
+                </div>
+            );
+        }
+
+        function renderCopingOverlay() {
+            if (!copingOverlayMount) return;
+            if (!state.isCopingOverlayOpen || !state.pendingCopingEvent) {
+                if (copingOverlayReactRoot) copingOverlayReactRoot.render(null);
+                return;
+            }
+            if (!copingOverlayReactRoot) {
+                copingOverlayReactRoot = ReactDOM.createRoot(copingOverlayMount);
+            }
+            copingOverlayReactRoot.render(
+                <CopingMechanismOverlay event={state.pendingCopingEvent} onAcknowledge={handleDestructiveCopingAcknowledge} />
+            );
+        }
+
+        function closeCopingOverlay() {
+            state.isCopingOverlayOpen = false;
+            state.pendingCopingEvent = null;
+            if (copingOverlayReactRoot) {
+                copingOverlayReactRoot.render(null);
+            }
+        }
+
+        function handleDestructiveCopingAcknowledge() {
+            var ev = state.pendingCopingEvent;
+            if (!ev) {
+                closeCopingOverlay();
+                runAgeUpWorkYearAfterPromotion();
+                updateUI();
+                return;
+            }
+            state.bankBalance -= ev.cost;
+            state.cash = state.bankBalance;
+            state.happiness += ev.happinessBoost;
+            if (typeof ev.healthPenalty === "number" && ev.healthPenalty > 0) {
+                state.health -= ev.healthPenalty;
+            }
+            logEvent(
+                "Destructive coping: " +
+                    ev.name +
+                    " — spent " +
+                    formatMoney(ev.cost) +
+                    ", Happiness +" +
+                    ev.happinessBoost +
+                    (ev.healthPenalty ? ", Health -" + ev.healthPenalty : "") +
+                    "."
+            );
+            closeCopingOverlay();
+            syncFinancialAliases();
+            state.happiness = clampStat(state.happiness);
+            state.health = clampStat(state.health);
+            if (state.health <= 0) {
+                onPlayerDeath();
+                yearlyResetMentalSuppression();
+                updateUI();
+                return;
+            }
+            runAgeUpWorkYearAfterPromotion();
+            updateUI();
+        }
+
         function maybeInterceptRetirementAt72(fromSchoolYear) {
             if (state.age !== 72 || state.isRetired || state.hasDeclinedRetirement) return false;
             var offer =
@@ -3469,6 +3693,7 @@
         }
 
         function completeAgeUpTick() {
+            state._copingCheckedThisAgeTick = false;
             state.cash -= state.annualExpenses;
             state.health -= 1;
             state.happiness -= 1;
@@ -6074,6 +6299,7 @@
             closeFiredOverlay();
             closeRetirementOverlay();
             closeDateTriviaOverlay();
+            closeCopingOverlay();
             closeEvictionOverlay();
             closeDiagnosisOverlay();
             gameUI.style.display = "none";
@@ -6176,7 +6402,7 @@
         }
 
         function ageUp() {
-            if (state.isDead || !state.playerPath || state.isExamModalOpen || state.isExamActive || state.isDiagnosisOverlayOpen || state.isPromotionOverlayOpen || state.isPerformanceReviewOverlayOpen || state.isCareerExamOpen || state.isFiredOverlayOpen || state.isRetirementOverlayOpen || state.isDateTriviaOpen || state.isEvictionOverlayOpen) return;
+            if (state.isDead || !state.playerPath || state.isExamModalOpen || state.isExamActive || state.isDiagnosisOverlayOpen || state.isPromotionOverlayOpen || state.isPerformanceReviewOverlayOpen || state.isCareerExamOpen || state.isFiredOverlayOpen || state.isRetirementOverlayOpen || state.isDateTriviaOpen || state.isCopingOverlayOpen || state.isEvictionOverlayOpen) return;
 
             if (state.isInSchool && state.currentlyPursuing) {
                 openYearlyExamOverlay();
@@ -6251,16 +6477,16 @@
 
         document.getElementById("age-up-btn").addEventListener("click", ageUp);
         document.getElementById("education-nav-btn").addEventListener("click", function () {
-            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isPerformanceReviewOverlayOpen && !state.isCareerExamOpen && !state.isFiredOverlayOpen && !state.isRetirementOverlayOpen && !state.isDateTriviaOpen && !state.isEvictionOverlayOpen) openEducationTab();
+            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isPerformanceReviewOverlayOpen && !state.isCareerExamOpen && !state.isFiredOverlayOpen && !state.isRetirementOverlayOpen && !state.isDateTriviaOpen && !state.isCopingOverlayOpen && !state.isEvictionOverlayOpen) openEducationTab();
         });
         document.getElementById("careers-nav-btn").addEventListener("click", function () {
-            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isPerformanceReviewOverlayOpen && !state.isCareerExamOpen && !state.isFiredOverlayOpen && !state.isRetirementOverlayOpen && !state.isDateTriviaOpen && !state.isEvictionOverlayOpen) openCareersTab();
+            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isPerformanceReviewOverlayOpen && !state.isCareerExamOpen && !state.isFiredOverlayOpen && !state.isRetirementOverlayOpen && !state.isDateTriviaOpen && !state.isCopingOverlayOpen && !state.isEvictionOverlayOpen) openCareersTab();
         });
         document.getElementById("activities-nav-btn").addEventListener("click", function () {
-            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isPerformanceReviewOverlayOpen && !state.isCareerExamOpen && !state.isFiredOverlayOpen && !state.isRetirementOverlayOpen && !state.isDateTriviaOpen && !state.isEvictionOverlayOpen) openActivitiesMenu();
+            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isPerformanceReviewOverlayOpen && !state.isCareerExamOpen && !state.isFiredOverlayOpen && !state.isRetirementOverlayOpen && !state.isDateTriviaOpen && !state.isCopingOverlayOpen && !state.isEvictionOverlayOpen) openActivitiesMenu();
         });
         document.getElementById("assets-nav-btn").addEventListener("click", function () {
-            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isPerformanceReviewOverlayOpen && !state.isCareerExamOpen && !state.isFiredOverlayOpen && !state.isRetirementOverlayOpen && !state.isDateTriviaOpen && !state.isEvictionOverlayOpen) openAssetsMenu();
+            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isPerformanceReviewOverlayOpen && !state.isCareerExamOpen && !state.isFiredOverlayOpen && !state.isRetirementOverlayOpen && !state.isDateTriviaOpen && !state.isCopingOverlayOpen && !state.isEvictionOverlayOpen) openAssetsMenu();
         });
         document.getElementById("play-again-btn").addEventListener("click", function () {
             location.reload();
