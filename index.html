@@ -1466,6 +1466,7 @@
         }
 
         function visitPsychiatrist() {
+            closeDiagnosisOverlay();
             if (state.cash < PSYCHIATRIST_VISIT_COST) {
                 logEvent("You couldn't afford a psychiatrist visit.");
                 closeModal();
@@ -1483,6 +1484,7 @@
 
             state.cash -= PSYCHIATRIST_VISIT_COST;
             const cured = [];
+            let visitProgressMade = false;
 
             activeMentalIllnesses.forEach(function (illnessKey) {
                 const disease = DISEASES[illnessKey];
@@ -1492,6 +1494,7 @@
 
                 if (disease.mentalCurable && mentalState.requiredVisitsRemaining > 0) {
                     mentalState.requiredVisitsRemaining -= 1;
+                    visitProgressMade = true;
                     if (mentalState.requiredVisitsRemaining <= 0) {
                         cured.push(illnessKey);
                     }
@@ -1508,7 +1511,7 @@
                 });
                 logEvent("Psychiatry sessions resolved: " + cured.map(function (key) { return DISEASES[key].name; }).join(", ") + ".");
             } else {
-                logEvent("You visited the psychiatrist. Mental illness symptoms were suppressed this year.");
+                logEvent("You visited the psychiatrist. Mental illness symptoms were suppressed this year." + (visitProgressMade ? " You are making treatment progress." : ""));
             }
 
             closeModal();
@@ -2282,7 +2285,7 @@
 
         function maybeContractDisease() {
             if (state.currentIllnesses.length >= 4) return;
-            if (Math.random() >= 0.26) return;
+            if (Math.random() >= 0.26 * getMentalRiskMultiplier()) return;
 
             const available = ILLNESS_ROLL_TABLE.filter(function (entry) {
                 return !state.currentIllnesses.includes(entry.key);
