@@ -356,10 +356,21 @@
 
         #modal-card {
             width: 100%;
+            max-width: min(520px, 100%);
+            max-height: min(92vh, 900px);
             background: #1a1a1a;
             border: 1px solid #333;
             border-radius: 14px;
             padding: 16px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-sizing: border-box;
+        }
+
+        #modal-card #modal-title,
+        #modal-card #modal-description {
+            flex-shrink: 0;
         }
 
         #modal-title {
@@ -375,8 +386,52 @@
         }
 
         #modal-actions {
-            display: grid;
+            display: flex;
+            flex-direction: column;
             gap: 10px;
+            flex: 1 1 auto;
+            min-height: 0;
+            overflow: hidden;
+        }
+
+        .modal-actions-scroll {
+            max-height: 55vh;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding-right: 15px;
+            margin-right: -4px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            scrollbar-width: thin;
+            scrollbar-color: #555 #1a1a1a;
+        }
+
+        .modal-actions-scroll::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .modal-actions-scroll::-webkit-scrollbar-track {
+            background: #1a1a1a;
+            border-radius: 4px;
+        }
+
+        .modal-actions-scroll::-webkit-scrollbar-thumb {
+            background: #555;
+            border-radius: 4px;
+        }
+
+        .modal-actions-scroll::-webkit-scrollbar-thumb:hover {
+            background: #666;
+        }
+
+        .modal-actions-footer {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            flex-shrink: 0;
+            padding-top: 4px;
+            border-top: 1px solid #2a2a2a;
         }
 
         .higher-ed-catalog {
@@ -2409,7 +2464,8 @@
             return parts.length ? parts.join(" | ") : "No immediate change";
         }
 
-        function openModal(title, description, actions) {
+        function openModal(title, description, actions, options) {
+            options = options || {};
             if (state.isExamModalOpen || state.isExamActive || state.isDiagnosisOverlayOpen || state.isPromotionOverlayOpen || state.isPerformanceReviewOverlayOpen || state.isEvictionOverlayOpen) return;
             if (higherEdCatalogRoot) {
                 higherEdCatalogRoot.render(null);
@@ -2418,7 +2474,21 @@
             modalDescription.innerHTML = description;
             modalActions.innerHTML = "";
 
-            actions.forEach(function (action) {
+            var scrollJobList = options.scrollJobActions === true;
+            var scrollHost = modalActions;
+            var footerHost = null;
+            if (scrollJobList && actions.length > 1) {
+                var scrollWrap = document.createElement("div");
+                scrollWrap.className = "modal-actions-scroll";
+                var footerWrap = document.createElement("div");
+                footerWrap.className = "modal-actions-footer";
+                modalActions.appendChild(scrollWrap);
+                modalActions.appendChild(footerWrap);
+                scrollHost = scrollWrap;
+                footerHost = footerWrap;
+            }
+
+            actions.forEach(function (action, idx) {
                 const btn = document.createElement("button");
                 btn.className = "modal-btn";
                 if (action.buttonVariant === "buyAfford") {
@@ -2439,7 +2509,11 @@
                 btn.addEventListener("click", function () {
                     action.handler();
                 });
-                modalActions.appendChild(btn);
+                var target = scrollHost;
+                if (footerHost && idx === actions.length - 1 && /^\s*close\s*$/i.test(String(action.label))) {
+                    target = footerHost;
+                }
+                target.appendChild(btn);
             });
 
             modalOverlay.style.display = "flex";
@@ -3552,6 +3626,19 @@
             return 0.15 + Math.random() * 0.15;
         }
 
+        function isOddJobListing(job) {
+            if (!job) return false;
+            if (job.jobKind === "OddJob") return true;
+            return job.requiredEducation === "None";
+        }
+
+        function getCareerHireChanceWithRecord() {
+            var base = getHireChance();
+            var tf = state.timesFired || 0;
+            var penalized = base * Math.pow(0.85, tf);
+            return Math.max(0.06, Math.min(0.98, penalized));
+        }
+
         function quitJob() {
             const prog = state.currentlyPursuing ? EDUCATION_PROGRAMS[state.currentlyPursuing] : null;
             if (prog && prog.pipeline === "residency") {
@@ -3593,12 +3680,12 @@
         }
 
         function applyForJob(job) {
-            const isOddJob = job.jobKind === "OddJob";
+            const isOddJob = isOddJobListing(job);
             if (!isOddJob && job.tier != null && !isCareerJobUnlocked(job)) {
                 logEvent("Application blocked: insufficient GPA tier or career experience for " + job.title + ".");
                 return;
             }
-            const chance = isOddJob ? 0.95 : getHireChance();
+            const chance = isOddJob ? 0.95 : getCareerHireChanceWithRecord();
             if (Math.random() < chance) {
                 state.annualIncome = job.salary;
                 state.jobTitle = job.title;
@@ -3723,7 +3810,8 @@
                     "<p style=\"margin:0;color:#d0d0d0;font-size:0.95rem;\">Professional roles on your " +
                     state.playerPath +
                     " path. Higher salaries need a strong GPA tier or enough years of experience.</p>",
-                actions
+                actions,
+                { scrollJobActions: true }
             );
         }
 
@@ -3754,7 +3842,8 @@
             openModal(
                 "Odd Jobs & Part-Time",
                 "No degree required. General listings plus " + state.playerPath + "-themed work. Easy to get hired; lighter stress if you study at the same time.",
-                actions
+                actions,
+                { scrollJobActions: true }
             );
         }
 
