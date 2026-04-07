@@ -813,6 +813,61 @@
             color: #fff;
         }
 
+        .careers-professional-profile {
+            margin: 14px 0 18px;
+            padding: 14px 16px;
+            border-radius: 12px;
+            border: 1px solid #3a3a3a;
+            background: #1a1a1a;
+            text-align: left;
+            line-height: 1.5;
+        }
+
+        .careers-professional-profile h3 {
+            margin: 0 0 12px;
+            font-size: 1.05rem;
+            color: #e0e0e0;
+            border-bottom: 1px solid #333;
+            padding-bottom: 8px;
+        }
+
+        .careers-profile-row {
+            margin: 6px 0;
+            font-size: 0.92rem;
+            color: #c0c0c0;
+        }
+
+        .careers-profile-row strong {
+            color: #fff;
+        }
+
+        .careers-profile-badge-pristine {
+            display: inline-block;
+            margin-left: 8px;
+            padding: 2px 8px;
+            border-radius: 6px;
+            font-size: 0.78rem;
+            font-weight: 600;
+            background: rgba(46, 125, 50, 0.25);
+            color: #a5d6a7;
+            border: 1px solid rgba(129, 199, 132, 0.4);
+        }
+
+        .careers-profile-terminations-warn strong {
+            color: #e57373 !important;
+        }
+
+        .careers-profile-bg-warning {
+            margin-top: 12px;
+            padding: 10px 12px;
+            border-radius: 10px;
+            background: rgba(183, 28, 28, 0.18);
+            border: 1px solid rgba(229, 115, 115, 0.35);
+            color: #ffcdd2;
+            font-size: 0.86rem;
+            line-height: 1.4;
+        }
+
         #eviction-overlay {
             position: fixed;
             top: 0;
@@ -1151,6 +1206,7 @@
             graduationTier: null,
             examPerformanceTier: null,
             totalWorkExperience: 0,
+            timesFired: 0,
             naturalAptitude: null
         };
 
@@ -2584,6 +2640,7 @@
                     promotionOverlayReactRoot.render(null);
                 }
                 state.happiness -= 20;
+                state.timesFired = (state.timesFired || 0) + 1;
                 logEvent("Performance review: terminated — fired for low morale, -20 Happiness.");
             }
             state.yearsSinceLastReview = 0;
@@ -3568,6 +3625,36 @@
             updateUI();
         }
 
+        function buildProfessionalProfileHtml() {
+            var exp = state.totalWorkExperience || 0;
+            var tf = state.timesFired || 0;
+            var termRow =
+                '<div class="careers-profile-row' + (tf > 0 ? " careers-profile-terminations-warn" : "") + '">' +
+                "Terminations on record: <strong>" + tf + "</strong>";
+            if (tf === 0) {
+                termRow += '<span class="careers-profile-badge-pristine">Status: Pristine Record</span>';
+            }
+            termRow += "</div>";
+            var warn =
+                tf > 0
+                    ? '<div class="careers-profile-bg-warning">🚩 Background Check Warning: You have been terminated from ' +
+                        tf +
+                        " previous role" +
+                        (tf === 1 ? "" : "s") +
+                        ". Top employers view you as a high-risk hire.</div>"
+                    : "";
+            return (
+                '<div class="careers-professional-profile">' +
+                "<h3>My Professional Profile</h3>" +
+                '<div class="careers-profile-row">Total Career Experience: <strong>' +
+                exp +
+                "</strong> Years</div>" +
+                termRow +
+                warn +
+                "</div>"
+            );
+        }
+
         function openJobBoard() {
             const enrProg = state.currentlyPursuing ? EDUCATION_PROGRAMS[state.currentlyPursuing] : null;
             if (enrProg && enrProg.pipeline === "residency") {
@@ -3631,8 +3718,11 @@
             actions.push({ label: "Close", handler: function () { closeModal(); } });
             openModal(
                 "Career Path (Requires Degree)",
-                "<strong>Total Career Experience: " + state.totalWorkExperience + " Years</strong> (full-time career work only; odd jobs do not count.)<br><br>" +
-                    "Professional roles on your " + state.playerPath + " path. Higher salaries need a strong GPA tier or enough years of experience.",
+                buildProfessionalProfileHtml() +
+                    "<p style=\"margin:0 0 8px;color:#bdbdbd;font-size:0.9rem;\">Full-time career work only; odd jobs do not count toward experience above.</p>" +
+                    "<p style=\"margin:0;color:#d0d0d0;font-size:0.95rem;\">Professional roles on your " +
+                    state.playerPath +
+                    " path. Higher salaries need a strong GPA tier or enough years of experience.</p>",
                 actions
             );
         }
@@ -3685,7 +3775,8 @@
                     "Type: " + (state.jobType === "OddJob" ? "Part-time / Odd Job" : state.jobType === "Career" ? "Career" : "Other") + "<br>" +
                     "Current Position: " + state.jobTitle + "<br>" +
                     "Current Salary: " + formatMoney(state.annualIncome) + " / year<br><br>" +
-                    "<span style=\"color:#bdbdbd;font-size:0.9rem;\">Career jobs use your " + state.playerPath + " path and credentials. Odd jobs never require a degree.</span>";
+                    "<span style=\"color:#bdbdbd;font-size:0.9rem;\">Career jobs use your " + state.playerPath + " path and credentials. Odd jobs never require a degree.</span>" +
+                    buildProfessionalProfileHtml();
                 openModal(
                     "Careers",
                     panel,
@@ -3704,9 +3795,9 @@
 
             openModal(
                 "Careers",
-                "<strong>Total Career Experience: " + state.totalWorkExperience + " Years</strong><br>" +
-                    "Status: " + state.jobTitle + " | Annual Income: " + formatMoney(state.annualIncome) + "<br>" + lockReason +
-                    "<br><br><strong>Choose a job board:</strong>",
+                "Status: " + state.jobTitle + " | Annual Income: " + formatMoney(state.annualIncome) + "<br>" + lockReason +
+                    buildProfessionalProfileHtml() +
+                    "<strong>Choose a job board:</strong>",
                 [
                     {
                         label: canCareerBoard ? "Career Path (Requires Degree)" : "Career Path (Locked)",
