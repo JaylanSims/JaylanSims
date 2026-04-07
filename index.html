@@ -2062,6 +2062,103 @@
             background: transparent;
             color: #b0b0b0;
         }
+
+        #networking-job-offer-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 10025;
+            background: rgba(10, 14, 20, 0.92);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        .networking-dm-card {
+            width: 100%;
+            max-width: 400px;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+            overflow: hidden;
+            font-family: "Inter", system-ui, -apple-system, sans-serif;
+            color: #1a1a1a;
+        }
+
+        .networking-dm-header {
+            padding: 12px 16px;
+            background: #0a66c2;
+            color: #fff;
+            font-size: 0.8rem;
+            font-weight: 600;
+            letter-spacing: 0.02em;
+        }
+
+        .networking-dm-thread {
+            padding: 16px;
+            border-bottom: 1px solid #e8e8e8;
+        }
+
+        .networking-dm-from {
+            font-size: 0.75rem;
+            color: #666;
+            margin-bottom: 8px;
+        }
+
+        .networking-dm-from strong {
+            color: #000;
+            font-weight: 600;
+        }
+
+        .networking-dm-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #ddd, #bbb);
+            float: left;
+            margin-right: 12px;
+        }
+
+        .networking-dm-body {
+            font-size: 0.9rem;
+            line-height: 1.5;
+            color: #222;
+            margin: 0;
+            overflow: hidden;
+        }
+
+        .networking-dm-actions {
+            padding: 12px 16px 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .networking-dm-btn {
+            width: 100%;
+            padding: 12px 14px;
+            border-radius: 24px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            font-family: inherit;
+        }
+
+        .networking-dm-btn-sellout {
+            background: #0a66c2;
+            color: #fff;
+        }
+
+        .networking-dm-btn-decline {
+            background: transparent;
+            color: #0a66c2;
+            border: 2px solid #0a66c2;
+        }
     </style>
 </head>
 <body>
@@ -2083,6 +2180,7 @@
     <div id="tombstone-overlay-root"></div>
     <div id="car-scrapped-overlay-root"></div>
     <div id="eviction-overlay-root"></div>
+    <div id="networking-job-offer-overlay-root"></div>
     <div id="app-container">
         <div id="intro-screen">
             <div id="intro-open-brand" aria-hidden="false">
@@ -2322,7 +2420,12 @@
             medicalLeaveYearsRemaining: 0,
             disabilityIncome: 0,
             isNervousBreakdownOverlayOpen: false,
-            isLayoffOverlayOpen: false
+            isLayoffOverlayOpen: false,
+            networkingCloutPoints: 0,
+            pendingNetworkingOffer: null,
+            isNetworkingJobOfferOverlayOpen: false,
+            networkingStressBoost: 0,
+            _networkingOfferOpenedFromModal: false
         };
 
         const CAR_MARKET_LISTINGS = [
@@ -2477,6 +2580,8 @@
         const carScrappedOverlayMount = document.getElementById("car-scrapped-overlay-root");
         let carScrappedOverlayReactRoot = null;
         const evictionOverlayMount = document.getElementById("eviction-overlay-root");
+        const networkingJobOfferOverlayMount = document.getElementById("networking-job-offer-overlay-root");
+        let networkingJobOfferOverlayReactRoot = null;
         let evictionOverlayReactRoot = null;
         let higherEdCatalogRoot = null;
         const diagnosisOverlayRoot = document.getElementById("diagnosis-overlay-root");
@@ -3901,9 +4006,178 @@
             }
             syncFinancialAliases();
             if (state.cash < 0) s += 10;
+            s += Math.max(0, Math.min(100, state.networkingStressBoost || 0));
             if (s < 0) s = 0;
             if (s > 100) s = 100;
             return s;
+        }
+
+        function getOtherTracksForNetworking() {
+            var all = ["STEM", "Humanities", "Trades"];
+            var cur = state.playerPath;
+            return all.filter(function (p) { return p !== cur; });
+        }
+
+        function pickRandomOtherTrack() {
+            var others = getOtherTracksForNetworking();
+            if (others.length === 0) return null;
+            return others[Math.floor(Math.random() * others.length)];
+        }
+
+        function networkingOfferTitleForTrack(track) {
+            if (track === "STEM") return "Senior Vice President, Strategy & Operations";
+            if (track === "Trades") return "Director of Field Operations";
+            if (track === "Humanities") return "Executive Creative Director";
+            return "Principal Consultant";
+        }
+
+        function networkingOfferYearsRequired(track) {
+            var jobs = JOB_MARKET[track] || [];
+            var tier1 = jobs.filter(function (j) { return j && j.tier === 1; });
+            if (tier1.length) {
+                var minExp = 99;
+                tier1.forEach(function (j) {
+                    var e = typeof j.experienceRequired === "number" ? j.experienceRequired : 8;
+                    if (e < minExp) minExp = e;
+                });
+                return minExp;
+            }
+            return 8;
+        }
+
+        function generateNetworkingCrossTrackOffer() {
+            var track = pickRandomOtherTrack();
+            if (!track) return null;
+            var baseIncome = Math.max(1, state.annualIncome || state.salary || 0);
+            var salary = Math.round(baseIncome * 2);
+            return {
+                title: networkingOfferTitleForTrack(track),
+                salary: salary,
+                track: track,
+                yearsExperienceRequired: networkingOfferYearsRequired(track)
+            };
+        }
+
+        function maybeOpenNetworkingJobOfferFromActivity() {
+            if (Math.random() >= 0.15) return false;
+            var offer = generateNetworkingCrossTrackOffer();
+            if (!offer) return false;
+            state.pendingNetworkingOffer = offer;
+            state.isNetworkingJobOfferOverlayOpen = true;
+            state._networkingOfferOpenedFromModal = true;
+            renderNetworkingJobOfferOverlay();
+            updateUI();
+            return true;
+        }
+
+        function NetworkingJobOfferOverlay(props) {
+            var o = props.offer;
+            if (!o) return null;
+            var nm = props.playerName || "there";
+            return (
+                <div id="networking-job-offer-overlay" role="dialog" aria-modal="true" aria-label="Job offer message">
+                    <div className="networking-dm-card">
+                        <div className="networking-dm-header">Messages</div>
+                        <div className="networking-dm-thread">
+                            <div className="networking-dm-from">
+                                <div className="networking-dm-avatar" aria-hidden="true" />
+                                <strong>From:</strong> An Old High School Acquaintance
+                            </div>
+                            <p className="networking-dm-body">
+                                {"Hey " + nm + "! I saw your profile and our company is looking for talent. We don't care about your lack of experience in this field; we need someone with your aptitude. This role pays " + formatMoney(o.salary) + ", fully remote. What do you say?"}
+                            </p>
+                        </div>
+                        <div className="networking-dm-actions">
+                            <button type="button" className="networking-dm-btn networking-dm-btn-sellout" onClick={props.onSellOut}>
+                                Yes, I&apos;ll Sell Out.
+                            </button>
+                            <button type="button" className="networking-dm-btn networking-dm-btn-decline" onClick={props.onDecline}>
+                                No, My Happiness is Priceless.
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        function renderNetworkingJobOfferOverlay() {
+            if (!networkingJobOfferOverlayMount) return;
+            if (!state.isNetworkingJobOfferOverlayOpen || !state.pendingNetworkingOffer) {
+                if (networkingJobOfferOverlayReactRoot) networkingJobOfferOverlayReactRoot.render(null);
+                return;
+            }
+            if (!networkingJobOfferOverlayReactRoot) {
+                networkingJobOfferOverlayReactRoot = ReactDOM.createRoot(networkingJobOfferOverlayMount);
+            }
+            networkingJobOfferOverlayReactRoot.render(
+                <NetworkingJobOfferOverlay
+                    offer={state.pendingNetworkingOffer}
+                    playerName={state.playerName || "there"}
+                    onSellOut={handleNetworkingOfferSellOut}
+                    onDecline={handleNetworkingOfferDecline}
+                />
+            );
+        }
+
+        function closeNetworkingJobOfferOverlay() {
+            state.isNetworkingJobOfferOverlayOpen = false;
+            state.pendingNetworkingOffer = null;
+            if (networkingJobOfferOverlayReactRoot) {
+                networkingJobOfferOverlayReactRoot.render(null);
+            }
+        }
+
+        function applyNetworkingOfferHire(offer) {
+            state.playerPath = offer.track;
+            state.major = offer.track;
+            state.jobTitle = offer.title;
+            state.annualIncome = offer.salary;
+            state.salary = offer.salary;
+            state.isEmployed = true;
+            state.jobType = "Career";
+            state.oddJobBaseSalary = null;
+            state.yearsAtCurrentJob = 0;
+            state.currentJobLevel = 1;
+            bumpHighestCareerTier(1);
+            state.pendingPromotion = null;
+            state.isPromotionOverlayOpen = false;
+            if (promotionOverlayReactRoot) promotionOverlayReactRoot.render(null);
+            resetPerformanceReviewTracking();
+            resetCareerPerformanceScore();
+            state.networkingStressBoost = 60;
+            state.happiness -= 40;
+            state.happiness = clampStat(state.happiness);
+            syncFinancialAliases();
+            refreshStressHappinessMultiplier();
+            logEvent("Networking offer accepted: switched to " + offer.track + " track as " + offer.title + " — major stress spike.");
+        }
+
+        function handleNetworkingOfferSellOut() {
+            var offer = state.pendingNetworkingOffer;
+            if (!offer) {
+                closeNetworkingJobOfferOverlay();
+                return;
+            }
+            applyNetworkingOfferHire(offer);
+            closeNetworkingJobOfferOverlay();
+            if (state._networkingOfferOpenedFromModal) {
+                state._networkingOfferOpenedFromModal = false;
+                closeModal();
+            }
+            updateUI();
+        }
+
+        function handleNetworkingOfferDecline() {
+            state.pendingNetworkingOffer = null;
+            closeNetworkingJobOfferOverlay();
+            state.happiness += 5;
+            state.happiness = clampStat(state.happiness);
+            logEvent("You declined the cross-track DM offer. Happiness +5.");
+            if (state._networkingOfferOpenedFromModal) {
+                state._networkingOfferOpenedFromModal = false;
+                closeModal();
+            }
+            updateUI();
         }
 
         function refreshStressHappinessMultiplier() {
@@ -6275,6 +6549,13 @@
             return getAlignment() === "True Calling" ? 0.75 : 0.3;
         }
 
+        /** Tier 1 & 2 career roles require visible professional network (LinkedIn clout). */
+        function hasNetworkingCloutForCareerTier(jobTier) {
+            var t = typeof jobTier === "number" ? jobTier : 3;
+            if (t !== 1 && t !== 2) return true;
+            return (state.networkingCloutPoints || 0) >= 15;
+        }
+
         function isCareerJobUnlocked(job) {
             var glassCeiling =
                 getAlignment() === "Selling Out" &&
@@ -6282,6 +6563,9 @@
                 state.examPerformanceTier === 1 &&
                 state.totalWorkExperience < (job.experienceRequired || 8);
             if (glassCeiling) return false;
+            if (job.tier === 1 || job.tier === 2) {
+                if (!hasNetworkingCloutForCareerTier(job.tier)) return false;
+            }
             if (state.graduationTier !== null && state.graduationTier <= job.tier) return true;
             if (state.totalWorkExperience >= job.experienceRequired) return true;
             return false;
@@ -6704,7 +6988,11 @@
             }
             const isOddJob = isOddJobListing(job);
             if (!isOddJob && job.tier != null && !isCareerJobUnlocked(job)) {
-                logEvent("Application blocked: insufficient GPA tier or career experience for " + job.title + ".");
+                if ((job.tier === 1 || job.tier === 2) && !hasNetworkingCloutForCareerTier(job.tier)) {
+                    logEvent("Application blocked: Tier " + job.tier + " roles require at least 15 Networking Clout Points (Relationships → Network on LinkedIn).");
+                } else {
+                    logEvent("Application blocked: insufficient GPA tier or career experience for " + job.title + ".");
+                }
                 return;
             }
             const chance = isOddJob ? 0.95 : getCareerHireChanceWithRecord();
@@ -6784,6 +7072,7 @@
         function buildProfessionalProfileHtml() {
             var exp = state.totalWorkExperience || 0;
             var tf = state.timesFired || 0;
+            var clout = state.networkingCloutPoints || 0;
             var termRow =
                 '<div class="careers-profile-row' + (tf > 0 ? " careers-profile-terminations-warn" : "") + '">' +
                 "Terminations on record: <strong>" + tf + "</strong>";
@@ -6805,6 +7094,9 @@
                 '<div class="careers-profile-row">Total Career Experience: <strong>' +
                 exp +
                 "</strong> Years</div>" +
+                '<div class="careers-profile-row">Networking Clout: <strong>' +
+                clout +
+                "</strong> <span style=\"color:#9e9e9e;font-size:0.85rem;\">(Tier 1–2 careers need 15+)</span></div>" +
                 termRow +
                 warn +
                 buildVehicleProfileHtml() +
@@ -6876,20 +7168,29 @@
             const jobs = JOB_MARKET[state.playerPath] || [];
             const actions = jobs.map(function (job) {
                 const credOk = meetsEducationRequirement(job.requiredEducation);
+                const glassCeilingLock =
+                    getAlignment() === "Selling Out" &&
+                    job.tier === 1 &&
+                    state.examPerformanceTier === 1 &&
+                    state.totalWorkExperience < job.experienceRequired;
+                const cloutLock =
+                    (job.tier === 1 || job.tier === 2) && !hasNetworkingCloutForCareerTier(job.tier);
                 const tierOk = isCareerJobUnlocked(job);
                 const canApply = credOk && tierOk;
                 var label;
                 if (!credOk) {
                     label = job.title + " — Requires " + job.requiredEducation;
                 } else if (!tierOk) {
-                    var glassCeilingLock =
-                        getAlignment() === "Selling Out" &&
-                        job.tier === 1 &&
-                        state.examPerformanceTier === 1 &&
-                        state.totalWorkExperience < job.experienceRequired;
                     if (glassCeilingLock) {
                         label = "Locked (Glass Ceiling): Tier 1 blocked while misaligned — need " + job.experienceRequired + "+ yrs exp. — " +
                             job.title + " (" + formatMoney(job.salary) + ")";
+                    } else if (cloutLock) {
+                        label =
+                            "Locked: Need 15+ Networking Clout (use Network on LinkedIn in Relationships) — " +
+                            job.title +
+                            " (" +
+                            formatMoney(job.salary) +
+                            ")";
                     } else {
                         label = "Locked: Requires Tier " + job.tier + " Degree OR " + job.experienceRequired + " Years Exp. — " +
                             job.title + " (" + formatMoney(job.salary) + ")";
@@ -8702,7 +9003,7 @@
             });
 
             actions.push({
-                label: lifestyleActionLabel("Networking Event", 1000, {}, 14),
+                label: lifestyleActionLabel("Network on LinkedIn", 1000, {}, 14),
                 disabled: netAvail.disabled,
                 disabledReason: netAvail.disabledReason,
                 handler: function () {
@@ -8717,13 +9018,13 @@
                     }
                     state.activityWtuSpentThisWeek = (state.activityWtuSpentThisWeek || 0) + 14;
                     state.cash -= 1000;
-                    state.salary *= 1.05;
-                    state.annualIncome = state.salary;
-                    loseHappiness(4);
-                    logEvent("Networking event: salary +5%, Happiness -4.");
-                    state.happiness = clampStat(state.happiness);
+                    state.networkingCloutPoints = (state.networkingCloutPoints || 0) + 15;
+                    logEvent("You networked on LinkedIn: +15 Networking Clout. Top-tier career applications expect visible connections.");
                     syncFinancialAliases();
                     updateUI();
+                    if (maybeOpenNetworkingJobOfferFromActivity()) {
+                        return;
+                    }
                     closeModal();
                 }
             });
@@ -8750,7 +9051,13 @@
                 }
             });
 
-            openModal("Relationships", dash + "Invest in connections. Career jobs drain weekly time (WTU).", actions);
+            openModal(
+                "Relationships",
+                dash +
+                    "Invest in connections. Career jobs drain weekly time (WTU). " +
+                    "<strong>Network on LinkedIn</strong> builds Clout (15 per session); Tier 1 and Tier 2 career roles require at least 15 Clout to apply.",
+                actions
+            );
         }
 
         function triggerRandomEvent() {
