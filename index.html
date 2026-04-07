@@ -332,13 +332,18 @@
 
         #yearly-exam-overlay {
             position: fixed;
-            inset: 0;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 9999;
+            background: rgba(0, 0, 0, 0.98);
             display: none;
+            flex-direction: column;
             align-items: center;
             justify-content: center;
             padding: 20px;
-            background: rgba(0, 0, 0, 0.86);
-            z-index: 9999;
+            box-sizing: border-box;
         }
 
         #yearly-exam-overlay.open {
@@ -374,14 +379,14 @@
         .exam-option {
             width: 100%;
             border: 1px solid #3a3a3a;
-            border-radius: 10px;
+            border-radius: 12px;
             background: #232323;
             color: #fff;
             text-align: left;
-            padding: 14px;
-            font-size: 1rem;
+            padding: 18px 16px;
+            font-size: 1.05rem;
             cursor: pointer;
-            min-height: 52px;
+            min-height: 64px;
         }
 
         .exam-option:disabled {
@@ -516,6 +521,7 @@
     </style>
 </head>
 <body>
+    <div id="yearly-exam-react-root"></div>
     <div id="app-container">
         <div id="intro-screen">
             <img src="js-games-logo.png" alt="JS Games" id="intro-logo" onerror="this.onerror=null;this.src='./js-games-logo.png';">
@@ -586,7 +592,6 @@
             </div>
         </div>
 
-        <div id="yearly-exam-root"></div>
         <div id="diagnosis-overlay-root"></div>
 
         <div id="death-screen">
@@ -598,7 +603,10 @@
         </div>
     </div>
 
-    <script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js" crossorigin></script>
+    <script type="text/babel" data-presets="react">
         let state = {
             age: 18, health: 100, happiness: 100, smarts: 50,
             cash: 5000, investments: 0, debt: 0, salary: 0, expenses: 25000, annualExpenses: 25000, bankBalance: 5000,
@@ -612,7 +620,9 @@
             isDiagnosisOverlayOpen: false, currentDiagnosisIllnessKey: null,
             canAccessDoctor: true, activeView: "MainGameplay",
             mentalIllnessState: {},
-            happinessZeroStreakYears: 0
+            happinessZeroStreakYears: 0,
+            isInSchool: false,
+            isExamActive: false
         };
 
         const setupScreen = document.getElementById("setup-screen");
@@ -624,7 +634,8 @@
         const modalTitle = document.getElementById("modal-title");
         const modalDescription = document.getElementById("modal-description");
         const modalActions = document.getElementById("modal-actions");
-        const yearlyExamRoot = document.getElementById("yearly-exam-root");
+        const yearlyExamReactMount = document.getElementById("yearly-exam-react-root");
+        let yearlyExamReactRoot = null;
         const diagnosisOverlayRoot = document.getElementById("diagnosis-overlay-root");
         const deathScreen = document.getElementById("death-screen");
         const deathTitle = document.getElementById("death-title");
@@ -782,68 +793,68 @@
         const EXAM_QUESTION_BANKS = {
             STEM: [
                 {
-                    question: "What is the time complexity of Binary Search?",
-                    options: ["O(n)", "O(log n)", "O(n log n)", "O(1)"],
+                    question: "In Thermodynamics, which law states that entropy tends to increase?",
+                    options: ["First Law", "Second Law", "Third Law", "Zeroth Law"],
                     correctAnswerIndex: 1
                 },
                 {
-                    question: "Which rule predicts the major product toward the more substituted alkene?",
-                    options: ["Markovnikov's Rule", "Le Chatelier's Principle", "Zaitsev's Rule", "Hess's Law"],
+                    question: "Which concept refers to a function calling itself?",
+                    options: ["Iteration", "Recursion", "Inheritance", "Polymorphism"],
+                    correctAnswerIndex: 1
+                },
+                {
+                    question: "What is the derivative of sin(x)?",
+                    options: ["-sin(x)", "cos(x)", "tan(x)", "sec²(x)"],
+                    correctAnswerIndex: 1
+                },
+                {
+                    question: "Which element has the highest electronegativity?",
+                    options: ["Oxygen", "Chlorine", "Fluorine", "Nitrogen"],
                     correctAnswerIndex: 2
-                },
-                {
-                    question: "What is the indefinite integral of 1/x?",
-                    options: ["x + C", "1/(x^2) + C", "e^x + C", "ln|x| + C"],
-                    correctAnswerIndex: 3
-                },
-                {
-                    question: "Who introduced the Uncertainty Principle?",
-                    options: ["Einstein", "Heisenberg", "Bohr", "Feynman"],
-                    correctAnswerIndex: 1
                 }
             ],
             Humanities: [
                 {
-                    question: "Which architectural style is known for flying buttresses?",
-                    options: ["Baroque", "Renaissance", "Gothic", "Neoclassical"],
+                    question: "Which movement was led by Salvador Dalí?",
+                    options: ["Impressionism", "Cubism", "Surrealism", "Dada"],
                     correctAnswerIndex: 2
                 },
                 {
-                    question: "Who wrote 'A Room of One's Own'?",
-                    options: ["Jane Austen", "Virginia Woolf", "George Eliot", "Toni Morrison"],
-                    correctAnswerIndex: 1
+                    question: "Who popularized 'The Hero's Journey'?",
+                    options: ["Sigmund Freud", "Carl Jung", "Joseph Campbell", "James Joyce"],
+                    correctAnswerIndex: 2
                 },
                 {
-                    question: "What are the primary subtractive colors?",
-                    options: ["Red, Blue, Yellow", "Cyan, Magenta, Yellow", "Red, Green, Blue", "Orange, Green, Purple"],
-                    correctAnswerIndex: 1
+                    question: "Which period featured Bach and Vivaldi?",
+                    options: ["Classical", "Romantic", "Baroque", "Modern"],
+                    correctAnswerIndex: 2
                 },
                 {
-                    question: "Which philosophy emphasizes emotional resilience through discipline?",
-                    options: ["Nihilism", "Existentialism", "Empiricism", "Stoicism"],
-                    correctAnswerIndex: 3
+                    question: "What is a word's literal, dictionary definition?",
+                    options: ["Connotation", "Denotation", "Etymology", "Syntax"],
+                    correctAnswerIndex: 1
                 }
             ],
             Trades: [
                 {
-                    question: "What is the standard wall stud spacing in most framing?",
-                    options: ["12 inches", "16 inches", "20 inches", "24 inches"],
+                    question: "What is the purpose of a level in construction?",
+                    options: ["Measure angles only", "Check horizontal/vertical alignment", "Mark cuts only", "Test for live voltage"],
                     correctAnswerIndex: 1
                 },
                 {
-                    question: "What is the purpose of a P-trap in plumbing?",
-                    options: ["Increase water pressure", "Prevent sewer gases from entering", "Filter hard minerals", "Store clean water"],
+                    question: "Which device shuts off a circuit during overload?",
+                    options: ["A fuse only (never resets)", "Circuit breaker", "Ground wire", "Resistor"],
                     correctAnswerIndex: 1
                 },
                 {
-                    question: "Which tool is commonly used to test live wires safely?",
-                    options: ["Pipe wrench", "Stud finder", "Multimeter", "Hacksaw"],
+                    question: "Which tool is used to smooth wood before painting?",
+                    options: ["Chisel", "Hand plane", "Sandpaper", "Soldering iron"],
                     correctAnswerIndex: 2
                 },
                 {
-                    question: "What is Argon primarily used for in MIG welding?",
-                    options: ["Cooling the torch", "Strengthening filler wire", "Shielding gas", "Cleaning base metal"],
-                    correctAnswerIndex: 2
+                    question: "What does 'PPE' stand for?",
+                    options: ["Project Planning Estimate", "Personal Protective Equipment", "Power Press Exam", "Public Permit Entry"],
+                    correctAnswerIndex: 1
                 }
             ]
         };
@@ -1015,6 +1026,7 @@
         const PSYCHIATRIST_VISIT_COST = 350;
         const MENTAL_HEALTH_SUPPRESSION_FACTOR = 0.25;
         const STEM_MENTAL_RISK_MULTIPLIER = 1.4;
+        const STEM_DISMISSAL_MENTAL_MULTIPLIER = 1.4;
 
         const MENTAL_TIER_ORDER = ["mild", "medium", "severe"];
         const MENTAL_TIER_HAPPINESS_DRAIN = {
@@ -1110,7 +1122,11 @@
         }
 
         function getMentalRiskMultiplier() {
-            return state.playerPath === "STEM" ? STEM_MENTAL_RISK_MULTIPLIER : 1;
+            let mult = state.playerPath === "STEM" ? STEM_MENTAL_RISK_MULTIPLIER : 1;
+            if (state.academicDismissed && state.playerPath === "STEM") {
+                mult *= STEM_DISMISSAL_MENTAL_MULTIPLIER;
+            }
+            return mult;
         }
 
         function getMentalTierIndex(tier) {
@@ -1139,49 +1155,6 @@
             });
         }
         addMentalIllnessDefinitions();
-
-        const proceduralWordBanks = {
-            relative: ["cousin", "uncle", "aunt", "step-brother", "grandma"],
-            animal: ["rabid raccoon", "stray dog", "massive bear", "feral cat", "pigeon"],
-            item: ["dirty magazine", "gold watch", "bag of weird pills", "stack of cash"],
-            location: ["the grocery store", "a dark alley", "the park", "your front porch"],
-            ailment: ["the flu", "food poisoning", "a mysterious rash", "a crippling migraine"]
-        };
-
-        const GENERATED_WORDS_PER_BANK = 1000000000;
-
-        const proceduralEventTemplates = [
-            {
-                id: "animal_attack",
-                title: "Wild Encounter!",
-                description: "While walking near [location], a [animal] suddenly lunges at you!",
-                choices: [
-                    { text: "Fight it off!", effects: { health: -20, happiness: -10 } },
-                    { text: "Run for your life!", effects: { health: -5, happiness: -5 } }
-                ]
-            },
-            {
-                id: "found_item",
-                title: "Look What I Found",
-                description: "Your [relative] calls you over and gives you a [item] they found near [location].",
-                choices: [
-                    { text: "Take it.", effects: { cash: 50, happiness: 15 } },
-                    { text: "Refuse it. That's weird.", effects: { happiness: -5 } }
-                ]
-            },
-            {
-                id: "sudden_illness",
-                title: "Feeling Under the Weather",
-                description: "You wake up feeling terrible. The doctor says you have caught [ailment].",
-                choices: [
-                    { text: "Pay $100 for medicine.", effects: { cash: -100, health: 10, happiness: 5 } },
-                    { text: "Tough it out.", effects: { health: -30, happiness: -20 } }
-                ]
-            }
-        ];
-
-        let yearlyProceduralEventTotal = 0;
-        let yearlyProceduralEventRemaining = 0;
 
         const proceduralWordBanks = {
             relative: ["cousin", "uncle", "aunt", "step-brother", "grandma"],
@@ -1283,7 +1256,7 @@
         }
 
         function openModal(title, description, actions) {
-            if (state.isExamModalOpen || state.isDiagnosisOverlayOpen) return;
+            if (state.isExamModalOpen || state.isExamActive || state.isDiagnosisOverlayOpen) return;
             modalTitle.textContent = title;
             modalDescription.innerHTML = description;
             modalActions.innerHTML = "";
@@ -1311,22 +1284,37 @@
         }
 
         function YearlyExamOverlay(props) {
-            const optionsHtml = props.question.options.map(function (optionText, optionIndex) {
-                let feedbackClass = "";
-                if (props.showFeedback && props.selectedOptionIndex === optionIndex) {
-                    feedbackClass = optionIndex === props.question.correctAnswerIndex ? "correct" : "wrong";
-                }
-                return "<button class=\"exam-option " + feedbackClass + "\" data-option-index=\"" + optionIndex + "\" " +
-                    (props.showFeedback ? "disabled" : "") + ">" + optionText + "</button>";
-            }).join("");
-
-            return "<div id=\"yearly-exam-overlay\" class=\"open\" role=\"dialog\" aria-modal=\"true\" aria-label=\"Yearly Exam\">" +
-                "<div id=\"exam-desk\">" +
-                "<h2 id=\"exam-title\">FINAL EXAM: YEAR " + props.currentSchoolYear + "</h2>" +
-                "<p id=\"exam-question\">" + props.question.question + "</p>" +
-                "<div id=\"exam-options\">" + optionsHtml + "</div>" +
-                "</div>" +
-                "</div>";
+            const q = props.question;
+            if (!q) return null;
+            return (
+                <div id="yearly-exam-overlay" className="open" role="dialog" aria-modal="true" aria-label="Yearly Exam">
+                    <div id="exam-desk">
+                        <h2 id="exam-title">FINAL EXAM: YEAR {props.currentSchoolYear}</h2>
+                        <p id="exam-question">{q.question}</p>
+                        <div id="exam-options">
+                            {q.options.map(function (optionText, optionIndex) {
+                                let feedbackClass = "";
+                                if (props.showFeedback && props.selectedOptionIndex === optionIndex) {
+                                    feedbackClass = optionIndex === q.correctAnswerIndex ? "correct" : "wrong";
+                                }
+                                return (
+                                    <button
+                                        key={optionIndex}
+                                        type="button"
+                                        className={"exam-option " + feedbackClass}
+                                        disabled={props.showFeedback}
+                                        onClick={function () {
+                                            if (!props.showFeedback) props.onSelectOption(optionIndex);
+                                        }}
+                                    >
+                                        {optionText}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+                </div>
+            );
         }
 
         function getRandomExamQuestionForPath(path) {
@@ -1341,32 +1329,36 @@
         }
 
         function renderYearlyExamOverlay(selectedOptionIndex, showFeedback) {
+            if (!yearlyExamReactMount) return;
             if (!state.isExamModalOpen || !state.currentExamQuestion) {
-                yearlyExamRoot.innerHTML = "";
+                state.isExamActive = false;
+                if (yearlyExamReactRoot) {
+                    yearlyExamReactRoot.render(null);
+                }
                 return;
             }
-
-            yearlyExamRoot.innerHTML = YearlyExamOverlay({
-                currentSchoolYear: state.yearsInSchool + 1,
-                question: state.currentExamQuestion,
-                selectedOptionIndex: selectedOptionIndex,
-                showFeedback: showFeedback
-            });
-
-            if (showFeedback) return;
-
-            yearlyExamRoot.querySelectorAll(".exam-option").forEach(function (btn) {
-                btn.addEventListener("click", function () {
-                    const selectedIndex = Number(btn.dataset.optionIndex);
-                    handleYearlyExamAnswer(selectedIndex);
-                });
-            });
+            state.isExamActive = true;
+            if (!yearlyExamReactRoot) {
+                yearlyExamReactRoot = ReactDOM.createRoot(yearlyExamReactMount);
+            }
+            yearlyExamReactRoot.render(
+                <YearlyExamOverlay
+                    currentSchoolYear={state.yearsInSchool + 1}
+                    question={state.currentExamQuestion}
+                    selectedOptionIndex={selectedOptionIndex}
+                    showFeedback={showFeedback}
+                    onSelectOption={handleYearlyExamAnswer}
+                />
+            );
         }
 
         function closeYearlyExamOverlay() {
             state.isExamModalOpen = false;
+            state.isExamActive = false;
             state.currentExamQuestion = null;
-            yearlyExamRoot.innerHTML = "";
+            if (yearlyExamReactRoot) {
+                yearlyExamReactRoot.render(null);
+            }
         }
 
         function escapeHtml(text) {
@@ -1636,6 +1628,14 @@
             return diagnoseIllness("depression", { setHappinessZero: true, skipHappinessPenalty: true });
         }
 
+        function getRequiredExamPassesForProgram(program) {
+            const byRatio = Math.ceil(program.yearsRequired * 0.75);
+            if (program.yearsRequired >= 4) {
+                return Math.max(3, byRatio);
+            }
+            return byRatio;
+        }
+
         function handleAcademicDismissal(program, requiredPasses) {
             const passedCount = state.examsPassedThisDegree;
             state.academicDismissed = true;
@@ -1643,13 +1643,14 @@
             state.yearsInSchool = 0;
             state.examsPassedThisDegree = 0;
             state.examsTakenThisDegree = 0;
+            state.isInSchool = true;
 
             logEvent("Academic dismissal: you did not pass enough yearly exams for " + program.degreeName + ".");
             openModal(
-                "Academic Dismissal",
-                "You passed " + passedCount + "/" + program.yearsRequired +
+                "Academic Dismissal — Failed Final Year",
+                "<strong>You did not meet the graduation exam requirement.</strong><br><br>You passed " + passedCount + "/" + program.yearsRequired +
                 " exams (minimum required: " + requiredPasses + "). You must restart " +
-                program.degreeName + " from Year 1. Find a Job is locked until you successfully graduate.",
+                program.degreeName + " from Year 1. Careers and Find a Job stay locked until you graduate successfully.",
                 [
                     {
                         label: "Continue",
@@ -1690,7 +1691,7 @@
             }
 
             if (state.yearsInSchool >= program.yearsRequired) {
-                const requiredPasses = Math.ceil(program.yearsRequired * 0.75);
+                const requiredPasses = getRequiredExamPassesForProgram(program);
                 if (state.examsPassedThisDegree >= requiredPasses) {
                     completeProgram(state.currentlyPursuing);
                 } else {
@@ -1843,6 +1844,8 @@
             state.examsTakenThisDegree = 0;
             state.currentExamQuestion = null;
             state.isExamModalOpen = false;
+            state.isExamActive = false;
+            state.isInSchool = true;
             state.jobSearchBlocked = true;
             state.annualIncome = 0;
             state.salary = 0;
@@ -1886,6 +1889,8 @@
             state.yearsInSchool = 0;
             state.examsPassedThisDegree = 0;
             state.examsTakenThisDegree = 0;
+            state.isInSchool = false;
+            state.isExamActive = false;
             state.academicDismissed = false;
             state.jobSearchBlocked = false;
             state.educationLevel = program.educationLevel;
@@ -2731,9 +2736,9 @@
         }
 
         function ageUp() {
-            if (state.isDead || !state.playerPath || state.isExamModalOpen || state.isDiagnosisOverlayOpen) return;
+            if (state.isDead || !state.playerPath || state.isExamModalOpen || state.isExamActive || state.isDiagnosisOverlayOpen) return;
 
-            if (state.currentlyPursuing) {
+            if (state.isInSchool && state.currentlyPursuing) {
                 openYearlyExamOverlay();
                 return;
             }
@@ -2839,16 +2844,16 @@
 
         document.getElementById("age-up-btn").addEventListener("click", ageUp);
         document.getElementById("education-nav-btn").addEventListener("click", function () {
-            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isDiagnosisOverlayOpen) openEducationTab();
+            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen) openEducationTab();
         });
         document.getElementById("careers-nav-btn").addEventListener("click", function () {
-            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isDiagnosisOverlayOpen) openCareersTab();
+            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen) openCareersTab();
         });
         document.getElementById("activities-nav-btn").addEventListener("click", function () {
-            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isDiagnosisOverlayOpen) openActivitiesMenu();
+            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen) openActivitiesMenu();
         });
         document.getElementById("assets-nav-btn").addEventListener("click", function () {
-            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isDiagnosisOverlayOpen) openAssetsMenu();
+            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen) openAssetsMenu();
         });
         document.getElementById("play-again-btn").addEventListener("click", function () {
             location.reload();
