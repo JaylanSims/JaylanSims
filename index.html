@@ -749,6 +749,70 @@
             color: #e0e0e0;
         }
 
+        #performance-review-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 10006;
+            background: rgba(0, 0, 0, 0.96);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: #fff;
+            padding: 24px;
+            box-sizing: border-box;
+        }
+
+        .performance-review-card {
+            width: 100%;
+            max-width: 500px;
+            background: #141414;
+            border: 1px solid #333;
+            border-radius: 16px;
+            padding: 26px 22px;
+            box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
+        }
+
+        .performance-review-card h2 {
+            margin: 0 0 18px;
+            font-size: 1.28rem;
+            text-align: center;
+        }
+
+        .performance-review-card .review-body {
+            margin: 0 0 10px;
+            line-height: 1.5;
+            color: #e8e8e8;
+            font-size: 0.98rem;
+        }
+
+        .performance-review-card .review-avg {
+            margin: 0 0 20px;
+            font-size: 0.88rem;
+            color: #9e9e9e;
+            text-align: center;
+        }
+
+        .review-header-stellar { color: #81c784 !important; }
+        .review-header-average { color: #ffee58 !important; }
+        .review-header-poor { color: #ffb74d !important; }
+        .review-header-fired { color: #e57373 !important; }
+
+        .performance-review-ack {
+            width: 100%;
+            padding: 14px 16px;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 700;
+            cursor: pointer;
+            border: 1px solid #555;
+            background: linear-gradient(180deg, #37474f, #263238);
+            color: #fff;
+        }
+
         #eviction-overlay {
             position: fixed;
             top: 0;
@@ -929,6 +993,7 @@
 <body>
     <div id="yearly-exam-react-root"></div>
     <div id="promotion-overlay-root"></div>
+    <div id="performance-review-overlay-root"></div>
     <div id="eviction-overlay-root"></div>
     <div id="app-container">
         <div id="intro-screen">
@@ -1075,6 +1140,10 @@
             currentJobLevel: 1,
             pendingPromotion: null,
             isPromotionOverlayOpen: false,
+            isPerformanceReviewOverlayOpen: false,
+            performanceReviewAverageHappiness: 0,
+            happinessHistory: [],
+            yearsSinceLastReview: 0,
             isEvictionOverlayOpen: false,
             currentHousing: null,
             roommate: null,
@@ -1118,6 +1187,8 @@
         let yearlyExamReactRoot = null;
         const promotionOverlayMount = document.getElementById("promotion-overlay-root");
         let promotionOverlayReactRoot = null;
+        const performanceReviewOverlayMount = document.getElementById("performance-review-overlay-root");
+        let performanceReviewOverlayReactRoot = null;
         const evictionOverlayMount = document.getElementById("eviction-overlay-root");
         let evictionOverlayReactRoot = null;
         let higherEdCatalogRoot = null;
@@ -2283,7 +2354,7 @@
         }
 
         function openModal(title, description, actions) {
-            if (state.isExamModalOpen || state.isExamActive || state.isDiagnosisOverlayOpen || state.isPromotionOverlayOpen || state.isEvictionOverlayOpen) return;
+            if (state.isExamModalOpen || state.isExamActive || state.isDiagnosisOverlayOpen || state.isPromotionOverlayOpen || state.isPerformanceReviewOverlayOpen || state.isEvictionOverlayOpen) return;
             if (higherEdCatalogRoot) {
                 higherEdCatalogRoot.render(null);
             }
@@ -2391,6 +2462,141 @@
             }
         }
 
+        function resetPerformanceReviewTracking() {
+            state.happinessHistory = [];
+            state.yearsSinceLastReview = 0;
+        }
+
+        function pushYearEndHappinessAndReviewTick() {
+            state.happinessHistory.push(state.happiness);
+            while (state.happinessHistory.length > 3) {
+                state.happinessHistory.shift();
+            }
+            if (state.isEmployed && state.jobType === "Career" && state.jobTitle !== "Medical Resident") {
+                state.yearsSinceLastReview += 1;
+            }
+        }
+
+        function maybeOpenPerformanceReviewOverlay() {
+            if (state.yearsSinceLastReview !== 3) return false;
+            if (!state.isEmployed || state.jobType !== "Career") return false;
+            if (state.jobTitle === "Student" || state.jobTitle === "Unemployed" || state.jobTitle === "Medical Resident") return false;
+            if (state.happinessHistory.length < 3) {
+                state.yearsSinceLastReview = 0;
+                logEvent("Performance review skipped: incomplete happiness history; cycle reset.");
+                return false;
+            }
+            var sum = state.happinessHistory.reduce(function (a, b) { return a + b; }, 0);
+            state.performanceReviewAverageHappiness = sum / 3;
+            state.isPerformanceReviewOverlayOpen = true;
+            renderPerformanceReviewOverlay();
+            return true;
+        }
+
+        function PerformanceReviewOverlay(props) {
+            var avg = props.averageHappiness;
+            var headerClass = "review-header-average";
+            var header = "AVERAGE PERFORMANCE 😐";
+            var body = "You are meeting expectations, but your lack of enthusiasm is noticeable. The company has decided to freeze your salary for this cycle.";
+            if (avg >= 75) {
+                headerClass = "review-header-stellar";
+                header = "STELLAR PERFORMANCE 🌟";
+                body = "Your positive attitude and high morale have made you an invaluable asset to the company. You've been awarded a merit increase!";
+            } else if (avg >= 40) {
+                headerClass = "review-header-average";
+                header = "AVERAGE PERFORMANCE 😐";
+                body = "You are meeting expectations, but your lack of enthusiasm is noticeable. The company has decided to freeze your salary for this cycle.";
+            } else if (avg >= 20) {
+                headerClass = "review-header-poor";
+                header = "POOR PERFORMANCE 📉";
+                body = "Your severe burnout and low morale are negatively impacting your work. You have been placed on a Performance Improvement Plan and your pay has been docked.";
+            } else {
+                headerClass = "review-header-fired";
+                header = "FIRED ❌";
+                body = "Your complete lack of engagement, chronic burnout, and poor attitude have left the company no choice. Your employment has been terminated immediately.";
+            }
+            return (
+                <div id="performance-review-overlay" role="dialog" aria-modal="true" aria-label="Performance review">
+                    <div className="performance-review-card">
+                        <h2 className={headerClass}>{header}</h2>
+                        <p className="review-body">{body}</p>
+                        <p className="review-avg">3-year average happiness: {Math.round(avg * 10) / 10}</p>
+                        <button type="button" className="performance-review-ack" onClick={props.onAcknowledge}>
+                            Acknowledge
+                        </button>
+                    </div>
+                </div>
+            );
+        }
+
+        function renderPerformanceReviewOverlay() {
+            if (!performanceReviewOverlayMount) return;
+            if (!state.isPerformanceReviewOverlayOpen) {
+                if (performanceReviewOverlayReactRoot) {
+                    performanceReviewOverlayReactRoot.render(null);
+                }
+                return;
+            }
+            if (!performanceReviewOverlayReactRoot) {
+                performanceReviewOverlayReactRoot = ReactDOM.createRoot(performanceReviewOverlayMount);
+            }
+            performanceReviewOverlayReactRoot.render(
+                <PerformanceReviewOverlay
+                    averageHappiness={state.performanceReviewAverageHappiness}
+                    onAcknowledge={handlePerformanceReviewAcknowledge}
+                />
+            );
+        }
+
+        function closePerformanceReviewOverlay() {
+            state.isPerformanceReviewOverlayOpen = false;
+            state.performanceReviewAverageHappiness = 0;
+            if (performanceReviewOverlayReactRoot) {
+                performanceReviewOverlayReactRoot.render(null);
+            }
+        }
+
+        function handlePerformanceReviewAcknowledge() {
+            var avg = state.performanceReviewAverageHappiness;
+            if (avg >= 75) {
+                state.annualIncome = Math.round(state.annualIncome * 1.1);
+                state.salary = state.annualIncome;
+                state.happiness += 5;
+                logEvent("Performance review: stellar rating — merit raise (+10% salary), +5 Happiness.");
+            } else if (avg >= 40) {
+                logEvent("Performance review: average rating — salary frozen this cycle.");
+            } else if (avg >= 20) {
+                state.annualIncome = Math.round(state.annualIncome * 0.85);
+                state.salary = state.annualIncome;
+                state.happiness -= 10;
+                logEvent("Performance review: poor rating — pay docked (-15% salary), -10 Happiness.");
+            } else {
+                state.jobTitle = "Unemployed";
+                state.annualIncome = 0;
+                state.salary = 0;
+                state.isEmployed = false;
+                state.jobType = "None";
+                state.yearsAtCurrentJob = 0;
+                state.currentJobLevel = 1;
+                state.pendingPromotion = null;
+                state.isPromotionOverlayOpen = false;
+                if (promotionOverlayReactRoot) {
+                    promotionOverlayReactRoot.render(null);
+                }
+                state.happiness -= 20;
+                logEvent("Performance review: terminated — fired for low morale, -20 Happiness.");
+            }
+            state.yearsSinceLastReview = 0;
+            state.happinessHistory = [];
+            closePerformanceReviewOverlay();
+            syncFinancialAliases();
+            state.happiness = clampStat(state.happiness);
+            state.health = clampStat(state.health);
+            yearlyResetMentalSuppression();
+            triggerProceduralYearEvents();
+            updateUI();
+        }
+
         function handlePromotionAccept() {
             var p = state.pendingPromotion;
             if (!p) {
@@ -2404,6 +2610,7 @@
             state.salary = p.newSalary;
             state.currentJobLevel = p.level;
             state.yearsAtCurrentJob = 0;
+            resetPerformanceReviewTracking();
             state.happiness -= 15;
             logEvent("You accepted a promotion to " + p.newTitle + " with a salary of " + formatMoney(p.newSalary) + ". Stress from the role reduced Happiness by 15.");
             closePromotionOverlay();
@@ -3303,6 +3510,8 @@
             state.currentJobLevel = 1;
             state.pendingPromotion = null;
             state.isPromotionOverlayOpen = false;
+            resetPerformanceReviewTracking();
+            closePerformanceReviewOverlay();
             if (promotionOverlayReactRoot) {
                 promotionOverlayReactRoot.render(null);
             }
@@ -3343,6 +3552,9 @@
                 state.currentJobLevel = 1;
                 state.pendingPromotion = null;
                 state.isPromotionOverlayOpen = false;
+                if (!isOddJob) {
+                    resetPerformanceReviewTracking();
+                }
                 if (promotionOverlayReactRoot) {
                     promotionOverlayReactRoot.render(null);
                 }
@@ -4711,6 +4923,7 @@
             closeModal();
             closeYearlyExamOverlay();
             closePromotionOverlay();
+            closePerformanceReviewOverlay();
             closeEvictionOverlay();
             closeDiagnosisOverlay();
             gameUI.style.display = "none";
@@ -4801,13 +5014,19 @@
                 return;
             }
 
+            pushYearEndHappinessAndReviewTick();
+            if (maybeOpenPerformanceReviewOverlay()) {
+                updateUI();
+                return;
+            }
+
             yearlyResetMentalSuppression();
             triggerProceduralYearEvents();
             updateUI();
         }
 
         function ageUp() {
-            if (state.isDead || !state.playerPath || state.isExamModalOpen || state.isExamActive || state.isDiagnosisOverlayOpen || state.isPromotionOverlayOpen || state.isEvictionOverlayOpen) return;
+            if (state.isDead || !state.playerPath || state.isExamModalOpen || state.isExamActive || state.isDiagnosisOverlayOpen || state.isPromotionOverlayOpen || state.isPerformanceReviewOverlayOpen || state.isEvictionOverlayOpen) return;
 
             if (state.isInSchool && state.currentlyPursuing) {
                 openYearlyExamOverlay();
@@ -4923,16 +5142,16 @@
 
         document.getElementById("age-up-btn").addEventListener("click", ageUp);
         document.getElementById("education-nav-btn").addEventListener("click", function () {
-            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isEvictionOverlayOpen) openEducationTab();
+            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isPerformanceReviewOverlayOpen && !state.isEvictionOverlayOpen) openEducationTab();
         });
         document.getElementById("careers-nav-btn").addEventListener("click", function () {
-            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isEvictionOverlayOpen) openCareersTab();
+            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isPerformanceReviewOverlayOpen && !state.isEvictionOverlayOpen) openCareersTab();
         });
         document.getElementById("activities-nav-btn").addEventListener("click", function () {
-            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isEvictionOverlayOpen) openActivitiesMenu();
+            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isPerformanceReviewOverlayOpen && !state.isEvictionOverlayOpen) openActivitiesMenu();
         });
         document.getElementById("assets-nav-btn").addEventListener("click", function () {
-            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isEvictionOverlayOpen) openAssetsMenu();
+            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isPerformanceReviewOverlayOpen && !state.isEvictionOverlayOpen) openAssetsMenu();
         });
         document.getElementById("play-again-btn").addEventListener("click", function () {
             location.reload();
