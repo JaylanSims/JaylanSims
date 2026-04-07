@@ -203,7 +203,7 @@
         #event-log {
             flex: 1;
             overflow-y: auto;
-            padding: 12px 14px 138px;
+            padding: 12px 14px 188px;
             min-height: 0;
         }
 
@@ -218,9 +218,14 @@
         }
 
         #action-area {
-            position: relative;
+            position: absolute;
+            left: 0;
+            right: 0;
+            bottom: 65px;
             height: 0;
             flex-shrink: 0;
+            z-index: 8;
+            pointer-events: none;
         }
 
         #age-up-btn {
@@ -236,11 +241,12 @@
             line-height: 1.15;
             position: absolute;
             left: 50%;
-            bottom: -55px;
+            bottom: -40px;
             transform: translateX(-50%);
-            z-index: 7;
+            z-index: 9;
             cursor: pointer;
             box-shadow: 0 16px 35px rgba(0, 200, 83, 0.5), 0 5px 12px rgba(0, 0, 0, 0.7);
+            pointer-events: auto;
         }
 
         #age-up-btn:active {
@@ -324,6 +330,75 @@
             transform: scale(0.995);
         }
 
+        #yearly-exam-overlay {
+            position: fixed;
+            inset: 0;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.86);
+            z-index: 9999;
+        }
+
+        #yearly-exam-overlay.open {
+            display: flex;
+        }
+
+        #exam-desk {
+            width: 100%;
+            max-width: 520px;
+            border-radius: 14px;
+            border: 1px solid #3a3a3a;
+            background: #171717;
+            box-shadow: 0 18px 50px rgba(0, 0, 0, 0.6);
+            padding: 16px;
+        }
+
+        #exam-title {
+            margin: 0 0 8px;
+            font-size: 1.15rem;
+        }
+
+        #exam-question {
+            margin: 0 0 14px;
+            color: #d6d6d6;
+            line-height: 1.4;
+        }
+
+        #exam-options {
+            display: grid;
+            gap: 10px;
+        }
+
+        .exam-option {
+            width: 100%;
+            border: 1px solid #3a3a3a;
+            border-radius: 10px;
+            background: #232323;
+            color: #fff;
+            text-align: left;
+            padding: 14px;
+            font-size: 1rem;
+            cursor: pointer;
+            min-height: 52px;
+        }
+
+        .exam-option:disabled {
+            opacity: 1;
+            cursor: default;
+        }
+
+        .exam-option.correct {
+            border-color: #33c266;
+            background: #1b3d28;
+        }
+
+        .exam-option.wrong {
+            border-color: #d04d4d;
+            background: #451f1f;
+        }
+
         #death-screen {
             display: none;
             flex: 1;
@@ -368,27 +443,24 @@
 <body>
     <div id="app-container">
         <div id="intro-screen">
-            <img src="js-games-logo.png" alt="JS Games" id="intro-logo">
+            <img src="js-games-logo.png" alt="JS Games" id="intro-logo" onerror="this.onerror=null;this.src='./js-games-logo.png';">
         </div>
 
         <div id="setup-screen">
             <h1 class="title">BitBalance: ROI vs. Passion</h1>
             <p class="subtitle">Choose your path and survive year by year. Build wealth without sacrificing your life.</p>
             <div class="major-grid">
-                <button class="major-btn" data-major="finance">
-                    <strong>Finance</strong>
-                    Debt: $60,000 · Salary: $85,000 · Smarts: 80<br>
-                    Trait: Every year Health -5, Happiness -10
+                <button class="major-btn" data-path="STEM">
+                    <strong>STEM</strong>
+                    Build a technical foundation in science, engineering, and analytics.
                 </button>
-                <button class="major-btn" data-major="arts">
-                    <strong>Arts</strong>
-                    Debt: $40,000 · Salary: $30,000 · Smarts: 60<br>
-                    Trait: Every year Health -2, Happiness -2, and if Happiness &gt; 85 then Salary +10%
+                <button class="major-btn" data-path="Humanities">
+                    <strong>Humanities</strong>
+                    Focus on communication, design, culture, and people-centered careers.
                 </button>
-                <button class="major-btn" data-major="trades">
+                <button class="major-btn" data-path="Trades">
                     <strong>Trades</strong>
-                    Debt: $5,000 · Salary: $55,000 · Smarts: 50<br>
-                    Trait: Every year Health -8, Happiness -3
+                    Train in practical, high-demand skilled work with hands-on expertise.
                 </button>
             </div>
         </div>
@@ -411,8 +483,8 @@
                     <div class="bar-track"><div id="smarts-fill" class="bar-fill"></div></div>
                 </div>
                 <div class="stat-block">
-                    <div class="stat-name">Net Worth</div>
-                    <div class="stat-value" id="networth-text">$0</div>
+                    <div class="stat-name">Cash Balance</div>
+                    <div class="stat-value" id="cash-balance-text">$0</div>
                     <div class="bar-track"><div class="bar-fill" style="width: 100%; background: #888;"></div></div>
                 </div>
             </header>
@@ -424,7 +496,8 @@
             </div>
 
             <nav id="bottom-nav">
-                <button class="nav-btn" id="career-nav-btn">Career</button>
+                <button class="nav-btn" id="education-nav-btn">Education</button>
+                <button class="nav-btn" id="careers-nav-btn">Careers</button>
                 <button class="nav-btn" id="activities-nav-btn">Activities</button>
                 <button class="nav-btn" id="assets-nav-btn">Assets</button>
             </nav>
@@ -438,6 +511,8 @@
             </div>
         </div>
 
+        <div id="yearly-exam-root"></div>
+
         <div id="death-screen">
             <p id="tombstone">🪦</p>
             <h2 id="death-title">Game Over</h2>
@@ -450,8 +525,14 @@
     <script>
         let state = {
             age: 18, health: 100, happiness: 100, smarts: 50,
-            cash: 0, investments: 0, debt: 0, salary: 0, expenses: 25000,
-            major: null, isDead: false, currentIllnesses: [], illnessYears: {}
+            cash: 5000, investments: 0, debt: 0, salary: 0, expenses: 25000, annualExpenses: 25000, bankBalance: 5000,
+            major: null, isDead: false, currentIllnesses: [], illnessYears: {},
+            ownedAssets: [], realEstateListings: [], nextPropertyId: 1, nextListingId: 1,
+            currentHousingMarketShift: 0, currentHousingMarketEvent: "stable",
+            playerPath: null, annualIncome: 0, educationLevel: "None", yearsInSchool: 0,
+            currentlyPursuing: null, educationCredentials: [], jobTitle: "Unemployed",
+            isExamModalOpen: false, currentExamQuestion: null, examsPassedThisDegree: 0,
+            examsTakenThisDegree: 0, jobSearchBlocked: true, academicDismissed: false
         };
 
         const setupScreen = document.getElementById("setup-screen");
@@ -463,6 +544,7 @@
         const modalTitle = document.getElementById("modal-title");
         const modalDescription = document.getElementById("modal-description");
         const modalActions = document.getElementById("modal-actions");
+        const yearlyExamRoot = document.getElementById("yearly-exam-root");
         const deathScreen = document.getElementById("death-screen");
         const deathSummary = document.getElementById("death-summary");
         const deathLifeNote = document.getElementById("death-life-note");
@@ -471,7 +553,7 @@
         const healthText = document.getElementById("health-text");
         const happinessText = document.getElementById("happiness-text");
         const smartsText = document.getElementById("smarts-text");
-        const networthText = document.getElementById("networth-text");
+        const cashBalanceText = document.getElementById("cash-balance-text");
 
         const healthFill = document.getElementById("health-fill");
         const happinessFill = document.getElementById("happiness-fill");
@@ -484,6 +566,8 @@
                 choices: [
                     {
                         label: "Panic Sell",
+                        requiresInvestments: true,
+                        outcome: "Convert 50% of investments to cash and lose the rest.",
                         effect: function () {
                             state.cash += state.investments * 0.5;
                             state.investments = 0;
@@ -491,6 +575,7 @@
                     },
                     {
                         label: "Hold",
+                        outcome: "Keep holdings, but investments immediately drop by 30%.",
                         effect: function () {
                             state.investments *= 0.70;
                         }
@@ -503,6 +588,7 @@
                 choices: [
                     {
                         label: "Take unpaid leave",
+                        outcome: "Cash -$10,000 and Happiness +20.",
                         effect: function () {
                             state.cash -= 10000;
                             state.happiness += 20;
@@ -510,6 +596,7 @@
                     },
                     {
                         label: "Push through",
+                        outcome: "Health -25.",
                         effect: function () {
                             state.health -= 25;
                         }
@@ -522,6 +609,7 @@
                 choices: [
                     {
                         label: "Cash out",
+                        outcome: "Cash +$50,000 and Happiness -20.",
                         effect: function () {
                             state.cash += 50000;
                             state.happiness -= 20;
@@ -529,6 +617,7 @@
                     },
                     {
                         label: "Keep Control",
+                        outcome: "Happiness +30 and Salary +10%.",
                         effect: function () {
                             state.happiness += 30;
                             state.salary *= 1.10;
@@ -537,6 +626,147 @@
                 ]
             }
         ];
+
+        const PATH_BASE_PROGRAM = {
+            STEM: "STEM_BASE",
+            Humanities: "HUMANITIES_BASE",
+            Trades: "TRADES_BASE"
+        };
+
+        const EDUCATION_PROGRAMS = {
+            STEM_BASE: { path: "STEM", degreeName: "BS in STEM", yearsRequired: 4, educationLevel: "BS in STEM", credentials: ["Bachelor's Degree"] },
+            HUMANITIES_BASE: { path: "Humanities", degreeName: "BA in Humanities", yearsRequired: 4, educationLevel: "BA in Humanities", credentials: ["Bachelor's Degree"] },
+            TRADES_BASE: { path: "Trades", degreeName: "Trade Certificate", yearsRequired: 4, educationLevel: "Trade Certificate", credentials: ["Trade Certificate"] },
+            STEM_MASTERS: { path: "STEM", degreeName: "Master's Degree", yearsRequired: 2, educationLevel: "Master's Degree", credentials: ["Bachelor's Degree", "Master's Degree"] },
+            STEM_MEDICAL: { path: "STEM", degreeName: "Medical Degree", yearsRequired: 4, educationLevel: "Medical Degree", credentials: ["Bachelor's Degree", "Master's Degree", "Medical Degree", "Doctorate"] },
+            HUMANITIES_MASTERS: { path: "Humanities", degreeName: "Master's Degree", yearsRequired: 2, educationLevel: "Master's Degree", credentials: ["Bachelor's Degree", "Master's Degree"] },
+            HUMANITIES_LAW: { path: "Humanities", degreeName: "Law Degree", yearsRequired: 3, educationLevel: "Law Degree", credentials: ["Bachelor's Degree", "Law Degree"] }
+        };
+
+        const JOB_MARKET = {
+            STEM: [
+                { title: "Neurosurgeon", salary: 239200, requiredEducation: "Medical Degree" },
+                { title: "Physician (General)", salary: 208000, requiredEducation: "Medical Degree" },
+                { title: "Machine Learning Engineer", salary: 167000, requiredEducation: "Master's Degree" },
+                { title: "Software Architect", salary: 158000, requiredEducation: "Master's Degree" },
+                { title: "Aerospace Engineer", salary: 135800, requiredEducation: "Bachelor's Degree" },
+                { title: "Data Scientist", salary: 132000, requiredEducation: "Master's Degree" },
+                { title: "Petroleum Engineer", salary: 131800, requiredEducation: "Bachelor's Degree" },
+                { title: "Pharmacist", salary: 128710, requiredEducation: "Medical Degree/Doctorate" },
+                { title: "Nuclear Engineer", salary: 124300, requiredEducation: "Master's Degree" },
+                { title: "Actuary", salary: 120000, requiredEducation: "Bachelor's Degree" },
+                { title: "Chemical Engineer", salary: 114820, requiredEducation: "Bachelor's Degree" },
+                { title: "Cybersecurity Analyst", salary: 112000, requiredEducation: "Bachelor's Degree" },
+                { title: "Statistician", salary: 108700, requiredEducation: "Master's Degree" },
+                { title: "Environmental Engineer", salary: 103220, requiredEducation: "Bachelor's Degree" },
+                { title: "Biomedical Engineer", salary: 100730, requiredEducation: "Bachelor's Degree" }
+            ],
+            Humanities: [
+                { title: "Entertainment Lawyer", salary: 135000, requiredEducation: "Law Degree" },
+                { title: "Public Relations Manager", salary: 125780, requiredEducation: "Bachelor's Degree" },
+                { title: "Art Director", salary: 106500, requiredEducation: "Bachelor's Degree" },
+                { title: "UX/UI Designer", salary: 99000, requiredEducation: "Bachelor's Degree" },
+                { title: "Technical Writer", salary: 79960, requiredEducation: "Bachelor's Degree" },
+                { title: "Film/TV Producer", salary: 76400, requiredEducation: "Bachelor's Degree" },
+                { title: "Editor (Books/Magazines)", salary: 72150, requiredEducation: "Bachelor's Degree" },
+                { title: "Social Media Manager", salary: 64000, requiredEducation: "Bachelor's Degree" },
+                { title: "Copywriter", salary: 63200, requiredEducation: "Bachelor's Degree" },
+                { title: "High School Teacher", salary: 62360, requiredEducation: "Bachelor's Degree" },
+                { title: "Librarian", salary: 61190, requiredEducation: "Master's Degree" },
+                { title: "Graphic Designer", salary: 58910, requiredEducation: "Bachelor's Degree" },
+                { title: "Museum Curator", salary: 58820, requiredEducation: "Master's Degree" },
+                { title: "Translator/Interpreter", salary: 57090, requiredEducation: "Bachelor's Degree" },
+                { title: "Journalist/Reporter", salary: 55960, requiredEducation: "Bachelor's Degree" }
+            ],
+            Trades: [
+                { title: "Elevator Installer & Repairer", salary: 97860, requiredEducation: "Trade Certificate" },
+                { title: "Electrical Power Line Installer", salary: 85420, requiredEducation: "Trade Certificate" },
+                { title: "Radiation Therapist", salary: 82790, requiredEducation: "Trade Certificate" },
+                { title: "Boilermaker", salary: 66920, requiredEducation: "Trade Certificate" },
+                { title: "Industrial Pipefitter", salary: 63100, requiredEducation: "Trade Certificate" },
+                { title: "Plumber", salary: 61550, requiredEducation: "Trade Certificate" },
+                { title: "Electrician", salary: 60240, requiredEducation: "Trade Certificate" },
+                { title: "Millwright", salary: 59800, requiredEducation: "Trade Certificate" },
+                { title: "Brickmason", salary: 58430, requiredEducation: "Trade Certificate" },
+                { title: "HVAC Technician", salary: 57300, requiredEducation: "Trade Certificate" },
+                { title: "Diesel Mechanic", salary: 54360, requiredEducation: "Trade Certificate" },
+                { title: "Heavy Equipment Operator", salary: 52230, requiredEducation: "Trade Certificate" },
+                { title: "Carpenter", salary: 51390, requiredEducation: "Trade Certificate" },
+                { title: "Welder", salary: 47540, requiredEducation: "Trade Certificate" },
+                { title: "Automotive Technician", salary: 46840, requiredEducation: "Trade Certificate" }
+            ]
+        };
+
+        const EXAM_QUESTION_BANKS = {
+            STEM: [
+                {
+                    question: "What is the time complexity of Binary Search?",
+                    options: ["O(n)", "O(log n)", "O(n log n)", "O(1)"],
+                    correctAnswerIndex: 1
+                },
+                {
+                    question: "Which rule predicts the major product toward the more substituted alkene?",
+                    options: ["Markovnikov's Rule", "Le Chatelier's Principle", "Zaitsev's Rule", "Hess's Law"],
+                    correctAnswerIndex: 2
+                },
+                {
+                    question: "What is the indefinite integral of 1/x?",
+                    options: ["x + C", "1/(x^2) + C", "e^x + C", "ln|x| + C"],
+                    correctAnswerIndex: 3
+                },
+                {
+                    question: "Who introduced the Uncertainty Principle?",
+                    options: ["Einstein", "Heisenberg", "Bohr", "Feynman"],
+                    correctAnswerIndex: 1
+                }
+            ],
+            Humanities: [
+                {
+                    question: "Which architectural style is known for flying buttresses?",
+                    options: ["Baroque", "Renaissance", "Gothic", "Neoclassical"],
+                    correctAnswerIndex: 2
+                },
+                {
+                    question: "Who wrote 'A Room of One's Own'?",
+                    options: ["Jane Austen", "Virginia Woolf", "George Eliot", "Toni Morrison"],
+                    correctAnswerIndex: 1
+                },
+                {
+                    question: "What are the primary subtractive colors?",
+                    options: ["Red, Blue, Yellow", "Cyan, Magenta, Yellow", "Red, Green, Blue", "Orange, Green, Purple"],
+                    correctAnswerIndex: 1
+                },
+                {
+                    question: "Which philosophy emphasizes emotional resilience through discipline?",
+                    options: ["Nihilism", "Existentialism", "Empiricism", "Stoicism"],
+                    correctAnswerIndex: 3
+                }
+            ],
+            Trades: [
+                {
+                    question: "What is the standard wall stud spacing in most framing?",
+                    options: ["12 inches", "16 inches", "20 inches", "24 inches"],
+                    correctAnswerIndex: 1
+                },
+                {
+                    question: "What is the purpose of a P-trap in plumbing?",
+                    options: ["Increase water pressure", "Prevent sewer gases from entering", "Filter hard minerals", "Store clean water"],
+                    correctAnswerIndex: 1
+                },
+                {
+                    question: "Which tool is commonly used to test live wires safely?",
+                    options: ["Pipe wrench", "Stud finder", "Multimeter", "Hacksaw"],
+                    correctAnswerIndex: 2
+                },
+                {
+                    question: "What is Argon primarily used for in MIG welding?",
+                    options: ["Cooling the torch", "Strengthening filler wire", "Shielding gas", "Cleaning base metal"],
+                    correctAnswerIndex: 2
+                }
+            ]
+        };
+
+        const EXAM_FEEDBACK_DELAY_MS = 700;
 
         const DISEASES = {
             commonCold: {
@@ -700,6 +930,49 @@
         const HAPPINESS_PENALTY_ON_DIAGNOSIS = 4;
         const GENERIC_HEALTH_DEATH_MESSAGE = "Your health slowly deteriorated until your body could take no more.";
 
+        const proceduralWordBanks = {
+            relative: ["cousin", "uncle", "aunt", "step-brother", "grandma"],
+            animal: ["rabid raccoon", "stray dog", "massive bear", "feral cat", "pigeon"],
+            item: ["dirty magazine", "gold watch", "bag of weird pills", "stack of cash"],
+            location: ["the grocery store", "a dark alley", "the park", "your front porch"],
+            ailment: ["the flu", "food poisoning", "a mysterious rash", "a crippling migraine"]
+        };
+
+        const GENERATED_WORDS_PER_BANK = 1000000000;
+
+        const proceduralEventTemplates = [
+            {
+                id: "animal_attack",
+                title: "Wild Encounter!",
+                description: "While walking near [location], a [animal] suddenly lunges at you!",
+                choices: [
+                    { text: "Fight it off!", effects: { health: -20, happiness: -10 } },
+                    { text: "Run for your life!", effects: { health: -5, happiness: -5 } }
+                ]
+            },
+            {
+                id: "found_item",
+                title: "Look What I Found",
+                description: "Your [relative] calls you over and gives you a [item] they found near [location].",
+                choices: [
+                    { text: "Take it.", effects: { cash: 50, happiness: 15 } },
+                    { text: "Refuse it. That's weird.", effects: { happiness: -5 } }
+                ]
+            },
+            {
+                id: "sudden_illness",
+                title: "Feeling Under the Weather",
+                description: "You wake up feeling terrible. The doctor says you have caught [ailment].",
+                choices: [
+                    { text: "Pay $100 for medicine.", effects: { cash: -100, health: 10, happiness: 5 } },
+                    { text: "Tough it out.", effects: { health: -30, happiness: -20 } }
+                ]
+            }
+        ];
+
+        let yearlyProceduralEventTotal = 0;
+        let yearlyProceduralEventRemaining = 0;
+
         function formatMoney(num) {
             return "$" + Math.round(num).toLocaleString("en-US");
         }
@@ -711,16 +984,15 @@
         }
 
         function updateUI() {
+            syncFinancialAliases();
             state.health = clampStat(state.health);
             state.happiness = clampStat(state.happiness);
             state.smarts = clampStat(state.smarts);
 
-            const netWorth = state.cash + state.investments - state.debt;
-
             healthText.textContent = Math.round(state.health);
             happinessText.textContent = Math.round(state.happiness);
             smartsText.textContent = Math.round(state.smarts);
-            networthText.textContent = formatMoney(netWorth);
+            cashBalanceText.textContent = formatMoney(state.cash);
 
             healthFill.style.width = state.health + "%";
             happinessFill.style.width = state.happiness + "%";
@@ -735,15 +1007,43 @@
             eventLog.appendChild(p);
         }
 
+        function formatSignedMoney(value) {
+            const abs = Math.abs(value);
+            return (value >= 0 ? "+" : "-") + formatMoney(abs);
+        }
+
+        function describeEffects(effects) {
+            const parts = [];
+            if (typeof effects.cash === "number" && effects.cash !== 0) {
+                parts.push(formatSignedMoney(effects.cash) + " Cash");
+            }
+            if (typeof effects.health === "number" && effects.health !== 0) {
+                parts.push((effects.health > 0 ? "+" : "") + effects.health + " Health");
+            }
+            if (typeof effects.happiness === "number" && effects.happiness !== 0) {
+                parts.push((effects.happiness > 0 ? "+" : "") + effects.happiness + " Happiness");
+            }
+            if (effects.death === true) {
+                parts.push("Fatal");
+            }
+            return parts.length ? parts.join(" | ") : "No immediate change";
+        }
+
         function openModal(title, description, actions) {
+            if (state.isExamModalOpen) return;
             modalTitle.textContent = title;
-            modalDescription.textContent = description;
+            modalDescription.innerHTML = description;
             modalActions.innerHTML = "";
 
             actions.forEach(function (action) {
                 const btn = document.createElement("button");
                 btn.className = "modal-btn";
                 btn.textContent = action.label;
+                if (action.disabled) {
+                    btn.disabled = true;
+                    btn.style.opacity = "0.45";
+                    btn.style.cursor = "not-allowed";
+                }
                 btn.addEventListener("click", function () {
                     action.handler();
                 });
@@ -757,6 +1057,676 @@
             modalOverlay.style.display = "none";
         }
 
+        function YearlyExamOverlay(props) {
+            const optionsHtml = props.question.options.map(function (optionText, optionIndex) {
+                let feedbackClass = "";
+                if (props.showFeedback && props.selectedOptionIndex === optionIndex) {
+                    feedbackClass = optionIndex === props.question.correctAnswerIndex ? "correct" : "wrong";
+                }
+                return "<button class=\"exam-option " + feedbackClass + "\" data-option-index=\"" + optionIndex + "\" " +
+                    (props.showFeedback ? "disabled" : "") + ">" + optionText + "</button>";
+            }).join("");
+
+            return "<div id=\"yearly-exam-overlay\" class=\"open\" role=\"dialog\" aria-modal=\"true\" aria-label=\"Yearly Exam\">" +
+                "<div id=\"exam-desk\">" +
+                "<h2 id=\"exam-title\">FINAL EXAM: YEAR " + props.currentSchoolYear + "</h2>" +
+                "<p id=\"exam-question\">" + props.question.question + "</p>" +
+                "<div id=\"exam-options\">" + optionsHtml + "</div>" +
+                "</div>" +
+                "</div>";
+        }
+
+        function getRandomExamQuestionForPath(path) {
+            const bank = EXAM_QUESTION_BANKS[path] || [];
+            if (!bank.length) return null;
+            const picked = bank[Math.floor(Math.random() * bank.length)];
+            return {
+                question: picked.question,
+                options: picked.options.slice(),
+                correctAnswerIndex: picked.correctAnswerIndex
+            };
+        }
+
+        function renderYearlyExamOverlay(selectedOptionIndex, showFeedback) {
+            if (!state.isExamModalOpen || !state.currentExamQuestion) {
+                yearlyExamRoot.innerHTML = "";
+                return;
+            }
+
+            yearlyExamRoot.innerHTML = YearlyExamOverlay({
+                currentSchoolYear: state.yearsInSchool + 1,
+                question: state.currentExamQuestion,
+                selectedOptionIndex: selectedOptionIndex,
+                showFeedback: showFeedback
+            });
+
+            if (showFeedback) return;
+
+            yearlyExamRoot.querySelectorAll(".exam-option").forEach(function (btn) {
+                btn.addEventListener("click", function () {
+                    const selectedIndex = Number(btn.dataset.optionIndex);
+                    handleYearlyExamAnswer(selectedIndex);
+                });
+            });
+        }
+
+        function closeYearlyExamOverlay() {
+            state.isExamModalOpen = false;
+            state.currentExamQuestion = null;
+            yearlyExamRoot.innerHTML = "";
+        }
+
+        function handleAcademicDismissal(program, requiredPasses) {
+            const passedCount = state.examsPassedThisDegree;
+            state.academicDismissed = true;
+            state.jobSearchBlocked = true;
+            state.yearsInSchool = 0;
+            state.examsPassedThisDegree = 0;
+            state.examsTakenThisDegree = 0;
+
+            logEvent("Academic dismissal: you did not pass enough yearly exams for " + program.degreeName + ".");
+            openModal(
+                "Academic Dismissal",
+                "You passed " + passedCount + "/" + program.yearsRequired +
+                " exams (minimum required: " + requiredPasses + "). You must restart " +
+                program.degreeName + " from Year 1. Find a Job is locked until you successfully graduate.",
+                [
+                    {
+                        label: "Continue",
+                        handler: function () {
+                            closeModal();
+                            updateUI();
+                        }
+                    }
+                ]
+            );
+            updateUI();
+        }
+
+        function advanceSchoolYearAfterExam(answerWasCorrect) {
+            const program = state.currentlyPursuing ? EDUCATION_PROGRAMS[state.currentlyPursuing] : null;
+            if (!program) return;
+
+            state.age += 1;
+            state.annualIncome = 0;
+            state.salary = 0;
+            state.jobTitle = "Student";
+            state.yearsInSchool += 1;
+            state.smarts += 2;
+            state.happiness -= 1;
+            state.health -= 1;
+
+            logEvent(
+                "Age " + state.age + ": Final exam " + (answerWasCorrect ? "passed" : "failed") +
+                ". School year " + state.yearsInSchool + "/" + program.yearsRequired + " in " + program.degreeName + "."
+            );
+
+            syncFinancialAliases();
+            if (state.health <= 0) {
+                onPlayerDeath(GENERIC_HEALTH_DEATH_MESSAGE);
+                return;
+            }
+
+            if (state.yearsInSchool >= program.yearsRequired) {
+                const requiredPasses = Math.ceil(program.yearsRequired * 0.75);
+                if (state.examsPassedThisDegree >= requiredPasses) {
+                    completeProgram(state.currentlyPursuing);
+                } else {
+                    handleAcademicDismissal(program, requiredPasses);
+                }
+                return;
+            }
+
+            updateUI();
+        }
+
+        function handleYearlyExamAnswer(selectedOptionIndex) {
+            if (!state.isExamModalOpen || !state.currentExamQuestion) return;
+
+            const answerWasCorrect = selectedOptionIndex === state.currentExamQuestion.correctAnswerIndex;
+            state.examsTakenThisDegree += 1;
+            if (answerWasCorrect) {
+                state.examsPassedThisDegree += 1;
+            }
+
+            renderYearlyExamOverlay(selectedOptionIndex, true);
+
+            window.setTimeout(function () {
+                closeYearlyExamOverlay();
+                advanceSchoolYearAfterExam(answerWasCorrect);
+            }, EXAM_FEEDBACK_DELAY_MS);
+        }
+
+        function openYearlyExamOverlay() {
+            if (state.isDead || !state.currentlyPursuing || state.isExamModalOpen) return;
+
+            const question = getRandomExamQuestionForPath(state.playerPath);
+            if (!question) {
+                advanceSchoolYearAfterExam(false);
+                return;
+            }
+
+            closeModal();
+            state.isExamModalOpen = true;
+            state.currentExamQuestion = question;
+            renderYearlyExamOverlay(null, false);
+        }
+
+        function addCredential(credential) {
+            if (!state.educationCredentials.includes(credential)) {
+                state.educationCredentials.push(credential);
+            }
+        }
+
+        function meetsEducationRequirement(requiredEducation) {
+            const creds = state.educationCredentials;
+            if (requiredEducation === "Trade Certificate") {
+                return creds.includes("Trade Certificate");
+            }
+            if (requiredEducation === "Bachelor's Degree") {
+                return creds.includes("Bachelor's Degree") || creds.includes("Master's Degree") || creds.includes("Medical Degree") || creds.includes("Law Degree") || creds.includes("Doctorate");
+            }
+            if (requiredEducation === "Master's Degree") {
+                return creds.includes("Master's Degree") || creds.includes("Medical Degree") || creds.includes("Doctorate");
+            }
+            if (requiredEducation === "Medical Degree") {
+                return creds.includes("Medical Degree") || creds.includes("Doctorate");
+            }
+            if (requiredEducation === "Medical Degree/Doctorate") {
+                return creds.includes("MedicalDegree") || creds.includes("Medical Degree") || creds.includes("Doctorate");
+            }
+            if (requiredEducation === "Law Degree") {
+                return creds.includes("Law Degree");
+            }
+            return state.educationLevel === requiredEducation;
+        }
+
+        function getHireChance() {
+            if (state.playerPath === "Trades") {
+                return 0.75 + Math.random() * 0.15;
+            }
+            if (state.playerPath === "STEM") {
+                return 0.50 + Math.random() * 0.20;
+            }
+            return 0.15 + Math.random() * 0.15;
+        }
+
+        function applyForJob(job) {
+            const chance = getHireChance();
+            if (Math.random() < chance) {
+                state.annualIncome = job.salary;
+                state.jobTitle = job.title;
+                state.salary = job.salary;
+                alert("You were hired as a " + job.title + " earning " + formatMoney(job.salary) + " a year!");
+                logEvent("You were hired as a " + job.title + ".");
+            } else {
+                alert("Your application for the " + job.title + " position was rejected. The job market is tough. Keep trying!");
+                logEvent("Your application was rejected for " + job.title + ".");
+            }
+            closeModal();
+            updateUI();
+        }
+
+        function openJobBoard() {
+            if (state.currentlyPursuing || state.jobSearchBlocked) {
+                const blockReason = state.currentlyPursuing
+                    ? "You are still in school. Graduate first to apply for jobs."
+                    : "Find a Job is locked because you were academically dismissed. Graduate to unlock career applications.";
+                openModal("Find a Job", blockReason, [
+                    { label: "Close", handler: function () { closeModal(); } }
+                ]);
+                return;
+            }
+            const jobs = JOB_MARKET[state.playerPath] || [];
+            const actions = jobs.map(function (job) {
+                const eligible = meetsEducationRequirement(job.requiredEducation);
+                return {
+                    label: eligible
+                        ? "Apply: " + job.title + " — " + formatMoney(job.salary)
+                        : job.title + " — Requires " + job.requiredEducation,
+                    disabled: !eligible,
+                    handler: function () {
+                        if (!eligible) return;
+                        applyForJob(job);
+                    }
+                };
+            });
+            actions.push({ label: "Close", handler: function () { closeModal(); } });
+            openModal("Find a Job", "Career opportunities for the " + state.playerPath + " path.", actions);
+        }
+
+        function openCareersTab() {
+            const canFindJob = !state.currentlyPursuing && !state.jobSearchBlocked;
+            const lockReason = state.currentlyPursuing
+                ? "You are currently enrolled in school."
+                : state.jobSearchBlocked
+                    ? "Career applications are locked due to academic dismissal."
+                    : "Career applications are available.";
+            openModal(
+                "Careers",
+                "Current Job: " + state.jobTitle + " | Annual Income: " + formatMoney(state.annualIncome) + "<br>" + lockReason,
+                [
+                    { label: canFindJob ? "Find a Job" : "Find a Job (Locked)", disabled: !canFindJob, handler: function () { if (canFindJob) openJobBoard(); } },
+                    { label: "Close", handler: function () { closeModal(); } }
+                ]
+            );
+        }
+
+        function enrollInProgram(programKey) {
+            const program = EDUCATION_PROGRAMS[programKey];
+            if (!program) return;
+            state.currentlyPursuing = programKey;
+            state.yearsInSchool = 0;
+            state.examsPassedThisDegree = 0;
+            state.examsTakenThisDegree = 0;
+            state.currentExamQuestion = null;
+            state.isExamModalOpen = false;
+            state.jobSearchBlocked = true;
+            state.annualIncome = 0;
+            state.salary = 0;
+            state.jobTitle = "Student";
+            logEvent("You enrolled in " + program.degreeName + ".");
+            updateUI();
+        }
+
+        function takeGapYear() {
+            if (state.isDead) return;
+            state.age += 1;
+            state.annualIncome = 0;
+            state.salary = 0;
+            state.bankBalance -= state.annualExpenses;
+            state.cash = state.bankBalance;
+            state.happiness += 10;
+            state.health -= 1;
+            logEvent("You spent a year traveling and discovering yourself.");
+            alert("You spent a year traveling and discovering yourself.");
+            updateUI();
+        }
+
+        function openHigherEducationMenu() {
+            if (state.playerPath === "Trades") return;
+            const actions = [];
+            if (state.playerPath === "STEM") {
+                actions.push({ label: "Master's Degree (2 years)", handler: function () { closeModal(); enrollInProgram("STEM_MASTERS"); } });
+                actions.push({ label: "Medical School / Doctorate (4 years)", handler: function () { closeModal(); enrollInProgram("STEM_MEDICAL"); } });
+            } else {
+                actions.push({ label: "Master's Degree (2 years)", handler: function () { closeModal(); enrollInProgram("HUMANITIES_MASTERS"); } });
+                actions.push({ label: "Law School (3 years)", handler: function () { closeModal(); enrollInProgram("HUMANITIES_LAW"); } });
+            }
+            actions.push({ label: "Cancel", handler: function () { closeModal(); } });
+            openModal("Earn More Education", "Choose your next degree.", actions);
+        }
+
+        function completeProgram(programKey) {
+            const program = EDUCATION_PROGRAMS[programKey];
+            if (!program) return;
+            state.currentlyPursuing = null;
+            state.yearsInSchool = 0;
+            state.examsPassedThisDegree = 0;
+            state.examsTakenThisDegree = 0;
+            state.academicDismissed = false;
+            state.jobSearchBlocked = false;
+            state.educationLevel = program.educationLevel;
+            program.credentials.forEach(addCredential);
+            logEvent("Graduation: You earned " + program.degreeName + ".");
+
+            const actions = [
+                {
+                    label: "Find a Job",
+                    handler: function () {
+                        closeModal();
+                        openCareersTab();
+                    }
+                },
+                {
+                    label: "Take a Gap Year",
+                    handler: function () {
+                        closeModal();
+                        takeGapYear();
+                    }
+                }
+            ];
+            if (state.playerPath !== "Trades") {
+                actions.push({
+                    label: "Earn More Education",
+                    handler: function () {
+                        closeModal();
+                        openHigherEducationMenu();
+                    }
+                });
+            }
+
+            openModal(
+                "Congratulations! 🎉",
+                "After years of hard work, you have officially graduated with your " + program.degreeName + "!",
+                actions
+            );
+            updateUI();
+        }
+
+        function openEducationTab() {
+            const program = state.currentlyPursuing ? EDUCATION_PROGRAMS[state.currentlyPursuing] : null;
+            const progress = program
+                ? "Currently pursuing: " + program.degreeName + " (" + state.yearsInSchool + "/" + program.yearsRequired + " years)"
+                : "You are not currently enrolled in school.";
+            const examProgress = program
+                ? "Exam passes: " + state.examsPassedThisDegree + "/" + state.examsTakenThisDegree + "."
+                : "";
+
+            const actions = [
+                {
+                    label: "Age Up +1 Year",
+                    handler: function () {
+                        closeModal();
+                        ageUp();
+                    }
+                },
+                {
+                    label: "Close",
+                    handler: function () {
+                        closeModal();
+                    }
+                }
+            ];
+
+            openModal(
+                "Education",
+                "Path: " + state.playerPath + " | Education Level: " + state.educationLevel + ". " + progress + " " + examProgress,
+                actions
+            );
+        }
+
+        function syncFinancialAliases() {
+            state.bankBalance = state.cash;
+            state.expenses = state.annualExpenses;
+        }
+
+        function applyProceduralEffects(effects) {
+            state.cash += effects.cash || 0;
+            state.health += effects.health || 0;
+            state.happiness += effects.happiness || 0;
+
+            if (effects.death === true || state.health <= 0) {
+                state.health = 0;
+                onPlayerDeath();
+                return true;
+            }
+            return false;
+        }
+
+        function generateProceduralEvent() {
+            const template = proceduralEventTemplates[Math.floor(Math.random() * proceduralEventTemplates.length)];
+            const event = {
+                title: template.title,
+                description: template.description,
+                choices: template.choices.map(function (choice) {
+                    return {
+                        text: choice.text,
+                        effects: Object.assign({}, choice.effects)
+                    };
+                })
+            };
+
+            event.description = event.description.replace(/\[(.*?)\]/g, function (match, tag) {
+                const bank = proceduralWordBanks[tag];
+                if (!bank || bank.length === 0) {
+                    return match;
+                }
+                const totalSize = bank.length + GENERATED_WORDS_PER_BANK;
+                const randomIndex = Math.floor(Math.random() * totalSize);
+                return getWordFromBank(bank, GENERATED_WORDS_PER_BANK, randomIndex);
+            });
+
+            return event;
+        }
+
+        function showNextProceduralEvent() {
+            if (state.isDead) return;
+
+            if (yearlyProceduralEventRemaining <= 0) {
+                updateUI();
+                return;
+            }
+
+            const event = generateProceduralEvent();
+            const eventIndex = yearlyProceduralEventTotal - yearlyProceduralEventRemaining + 1;
+            logEvent("Event - " + event.title + ": " + event.description);
+
+            openModal(
+                event.title + " (" + eventIndex + "/" + yearlyProceduralEventTotal + ")",
+                event.description + " Your choice determines the outcome.",
+                event.choices.map(function (choice) {
+                    return {
+                        label: choice.text + " (" + describeEffects(choice.effects) + ")",
+                        handler: function () {
+                            const died = applyProceduralEffects(choice.effects);
+                            logEvent("Outcome - " + event.title + ": " + choice.text + " -> " + describeEffects(choice.effects));
+                            yearlyProceduralEventRemaining -= 1;
+                            closeModal();
+                            if (died || state.isDead) return;
+                            updateUI();
+                            showNextProceduralEvent();
+                        }
+                    };
+                })
+            );
+        }
+
+        function triggerProceduralYearEvents() {
+            yearlyProceduralEventTotal = Math.floor(Math.random() * 4);
+            yearlyProceduralEventRemaining = yearlyProceduralEventTotal;
+
+            if (yearlyProceduralEventTotal === 0) {
+                logEvent("A quiet, uneventful year passes by...");
+                updateUI();
+                return;
+            }
+
+            showNextProceduralEvent();
+        }
+
+        function getPropertyMarketDelta(property) {
+            const delta = property.currentValue - property.originalPrice;
+            const pct = property.originalPrice > 0 ? (delta / property.originalPrice) * 100 : 0;
+            return { delta: delta, pct: pct };
+        }
+
+        function getGlobalHousingMarketShiftForYear() {
+            let shift = 0;
+            let eventType = "stable";
+            if (Math.random() < 0.05) {
+                if (Math.random() < 0.5) {
+                    shift = -0.20;
+                    eventType = "crash";
+                    logEvent("Housing Market Crash: real estate values dropped by 20% this year.");
+                } else {
+                    shift = 0.20;
+                    eventType = "boom";
+                    logEvent("Housing Boom: real estate values jumped by 20% this year.");
+                }
+            }
+            state.currentHousingMarketShift = shift;
+            state.currentHousingMarketEvent = eventType;
+        }
+
+        function applyHousingMarketForYear() {
+            getGlobalHousingMarketShiftForYear();
+
+            state.ownedAssets.forEach(function (property) {
+                const marketFluctuation = Math.random() * 0.12 - 0.05;
+                const totalShift = marketFluctuation + state.currentHousingMarketShift;
+                property.currentValue = Math.max(10000, Math.round(property.currentValue * (1 + totalShift)));
+                property.lastMarketFluctuation = totalShift;
+
+                if (property.isMortgaged && property.remainingBalance > 0) {
+                    const principalPaydown = Math.min(property.remainingBalance, Math.max(0, Math.round(property.mortgagePayment * 0.55)));
+                    property.remainingBalance -= principalPaydown;
+                    if (property.remainingBalance <= 0) {
+                        property.remainingBalance = 0;
+                        property.isMortgaged = false;
+                        if (property.mortgagePayment > 0) {
+                            state.annualExpenses = Math.max(0, state.annualExpenses - property.mortgagePayment);
+                        }
+                        property.mortgagePayment = 0;
+                        logEvent(property.propertyType + " mortgage has been fully paid off.");
+                    }
+                }
+            });
+
+            syncFinancialAliases();
+            generateRealEstateMarket();
+        }
+
+        function generateRealEstateMarket() {
+            const templates = [
+                { propertyType: "Starter Condo", minPrice: 120000, maxPrice: 220000, upkeepRate: 0.010 },
+                { propertyType: "Suburban House", minPrice: 240000, maxPrice: 420000, upkeepRate: 0.012 },
+                { propertyType: "Urban Duplex", minPrice: 300000, maxPrice: 550000, upkeepRate: 0.013 }
+            ];
+
+            state.realEstateListings = templates.map(function (tpl) {
+                const basePrice = tpl.minPrice + Math.random() * (tpl.maxPrice - tpl.minPrice);
+                const adjustedPrice = Math.max(50000, Math.round(basePrice * (1 + state.currentHousingMarketShift)));
+                const annualUpkeep = Math.max(1000, Math.round(adjustedPrice * tpl.upkeepRate));
+                const suggestedMortgagePayment = Math.max(1200, Math.round(adjustedPrice * 0.06));
+                return {
+                    id: state.nextListingId++,
+                    propertyType: tpl.propertyType,
+                    price: adjustedPrice,
+                    annualUpkeep: annualUpkeep,
+                    suggestedMortgagePayment: suggestedMortgagePayment
+                };
+            });
+        }
+
+        function buyProperty(listingId) {
+            const listing = state.realEstateListings.find(function (item) { return item.id === listingId; });
+            if (!listing) return;
+
+            const canPayInFull = state.cash >= listing.price;
+            const downPayment = Math.round(listing.price * 0.20);
+            if (!canPayInFull && state.cash < downPayment) {
+                logEvent("You don't have enough cash to buy " + listing.propertyType + ".");
+                closeModal();
+                updateUI();
+                return;
+            }
+
+            let paidNow = 0;
+            let isMortgaged = false;
+            let remainingBalance = 0;
+            let mortgagePayment = 0;
+
+            if (canPayInFull) {
+                paidNow = listing.price;
+            } else {
+                paidNow = downPayment;
+                isMortgaged = true;
+                remainingBalance = listing.price - downPayment;
+                mortgagePayment = listing.suggestedMortgagePayment;
+            }
+
+            state.cash -= paidNow;
+            state.annualExpenses += listing.annualUpkeep + mortgagePayment;
+            syncFinancialAliases();
+
+            state.ownedAssets.push({
+                id: state.nextPropertyId++,
+                propertyType: listing.propertyType,
+                originalPrice: listing.price,
+                currentValue: listing.price,
+                annualUpkeep: listing.annualUpkeep,
+                isMortgaged: isMortgaged,
+                remainingBalance: remainingBalance,
+                mortgagePayment: mortgagePayment,
+                lastMarketFluctuation: 0
+            });
+
+            state.realEstateListings = state.realEstateListings.filter(function (item) {
+                return item.id !== listingId;
+            });
+
+            if (isMortgaged) {
+                logEvent("You bought " + listing.propertyType + " with a mortgage. Down payment: " + formatMoney(downPayment) + ".");
+            } else {
+                logEvent("You bought " + listing.propertyType + " outright for " + formatMoney(listing.price) + ".");
+            }
+
+            closeModal();
+            updateUI();
+        }
+
+        function sellProperty(propertyId) {
+            const index = state.ownedAssets.findIndex(function (asset) { return asset.id === propertyId; });
+            if (index === -1) return;
+
+            const property = state.ownedAssets[index];
+            const salePrice = Math.round(property.currentValue);
+            const mortgageBalance = property.isMortgaged ? Math.round(property.remainingBalance) : 0;
+            const proceeds = salePrice - mortgageBalance;
+
+            state.cash += proceeds;
+            state.annualExpenses = Math.max(0, state.annualExpenses - property.annualUpkeep - (property.isMortgaged ? property.mortgagePayment : 0));
+            syncFinancialAliases();
+
+            state.ownedAssets.splice(index, 1);
+
+            const profitLoss = salePrice - property.originalPrice;
+            const profitLossLabel = profitLoss >= 0 ? "profit" : "loss";
+            logEvent("You sold your " + property.propertyType + " for " + formatMoney(salePrice) + " and pocketed " + formatMoney(proceeds) + ". " + profitLossLabel + ": " + formatMoney(Math.abs(profitLoss)) + ".");
+
+            closeModal();
+            updateUI();
+        }
+
+        function openSellPropertyConfirmation(propertyId) {
+            const property = state.ownedAssets.find(function (asset) { return asset.id === propertyId; });
+            if (!property) return;
+
+            const currentValue = Math.round(property.currentValue);
+            const mortgageBalance = property.isMortgaged ? Math.round(property.remainingBalance) : 0;
+            const netProceeds = currentValue - mortgageBalance;
+            const netLabel = netProceeds >= 0 ? formatMoney(netProceeds) : "-" + formatMoney(Math.abs(netProceeds));
+
+            openModal(
+                "Sell Property",
+                "You have an offer of " + formatMoney(currentValue) + " for your " + property.propertyType + ". After paying off your mortgage of " + formatMoney(mortgageBalance) + ", you will pocket " + netLabel + ". Do you want to sell?",
+                [
+                    {
+                        label: "Yes, Sell",
+                        handler: function () {
+                            sellProperty(propertyId);
+                        }
+                    },
+                    {
+                        label: "Cancel",
+                        handler: function () {
+                            closeModal();
+                        }
+                    }
+                ]
+            );
+        }
+
+        function applyActionWithRefresh(actionText, fn) {
+            if (state.isDead) return;
+            fn();
+            logEvent(actionText);
+            if (state.health <= 0) {
+                onPlayerDeath();
+                return;
+            }
+            updateUI();
+            closeModal();
+        }
+
+        function getCureRecoveryAmount(disease) {
+            const base = Math.max(2, disease.annualHealthDrain);
+            const minRecovery = Math.max(2, Math.floor(base * 0.8));
+            const maxRecovery = Math.max(minRecovery + 1, Math.floor(base * 2.4));
+            return minRecovery + Math.floor(Math.random() * (maxRecovery - minRecovery + 1));
+        }
+
         function getActiveIllnessSummary() {
             if (!state.currentIllnesses.length) return "No active illnesses.";
             return state.currentIllnesses.map(function (key) {
@@ -767,7 +1737,7 @@
             }).filter(Boolean).join(" | ");
         }
 
-        function applyYearlyIllnessEffects() {
+        function processIllnessesForYear() {
             if (!state.currentIllnesses.length) return false;
 
             const healthAtStart = state.health;
@@ -803,7 +1773,6 @@
                 }
 
                 logEvent(disease.name + " effect: -" + healthDrain + " HP this year.");
-
             }
 
             if (state.health <= 0) {
@@ -835,7 +1804,7 @@
             return false;
         }
 
-        function maybeContractIllness() {
+        function maybeContractDisease() {
             if (state.currentIllnesses.length >= 4) return;
             if (Math.random() >= 0.26) return;
 
@@ -895,7 +1864,9 @@
                                 return illnessKey !== key;
                             });
                             delete state.illnessYears[key];
-                            logEvent("Doctor treated and cured " + disease.name + " for " + formatMoney(disease.cureCost) + ".");
+                            const recovery = getCureRecoveryAmount(disease);
+                            state.health += recovery;
+                            logEvent("Doctor treated and cured " + disease.name + " for " + formatMoney(disease.cureCost) + ". Health recovered by +" + recovery + ".");
                         } else {
                             logEvent("Doctor visit for " + disease.name + " cost " + formatMoney(disease.cureCost) + ", but it remains incurable.");
                         }
@@ -908,18 +1879,6 @@
 
             actions.push({ label: "Close", handler: function () { closeModal(); } });
             openModal("Doctor", "Active illnesses: " + getActiveIllnessSummary(), actions);
-        }
-
-        function applyActionWithRefresh(actionText, fn) {
-            if (state.isDead) return;
-            fn();
-            logEvent(actionText);
-            if (state.health <= 0) {
-                onPlayerDeath();
-                return;
-            }
-            updateUI();
-            closeModal();
         }
 
         function openCareerMenu() {
@@ -967,7 +1926,8 @@
                                 state.cash -= 2000;
                                 state.happiness += 25;
                             } else {
-                                logEvent("You couldn't afford therapy.");
+                                state.happiness += 5;
+                                logEvent("You couldn't afford a full session, but deciding to seek help still improved your mood.");
                             }
                         });
                     }
@@ -1009,14 +1969,140 @@
         }
 
         function openAssetsMenu() {
-            openModal("Assets", "Move money into investments and ride market volatility.", [
-                {
-                    label: "Invest 50% Cash",
+            if (state.realEstateListings.length === 0) {
+                generateRealEstateMarket();
+            }
+            const currentNetWorth = state.cash + state.investments - state.debt;
+            const canInvest = state.cash > 0 && currentNetWorth > 0;
+            const marketLabel = state.currentHousingMarketEvent === "crash"
+                ? "<span style=\"color:#ff6b6b;\">Market Mood: Crash (-20%)</span>"
+                : state.currentHousingMarketEvent === "boom"
+                    ? "<span style=\"color:#69f0ae;\">Market Mood: Boom (+20%)</span>"
+                    : "<span style=\"color:#bdbdbd;\">Market Mood: Stable</span>";
+
+            const myPropertiesHtml = state.ownedAssets.length
+                ? state.ownedAssets.map(function (property) {
+                    const delta = getPropertyMarketDelta(property);
+                    const up = delta.delta > 0;
+                    const down = delta.delta < 0;
+                    const color = up ? "#69f0ae" : down ? "#ff6b6b" : "#bdbdbd";
+                    const marker = up ? "▲" : down ? "▼" : "■";
+                    const mortgageText = property.isMortgaged ? "Mortgage: " + formatMoney(property.remainingBalance) : "No mortgage";
+                    return "<div style=\"margin-bottom:8px;\">" +
+                        "<strong>" + property.propertyType + "</strong><br>" +
+                        "Original: " + formatMoney(property.originalPrice) + " | Current: " + formatMoney(property.currentValue) + "<br>" +
+                        "<span style=\"color:" + color + ";\">" + marker + " " + (up ? "+" : "") + delta.pct.toFixed(1) + "%</span> | " + mortgageText +
+                        "</div>";
+                }).join("")
+                : "<div style=\"color:#bdbdbd; margin-bottom:8px;\">No properties owned.</div>";
+
+            const listingsHtml = state.realEstateListings.map(function (listing) {
+                return "<div style=\"margin-bottom:6px;\"><strong>" + listing.propertyType + "</strong> - " +
+                    formatMoney(listing.price) + " (Upkeep " + formatMoney(listing.annualUpkeep) + "/yr)</div>";
+            }).join("");
+
+            const actions = [];
+            state.ownedAssets.forEach(function (property) {
+                actions.push({
+                    label: "Sell " + property.propertyType,
                     handler: function () {
-                        applyActionWithRefresh("You invested half your cash.", function () {
-                            const amt = state.cash * 0.5;
-                            state.cash -= amt;
-                            state.investments += amt;
+                        openSellPropertyConfirmation(property.id);
+                    }
+                });
+            });
+
+            state.realEstateListings.forEach(function (listing) {
+                const downPayment = Math.round(listing.price * 0.20);
+                const canBuy = state.cash >= downPayment;
+                actions.push({
+                    label: "Buy " + listing.propertyType + " (" + formatMoney(listing.price) + ")",
+                    disabled: !canBuy,
+                    handler: function () {
+                        if (!canBuy) return;
+                        buyProperty(listing.id);
+                    }
+                });
+            });
+
+            actions.push({
+                label: canInvest ? "Invest 50% Cash" : "Invest 50% Cash (Unavailable)",
+                disabled: !canInvest,
+                handler: function () {
+                    if (!canInvest) return;
+                    applyActionWithRefresh("You invested 50% cash, and your net worth dropped by 50%.", function () {
+                        const amt = state.cash * 0.5;
+                        state.cash -= amt;
+                        state.investments += amt;
+                        const netWorthBeforeDrop = state.cash + state.investments - state.debt;
+                        const netWorthDrop = Math.abs(netWorthBeforeDrop) * 0.50;
+                        state.cash -= netWorthDrop;
+                    });
+                }
+            });
+            actions.push({
+                label: canInvest ? "Contribute 10% Cash" : "Contribute 10% Cash (Unavailable)",
+                disabled: !canInvest,
+                handler: function () {
+                    if (!canInvest) return;
+                    applyActionWithRefresh("You contributed 10% cash, and your net worth dropped by 10%.", function () {
+                        const amt = state.cash * 0.10;
+                        state.cash -= amt;
+                        state.investments += amt;
+                        const netWorthBeforeDrop = state.cash + state.investments - state.debt;
+                        const netWorthDrop = Math.abs(netWorthBeforeDrop) * 0.10;
+                        state.cash -= netWorthDrop;
+                    });
+                }
+            });
+            actions.push({
+                label: "Close",
+                handler: function () {
+                    closeModal();
+                }
+            });
+
+            openModal(
+                "Assets",
+                marketLabel + "<br><br><strong>My Properties</strong><br>" + myPropertiesHtml +
+                "<br><strong>Broker Listings</strong><br>" + listingsHtml,
+                actions
+            );
+        }
+
+        function openRelationshipsMenu() {
+            openModal("Relationships", "Invest in your connections to improve quality of life.", [
+                {
+                    label: "Date Night ($1.5k)",
+                    handler: function () {
+                        applyActionWithRefresh("You invested in a date night.", function () {
+                            if (state.cash >= 1500) {
+                                state.cash -= 1500;
+                                state.happiness += 18;
+                            } else {
+                                logEvent("You couldn't afford date night.");
+                            }
+                        });
+                    }
+                },
+                {
+                    label: "Call Family (Free)",
+                    handler: function () {
+                        applyActionWithRefresh("You called family and recharged emotionally.", function () {
+                            state.happiness += 10;
+                        });
+                    }
+                },
+                {
+                    label: "Networking Event ($1k)",
+                    handler: function () {
+                        applyActionWithRefresh("You attended a networking event.", function () {
+                            if (state.cash >= 1000) {
+                                state.cash -= 1000;
+                                state.salary *= 1.05;
+                                state.happiness -= 4;
+                            } else {
+                                logEvent("You couldn't afford the networking event.");
+                            }
                         });
                     }
                 },
@@ -1031,12 +2117,20 @@
 
         function triggerRandomEvent() {
             const eventObj = randomEvents[Math.floor(Math.random() * randomEvents.length)];
+            logEvent("Event - " + eventObj.name + ": " + eventObj.text);
             const actions = eventObj.choices.map(function (choice) {
+                const unavailable = choice.requiresInvestments && state.investments <= 0;
                 return {
-                    label: choice.label,
+                    label: unavailable
+                        ? choice.label + " (Unavailable: no investments)"
+                        : choice.label + " (" + choice.outcome + ")",
+                    disabled: unavailable,
                     handler: function () {
+                        if (unavailable) {
+                            return;
+                        }
                         choice.effect();
-                        logEvent("Random Event - " + eventObj.name + ": " + choice.label + ".");
+                        logEvent("Outcome - " + eventObj.name + ": " + choice.label + " -> " + choice.outcome);
                         if (state.health <= 0) {
                             closeModal();
                             onPlayerDeath();
@@ -1053,26 +2147,24 @@
         function triggerDeath(customDeathMessage) {
             state.isDead = true;
             closeModal();
+            closeYearlyExamOverlay();
             gameUI.style.display = "none";
             deathScreen.style.display = "flex";
 
             const netWorth = state.cash + state.investments - state.debt;
-            deathSummary.textContent = "You died at Age " + state.age + ". Final Net Worth: " + formatMoney(netWorth) + ".";
-
             const causeMessage = customDeathMessage || GENERIC_HEALTH_DEATH_MESSAGE;
-            let lifeSummary = "";
+            deathSummary.textContent = causeMessage + " You died at Age " + state.age + ". Final Net Worth: " + formatMoney(netWorth) + ".";
+
             if (state.happiness > 80) {
-                lifeSummary = "You lived a deeply happy life.";
+                deathLifeNote.textContent = "You lived a deeply happy life.";
             } else if (state.happiness < 40) {
-                lifeSummary = "You died stressed and miserable.";
+                deathLifeNote.textContent = "You died stressed and miserable.";
             } else {
-                lifeSummary = "A perfectly average life.";
+                deathLifeNote.textContent = "A perfectly average life.";
             }
-            deathLifeNote.textContent = causeMessage + " " + lifeSummary;
         }
 
         function onPlayerDeath(customDeathMessage) {
-            if (state.isDead) return;
             deathSound.currentTime = 0;
             deathSound.play();
             triggerDeath(customDeathMessage);
@@ -1080,103 +2172,87 @@
         }
 
         function ageUp() {
-            if (state.isDead || !state.major) return;
+            if (state.isDead || !state.playerPath || state.isExamModalOpen) return;
 
-            state.age++;
-
-            if (state.major === "finance") {
-                state.health -= 5;
-                state.happiness -= 10;
-            } else if (state.major === "arts") {
-                state.health -= 2;
-                state.happiness -= 2;
-                if (state.happiness > 85) {
-                    state.salary *= 1.10;
-                }
-            } else if (state.major === "trades") {
-                state.health -= 8;
-                state.happiness -= 3;
+            if (state.currentlyPursuing) {
+                openYearlyExamOverlay();
+                return;
             }
 
-            let netIncome = state.salary * 0.75;
+            state.age += 1;
+            state.cash -= state.annualExpenses;
+            state.health -= 1;
+            state.happiness -= 1;
 
-            state.debt *= 1.06;
-            if (state.debt > 0) {
-                let payment = netIncome * 0.15;
-                state.debt -= payment;
-                netIncome -= payment;
-                if (state.debt < 0) {
-                    state.debt = 0;
-                }
+            const netIncome = state.annualIncome * 0.75;
+            state.cash += netIncome;
+            state.salary = state.annualIncome;
+            syncFinancialAliases();
+
+            if (state.annualIncome > 0) {
+                logEvent("Age " + state.age + ": You worked as " + state.jobTitle + " and took home " + formatMoney(netIncome) + " after taxes.");
+            } else {
+                logEvent("Age " + state.age + ": You had no income this year.");
             }
-
-            state.cash += (netIncome - state.expenses);
 
             state.investments *= (1 + (Math.random() * 0.25 - 0.10));
+            applyHousingMarketForYear();
 
-            logEvent("Age " + state.age + ": You lived another year.");
+            if (processIllnessesForYear()) {
+                return;
+            }
+            maybeContractDisease();
 
             if (state.health <= 0) {
                 onPlayerDeath(GENERIC_HEALTH_DEATH_MESSAGE);
                 return;
             }
 
-            if (applyYearlyIllnessEffects()) {
-                return;
-            }
-            maybeContractIllness();
-
-            if (state.health <= 0) {
-                onPlayerDeath();
-                return;
-            }
-
-            if (Math.random() < 0.25) {
-                triggerRandomEvent();
-            } else {
-                updateUI();
-            }
+            triggerProceduralYearEvents();
         }
 
-        function chooseMajor(major) {
-            state.major = major;
+        function choosePath(path) {
+            state.playerPath = path;
+            state.major = path;
+            state.annualIncome = 0;
+            state.salary = 0;
+            state.jobTitle = "Student";
 
-            if (major === "finance") {
-                state.debt = 60000;
-                state.salary = 85000;
-                state.smarts = 80;
-            } else if (major === "arts") {
-                state.debt = 40000;
-                state.salary = 30000;
-                state.smarts = 60;
-            } else if (major === "trades") {
-                state.debt = 5000;
-                state.salary = 55000;
-                state.smarts = 50;
+            if (path === "STEM") {
+                enrollInProgram("STEM_BASE");
+            } else if (path === "Humanities") {
+                enrollInProgram("HUMANITIES_BASE");
+            } else {
+                enrollInProgram("TRADES_BASE");
             }
 
             setupScreen.style.display = "none";
             gameUI.style.display = "flex";
+            syncFinancialAliases();
+            generateRealEstateMarket();
 
-            logEvent("You chose " + major.charAt(0).toUpperCase() + major.slice(1) + ". Your adult life begins at age 18.");
+            logEvent("You chose the " + path + " path. Your education journey begins.");
             updateUI();
         }
 
         document.querySelectorAll(".major-btn").forEach(function (btn) {
             btn.addEventListener("click", function () {
-                chooseMajor(btn.dataset.major);
+                choosePath(btn.dataset.path);
             });
         });
 
         document.getElementById("age-up-btn").addEventListener("click", ageUp);
-        document.getElementById("career-nav-btn").addEventListener("click", function () {
-            if (!state.isDead && state.major) openCareerMenu();
+        document.getElementById("education-nav-btn").addEventListener("click", function () {
+            if (!state.isDead && state.playerPath && !state.isExamModalOpen) openEducationTab();
+        });
+        document.getElementById("careers-nav-btn").addEventListener("click", function () {
+            if (!state.isDead && state.playerPath && !state.isExamModalOpen) openCareersTab();
         });
         document.getElementById("activities-nav-btn").addEventListener("click", function () {
-            if (!state.isDead && state.major) openActivitiesMenu();
+            if (!state.isDead && state.playerPath && !state.isExamModalOpen) openActivitiesMenu();
         });
         document.getElementById("assets-nav-btn").addEventListener("click", function () {
-            if (!state.isDead && state.major) openAssetsMenu();
+            if (!state.isDead && state.playerPath && !state.isExamModalOpen) openAssetsMenu();
         });
         document.getElementById("play-again-btn").addEventListener("click", function () {
             location.reload();
