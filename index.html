@@ -1424,6 +1424,58 @@
             cursor: pointer;
         }
 
+        #divorce-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 10017;
+            background: linear-gradient(165deg, #1a0a1a 0%, #0d0d12 50%, #120818 100%);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: #fff;
+            padding: 24px;
+            box-sizing: border-box;
+        }
+
+        .divorce-card {
+            max-width: 520px;
+            width: 100%;
+            background: rgba(35, 15, 35, 0.95);
+            border: 2px solid #7e57c2;
+            border-radius: 16px;
+            padding: 26px 22px;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+            text-align: center;
+        }
+
+        .divorce-card h2 {
+            margin: 0 0 16px;
+            color: #e1bee7;
+            font-size: 1.2rem;
+        }
+
+        .divorce-card p {
+            margin: 0 0 20px;
+            line-height: 1.55;
+            color: #f3e5f5;
+            font-size: 0.95rem;
+        }
+
+        .divorce-ack-btn {
+            width: 100%;
+            padding: 14px;
+            border-radius: 12px;
+            border: 1px solid #ce93d8;
+            background: linear-gradient(180deg, #6a1b9a, #4a148c);
+            color: #fff;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
         .careers-medical-leave-banner {
             margin: 0 0 16px;
             padding: 14px 16px;
@@ -1752,6 +1804,7 @@
     <div id="inflation-overlay-root"></div>
     <div id="mortgage-paid-overlay-root"></div>
     <div id="foreclosure-overlay-root"></div>
+    <div id="divorce-overlay-root"></div>
     <div id="eviction-overlay-root"></div>
     <div id="app-container">
         <div id="intro-screen">
@@ -1827,6 +1880,7 @@
                 <div class="nav-group nav-group--left">
                     <button type="button" class="nav-btn" id="education-nav-btn">Education</button>
                     <button type="button" class="nav-btn" id="careers-nav-btn">Careers</button>
+                    <button type="button" class="nav-btn" id="relationships-nav-btn">Relationships</button>
                 </div>
                 <div class="nav-fab-slot">
                     <button type="button" id="age-up-btn">+1 Year</button>
@@ -1917,6 +1971,17 @@
             currentHousing: null,
             roommate: null,
             rentExpenseInBudget: 0,
+            weeklyTimeUnits: 100,
+            timeSunkInWork: 0,
+            activityWtuSpentThisWeek: 0,
+            spouse: { name: "", relationshipLevel: 0, isMarried: false },
+            children: { count: 0, happiness: 70 },
+            qualityTimeCountThisYear: 0,
+            alimonyObligationActive: false,
+            _alimonyStartsNextYear: false,
+            preventAutoRemarry: false,
+            isDivorceOverlayOpen: false,
+            _postDivorceResume: null,
             housingStatus: "Renting",
             mortgageBalance: 0,
             annualMortgagePayment: 0,
@@ -2008,6 +2073,8 @@
         let mortgagePaidOverlayReactRoot = null;
         const foreclosureOverlayMount = document.getElementById("foreclosure-overlay-root");
         let foreclosureOverlayReactRoot = null;
+        const divorceOverlayMount = document.getElementById("divorce-overlay-root");
+        let divorceOverlayReactRoot = null;
         const evictionOverlayMount = document.getElementById("eviction-overlay-root");
         let evictionOverlayReactRoot = null;
         let higherEdCatalogRoot = null;
@@ -3494,6 +3561,188 @@
             updateUI();
         }
 
+        function getEffectiveJobTierForTimeDrain() {
+            if (!state.isEmployed || state.jobType !== "Career") return 3;
+            if (state.jobTitle === "Student" || state.jobTitle === "Unemployed" || state.jobTitle === "Medical Resident") return 3;
+            var jobs = JOB_MARKET[state.playerPath] || [];
+            var baseTitle = stripPromotionPrefixesFromTitle(state.jobTitle);
+            for (var i = 0; i < jobs.length; i++) {
+                if (jobs[i].title === baseTitle || jobs[i].title === state.jobTitle) {
+                    return typeof jobs[i].tier === "number" ? jobs[i].tier : 3;
+                }
+            }
+            return typeof state.currentJobLevel === "number" && state.currentJobLevel >= 3 ? 1 : 2;
+        }
+
+        function computeTimeSunkInWork() {
+            if (!state.isEmployed || state.jobType !== "Career") {
+                state.timeSunkInWork = 0;
+                return;
+            }
+            if (state.jobTitle === "Student" || state.jobTitle === "Unemployed" || state.jobTitle === "Medical Resident") {
+                state.timeSunkInWork = 0;
+                return;
+            }
+            var tier = getEffectiveJobTierForTimeDrain();
+            if (state.playerPath === "STEM" && tier === 1) {
+                state.timeSunkInWork = 85;
+            } else if (state.playerPath === "STEM") {
+                state.timeSunkInWork = 70;
+            } else if (state.playerPath === "Trades") {
+                state.timeSunkInWork = 45;
+            } else {
+                state.timeSunkInWork = 55;
+            }
+        }
+
+        function activityWtuAvailable() {
+            return Math.max(0, (state.weeklyTimeUnits || 100) - (state.timeSunkInWork || 0) - (state.activityWtuSpentThisWeek || 0));
+        }
+
+        function randomSpouseFirstName() {
+            var names = ["Alex", "Jordan", "Sam", "Riley", "Casey", "Morgan", "Taylor", "Quinn"];
+            return names[Math.floor(Math.random() * names.length)];
+        }
+
+        function ensureMarriedIfAdult() {
+            if (state.age < 18) return;
+            if (state.spouse && state.spouse.isMarried) return;
+            if (state.preventAutoRemarry) return;
+            state.spouse = {
+                name: randomSpouseFirstName(),
+                relationshipLevel: 75,
+                isMarried: true
+            };
+            state.children = {
+                count: Math.floor(Math.random() * 3),
+                happiness: 70
+            };
+            logEvent(
+                "Life update: you are married to " +
+                    state.spouse.name +
+                    (state.children.count > 0 ? " with " + state.children.count + " kid(s)." : ".")
+            );
+        }
+
+        function applyAlimonyForYear(doneFn) {
+            if (state._alimonyStartsNextYear) {
+                state._alimonyStartsNextYear = false;
+                if (typeof doneFn === "function") doneFn();
+                return;
+            }
+            if (!state.alimonyObligationActive || state.age >= 65) {
+                if (state.age >= 65) {
+                    state.alimonyObligationActive = false;
+                }
+                if (typeof doneFn === "function") doneFn();
+                return;
+            }
+            var gross =
+                state.isRetired ? (state.pensionIncome || 0) : state.medicalLeaveYearsRemaining > 0 ? (state.disabilityIncome || 0) : (state.annualIncome || 0);
+            var pay = Math.round(gross * 0.4);
+            if (pay > 0) {
+                state.cash -= pay;
+                state.bankBalance = state.cash;
+                logEvent("Alimony / child support: -" + formatMoney(pay) + " (40% of gross " + formatMoney(gross) + ").");
+                syncFinancialAliases();
+            }
+            if (typeof doneFn === "function") doneFn();
+        }
+
+        function processRelationshipYearEnd(doneFn) {
+            ensureMarriedIfAdult();
+            if (!state.spouse || !state.spouse.isMarried) {
+                state.qualityTimeCountThisYear = 0;
+                state.activityWtuSpentThisWeek = 0;
+                computeTimeSunkInWork();
+                if (typeof doneFn === "function") doneFn();
+                return;
+            }
+            if (state.qualityTimeCountThisYear < 2) {
+                state.spouse.relationshipLevel -= 25;
+                logEvent("Relationship strain: fewer than 2 quality-time weeks this year (-25 relationship).");
+            }
+            state.spouse.relationshipLevel = Math.max(0, Math.min(100, state.spouse.relationshipLevel));
+            state.qualityTimeCountThisYear = 0;
+            state.activityWtuSpentThisWeek = 0;
+            computeTimeSunkInWork();
+
+            if (state.spouse.relationshipLevel < 20) {
+                state._postDivorceResume = doneFn;
+                state.isDivorceOverlayOpen = true;
+                renderDivorceOverlay();
+                updateUI();
+                return;
+            }
+            if (typeof doneFn === "function") doneFn();
+        }
+
+        function DivorceOverlay(props) {
+            return (
+                <div id="divorce-overlay" role="dialog" aria-modal="true" aria-label="Divorce">
+                    <div className="divorce-card">
+                        <h2>DIVORCE 💔</h2>
+                        <p>
+                            Neglect destroyed your marriage. Legal fees and settlement have taken half your bank balance. You will pay alimony and child support — 40% of your gross income each year until age 65.
+                        </p>
+                        <button type="button" className="divorce-ack-btn" onClick={props.onAcknowledge}>
+                            Face the Papers
+                        </button>
+                    </div>
+                </div>
+            );
+        }
+
+        function renderDivorceOverlay() {
+            if (!divorceOverlayMount) return;
+            if (!state.isDivorceOverlayOpen) {
+                if (divorceOverlayReactRoot) divorceOverlayReactRoot.render(null);
+                return;
+            }
+            if (!divorceOverlayReactRoot) {
+                divorceOverlayReactRoot = ReactDOM.createRoot(divorceOverlayMount);
+            }
+            divorceOverlayReactRoot.render(<DivorceOverlay onAcknowledge={handleDivorceAcknowledge} />);
+        }
+
+        function closeDivorceOverlay() {
+            state.isDivorceOverlayOpen = false;
+            if (divorceOverlayReactRoot) {
+                divorceOverlayReactRoot.render(null);
+            }
+        }
+
+        function handleDivorceAcknowledge() {
+            var half = Math.round(state.bankBalance * 0.5);
+            state.cash -= half;
+            state.bankBalance = state.cash;
+            state.spouse.isMarried = false;
+            state.spouse.relationshipLevel = 0;
+            state.spouse.name = "";
+            state.alimonyObligationActive = true;
+            state._alimonyStartsNextYear = true;
+            state.preventAutoRemarry = true;
+            if (!state.children) state.children = { count: 0, happiness: 70 };
+            state.children.happiness = Math.max(0, (state.children.happiness || 0) - 30);
+            logEvent("Divorce finalized: legal/settlement cost " + formatMoney(half) + ". Alimony obligation begins next year through age 64.");
+            closeDivorceOverlay();
+            syncFinancialAliases();
+            var fn = state._postDivorceResume;
+            state._postDivorceResume = null;
+            if (typeof fn === "function") {
+                fn();
+            }
+            updateUI();
+        }
+
+        function continueAfterIncomeAndHousing(doneFn) {
+            applyAlimonyForYear(function () {
+                processRelationshipYearEnd(function () {
+                    processMortgageAfterYearIncome(doneFn);
+                });
+            });
+        }
+
         function updateUI() {
             syncCurrentEnrollment();
             evictDormIfNotEnrolled(true);
@@ -3594,7 +3843,7 @@
 
         function openModal(title, description, actions, options) {
             options = options || {};
-            if (state.isExamModalOpen || state.isExamActive || state.isDiagnosisOverlayOpen || state.isPromotionOverlayOpen || state.isPerformanceReviewOverlayOpen || state.isCareerExamOpen || state.isFiredOverlayOpen || state.isRetirementOverlayOpen || state.isDateTriviaOpen || state.isCopingOverlayOpen || state.isNervousBreakdownOverlayOpen || state.isLayoffOverlayOpen || state.isInflationOverlayOpen || state.isMortgagePaidOverlayOpen || state.isForeclosureOverlayOpen || state.isEvictionOverlayOpen) return;
+            if (state.isExamModalOpen || state.isExamActive || state.isDiagnosisOverlayOpen || state.isPromotionOverlayOpen || state.isPerformanceReviewOverlayOpen || state.isCareerExamOpen || state.isFiredOverlayOpen || state.isRetirementOverlayOpen || state.isDateTriviaOpen || state.isCopingOverlayOpen || state.isNervousBreakdownOverlayOpen || state.isLayoffOverlayOpen || state.isInflationOverlayOpen || state.isMortgagePaidOverlayOpen || state.isForeclosureOverlayOpen || state.isDivorceOverlayOpen || state.isEvictionOverlayOpen) return;
             if (higherEdCatalogRoot) {
                 higherEdCatalogRoot.render(null);
             }
@@ -3634,6 +3883,9 @@
                     btn.classList.add("modal-btn-buy-deny");
                 }
                 btn.textContent = action.label;
+                if (action.disabledReason) {
+                    btn.title = action.disabledReason;
+                }
                 if (action.disabled) {
                     btn.disabled = true;
                     if (action.buttonVariant === "lockedJob") {
@@ -4518,7 +4770,9 @@
                 state.yearsAtCurrentJob += 1;
             }
             tickMedicalLeaveCountdown();
-            processMortgageAfterYearIncome();
+            continueAfterIncomeAndHousing(function () {
+                finishWorkYearCareerPhase();
+            });
         }
 
         function RetirementOverlay(props) {
@@ -5332,7 +5586,7 @@
                 state.age += 1;
                 state.yearsInSchool += 1;
                 schoolYearAfterIncomeAndCosts();
-                processMortgageAfterYearIncome(function () {
+                continueAfterIncomeAndHousing(function () {
                     schoolYearAfterGraduationOrRetirement();
                 });
             }
@@ -6842,11 +7096,24 @@
             return b > 0 ? inflScale(b) : 0;
         }
 
-        function runLifestyleActivity(cost, effects, logMessage) {
+        function runLifestyleActivity(cost, effects, logMessage, opts) {
+            opts = opts || {};
             if (state.isDead) return;
+            var wtu = typeof opts.wtu === "number" ? opts.wtu : 0;
+            if (wtu > 0) {
+                computeTimeSunkInWork();
+                if (activityWtuAvailable() < wtu) {
+                    logEvent("Too exhausted from work to do that activity.");
+                    return;
+                }
+                state.activityWtuSpentThisWeek = (state.activityWtuSpentThisWeek || 0) + wtu;
+            }
             var c = typeof cost === "number" ? cost : 0;
             if (c > 0 && state.cash < c) {
                 logEvent("You couldn't afford that activity.");
+                if (wtu > 0) {
+                    state.activityWtuSpentThisWeek = Math.max(0, (state.activityWtuSpentThisWeek || 0) - wtu);
+                }
                 return;
             }
             if (c > 0) {
@@ -6861,6 +7128,10 @@
             if (effects && typeof effects.smarts === "number") {
                 state.smarts += effects.smarts;
             }
+            if (opts.qualityTime && state.spouse && state.spouse.isMarried) {
+                state.qualityTimeCountThisYear = (state.qualityTimeCountThisYear || 0) + 1;
+                state.spouse.relationshipLevel = Math.min(100, (state.spouse.relationshipLevel || 0) + 10);
+            }
             logEvent(logMessage);
             state.health = clampStat(state.health);
             state.happiness = clampStat(state.happiness);
@@ -6874,118 +7145,240 @@
             closeModal();
         }
 
-        function lifestyleActionLabel(title, cost, effects) {
+        function lifestyleActionLabel(title, cost, effects, wtuCost) {
             var e = Object.assign({}, effects || {});
             if (cost > 0) {
                 e.cash = -cost;
             }
             var summary = describeEffects(e);
             var price = cost > 0 ? formatMoney(cost) : "Free";
-            return title + " (" + price + ")" + (summary !== "No immediate change" ? " — " + summary : "");
+            var wtuPart = typeof wtuCost === "number" && wtuCost > 0 ? ", " + wtuCost + " WTU" : "";
+            return title + " (" + price + wtuPart + ")" + (summary !== "No immediate change" ? " — " + summary : "");
+        }
+
+        function activityAvailability(costInflated, wtu) {
+            computeTimeSunkInWork();
+            var w = typeof wtu === "number" ? wtu : 0;
+            var lackW = w > 0 && activityWtuAvailable() < w;
+            var lackM = costInflated > 0 && state.cash < costInflated;
+            return {
+                disabled: lackW || lackM,
+                disabledReason: lackW ? "Too exhausted from work." : lackM ? "Insufficient funds." : ""
+            };
         }
 
         function openActivitiesMenu() {
             var actions = [
                 { sectionHeader: true, label: "Health & Wellness" },
-                {
-                    label: lifestyleActionLabel("Go Bouldering", activityCost(40), { health: 15, happiness: 5 }),
-                    handler: function () {
-                        runLifestyleActivity(activityCost(40), { health: 15, happiness: 5 }, "Go Bouldering: a challenging full-body workout.");
-                    }
-                },
-                {
-                    label: lifestyleActionLabel("Book a Spa Day", activityCost(250), { health: 5, happiness: 30 }),
-                    handler: function () {
-                        runLifestyleActivity(activityCost(250), { health: 5, happiness: 30 }, "Spa day: deep tissue massage and sauna recovery.");
-                    }
-                },
-                {
-                    label: lifestyleActionLabel("Try Acupuncture", activityCost(80), { health: 10 }),
-                    handler: function () {
-                        runLifestyleActivity(activityCost(80), { health: 10 }, "Acupuncture: alternative medicine to relieve chronic tension.");
-                    }
-                },
-                {
-                    label: lifestyleActionLabel("Do a 3-Day Juice Cleanse", activityCost(150), { health: 15, happiness: -10 }),
-                    handler: function () {
-                        runLifestyleActivity(activityCost(150), { health: 15, happiness: -10 }, "Juice cleanse: you feel purified, but you are incredibly cranky.");
-                    }
-                },
-                {
-                    label: lifestyleActionLabel("See a Therapist", activityCost(200), { health: 5, happiness: 25 }),
-                    handler: function () {
-                        runLifestyleActivity(activityCost(200), { health: 5, happiness: 25 }, "Therapy: working through stress and trauma.");
-                    }
-                },
+                (function () {
+                    var c = activityCost(40);
+                    var w = 12;
+                    var g = activityAvailability(c, w);
+                    return {
+                        label: lifestyleActionLabel("Go Bouldering", c, { health: 15, happiness: 5 }, w),
+                        disabled: g.disabled,
+                        disabledReason: g.disabledReason,
+                        handler: function () {
+                            runLifestyleActivity(c, { health: 15, happiness: 5 }, "Go Bouldering: a challenging full-body workout.", { wtu: w });
+                        }
+                    };
+                })(),
+                (function () {
+                    var c = activityCost(250);
+                    var w = 8;
+                    var g = activityAvailability(c, w);
+                    return {
+                        label: lifestyleActionLabel("Book a Spa Day", c, { health: 5, happiness: 30 }, w),
+                        disabled: g.disabled,
+                        disabledReason: g.disabledReason,
+                        handler: function () {
+                            runLifestyleActivity(c, { health: 5, happiness: 30 }, "Spa day: deep tissue massage and sauna recovery.", { wtu: w });
+                        }
+                    };
+                })(),
+                (function () {
+                    var c = activityCost(80);
+                    var w = 10;
+                    var g = activityAvailability(c, w);
+                    return {
+                        label: lifestyleActionLabel("Try Acupuncture", c, { health: 10 }, w),
+                        disabled: g.disabled,
+                        disabledReason: g.disabledReason,
+                        handler: function () {
+                            runLifestyleActivity(c, { health: 10 }, "Acupuncture: alternative medicine to relieve chronic tension.", { wtu: w });
+                        }
+                    };
+                })(),
+                (function () {
+                    var c = activityCost(150);
+                    var w = 10;
+                    var g = activityAvailability(c, w);
+                    return {
+                        label: lifestyleActionLabel("Do a 3-Day Juice Cleanse", c, { health: 15, happiness: -10 }, w),
+                        disabled: g.disabled,
+                        disabledReason: g.disabledReason,
+                        handler: function () {
+                            runLifestyleActivity(c, { health: 15, happiness: -10 }, "Juice cleanse: you feel purified, but you are incredibly cranky.", { wtu: w });
+                        }
+                    };
+                })(),
+                (function () {
+                    var c = activityCost(200);
+                    var w = 12;
+                    var g = activityAvailability(c, w);
+                    return {
+                        label: lifestyleActionLabel("See a Therapist", c, { health: 5, happiness: 25 }, w),
+                        disabled: g.disabled,
+                        disabledReason: g.disabledReason,
+                        handler: function () {
+                            runLifestyleActivity(c, { health: 5, happiness: 25 }, "Therapy: working through stress and trauma.", { wtu: w });
+                        }
+                    };
+                })(),
                 { sectionHeader: true, label: "Smarts & Enrichment" },
-                {
-                    label: lifestyleActionLabel("Attend a TED Talk", activityCost(100), { smarts: 20 }),
-                    handler: function () {
-                        runLifestyleActivity(activityCost(100), { smarts: 20 }, "TED Talk: industry leaders expanded your mind.");
-                    }
-                },
-                {
-                    label: lifestyleActionLabel("Buy a Language App Subscription", activityCost(60), { smarts: 15 }),
-                    handler: function () {
-                        runLifestyleActivity(activityCost(60), { smarts: 15 }, "Language app: practicing Spanish 15 minutes a day.");
-                    }
-                },
-                {
-                    label: lifestyleActionLabel("Go to an Escape Room", activityCost(40), { smarts: 10, happiness: 15 }),
-                    handler: function () {
-                        runLifestyleActivity(activityCost(40), { smarts: 10, happiness: 15 }, "Escape room: puzzles under pressure.");
-                    }
-                },
-                {
-                    label: lifestyleActionLabel("Visit a Planetarium", activityCost(25), { smarts: 10, happiness: 5 }),
-                    handler: function () {
-                        runLifestyleActivity(activityCost(25), { smarts: 10, happiness: 5 }, "Planetarium: astrophysics and the cosmos.");
-                    }
-                },
-                {
-                    label: lifestyleActionLabel("Take a Masterclass", activityCost(180), { smarts: 25 }),
-                    handler: function () {
-                        runLifestyleActivity(activityCost(180), { smarts: 25 }, "Masterclass: specialized skill from an expert.");
-                    }
-                },
+                (function () {
+                    var c = activityCost(100);
+                    var w = 15;
+                    var g = activityAvailability(c, w);
+                    return {
+                        label: lifestyleActionLabel("Attend a TED Talk", c, { smarts: 20 }, w),
+                        disabled: g.disabled,
+                        disabledReason: g.disabledReason,
+                        handler: function () {
+                            runLifestyleActivity(c, { smarts: 20 }, "TED Talk: industry leaders expanded your mind.", { wtu: w });
+                        }
+                    };
+                })(),
+                (function () {
+                    var c = activityCost(60);
+                    var w = 10;
+                    var g = activityAvailability(c, w);
+                    return {
+                        label: lifestyleActionLabel("Buy a Language App Subscription", c, { smarts: 15 }, w),
+                        disabled: g.disabled,
+                        disabledReason: g.disabledReason,
+                        handler: function () {
+                            runLifestyleActivity(c, { smarts: 15 }, "Language app: practicing Spanish 15 minutes a day.", { wtu: w });
+                        }
+                    };
+                })(),
+                (function () {
+                    var c = activityCost(40);
+                    var w = 14;
+                    var g = activityAvailability(c, w);
+                    return {
+                        label: lifestyleActionLabel("Go to an Escape Room", c, { smarts: 10, happiness: 15 }, w),
+                        disabled: g.disabled,
+                        disabledReason: g.disabledReason,
+                        handler: function () {
+                            runLifestyleActivity(c, { smarts: 10, happiness: 15 }, "Escape room: puzzles under pressure.", { wtu: w });
+                        }
+                    };
+                })(),
+                (function () {
+                    var c = activityCost(25);
+                    var w = 12;
+                    var g = activityAvailability(c, w);
+                    return {
+                        label: lifestyleActionLabel("Visit a Planetarium", c, { smarts: 10, happiness: 5 }, w),
+                        disabled: g.disabled,
+                        disabledReason: g.disabledReason,
+                        handler: function () {
+                            runLifestyleActivity(c, { smarts: 10, happiness: 5 }, "Planetarium: astrophysics and the cosmos.", { wtu: w });
+                        }
+                    };
+                })(),
+                (function () {
+                    var c = activityCost(180);
+                    var w = 18;
+                    var g = activityAvailability(c, w);
+                    return {
+                        label: lifestyleActionLabel("Take a Masterclass", c, { smarts: 25 }, w),
+                        disabled: g.disabled,
+                        disabledReason: g.disabledReason,
+                        handler: function () {
+                            runLifestyleActivity(c, { smarts: 25 }, "Masterclass: specialized skill from an expert.", { wtu: w });
+                        }
+                    };
+                })(),
                 { sectionHeader: true, label: "Happiness & Leisure" },
-                {
-                    label: lifestyleActionLabel("Go Skydiving", activityCost(400), { happiness: 50, health: -5 }),
-                    handler: function () {
-                        runLifestyleActivity(activityCost(400), { happiness: 50, health: -5 }, "Skydiving: adrenaline rush — hard on the joints.");
-                    }
-                },
-                {
-                    label: lifestyleActionLabel("Attend a Comedy Club", activityCost(50), { happiness: 20 }),
-                    handler: function () {
-                        runLifestyleActivity(activityCost(50), { happiness: 20 }, "Comedy club: laughing off workweek stress.");
-                    }
-                },
-                {
-                    label: lifestyleActionLabel("Go to a Wine Tasting", activityCost(75), { happiness: 15, health: -5 }),
-                    handler: function () {
-                        runLifestyleActivity(activityCost(75), { happiness: 15, health: -5 }, "Wine tasting: new vintages (and a mild hangover).");
-                    }
-                },
-                {
-                    label: lifestyleActionLabel("Volunteer at an Animal Shelter", 0, { happiness: 25 }),
-                    handler: function () {
-                        runLifestyleActivity(0, { happiness: 25 }, "Animal shelter: puppies are good for the soul.");
-                    }
-                },
-                {
-                    label: lifestyleActionLabel("Go to a Music Festival", activityCost(350), { happiness: 40, health: -10 }),
-                    handler: function () {
-                        runLifestyleActivity(activityCost(350), { happiness: 40, health: -10 }, "Music festival: three days of music, dancing, and no sleep.");
-                    }
-                },
+                (function () {
+                    var c = activityCost(400);
+                    var w = 20;
+                    var g = activityAvailability(c, w);
+                    return {
+                        label: lifestyleActionLabel("Go Skydiving", c, { happiness: 50, health: -5 }, w),
+                        disabled: g.disabled,
+                        disabledReason: g.disabledReason,
+                        handler: function () {
+                            runLifestyleActivity(c, { happiness: 50, health: -5 }, "Skydiving: adrenaline rush — hard on the joints.", { wtu: w });
+                        }
+                    };
+                })(),
+                (function () {
+                    var c = activityCost(50);
+                    var w = 10;
+                    var g = activityAvailability(c, w);
+                    return {
+                        label: lifestyleActionLabel("Attend a Comedy Club", c, { happiness: 20 }, w),
+                        disabled: g.disabled,
+                        disabledReason: g.disabledReason,
+                        handler: function () {
+                            runLifestyleActivity(c, { happiness: 20 }, "Comedy club: laughing off workweek stress.", { wtu: w });
+                        }
+                    };
+                })(),
+                (function () {
+                    var c = activityCost(75);
+                    var w = 12;
+                    var g = activityAvailability(c, w);
+                    return {
+                        label: lifestyleActionLabel("Go to a Wine Tasting", c, { happiness: 15, health: -5 }, w),
+                        disabled: g.disabled,
+                        disabledReason: g.disabledReason,
+                        handler: function () {
+                            runLifestyleActivity(c, { happiness: 15, health: -5 }, "Wine tasting: new vintages (and a mild hangover).", { wtu: w });
+                        }
+                    };
+                })(),
+                (function () {
+                    var w = 15;
+                    var g = activityAvailability(0, w);
+                    return {
+                        label: lifestyleActionLabel("Volunteer at an Animal Shelter", 0, { happiness: 25 }, w),
+                        disabled: g.disabled,
+                        disabledReason: g.disabledReason,
+                        handler: function () {
+                            runLifestyleActivity(0, { happiness: 25 }, "Animal shelter: puppies are good for the soul.", { wtu: w });
+                        }
+                    };
+                })(),
+                (function () {
+                    var c = activityCost(350);
+                    var w = 22;
+                    var g = activityAvailability(c, w);
+                    return {
+                        label: lifestyleActionLabel("Go to a Music Festival", c, { happiness: 40, health: -10 }, w),
+                        disabled: g.disabled,
+                        disabledReason: g.disabledReason,
+                        handler: function () {
+                            runLifestyleActivity(c, { happiness: 40, health: -10 }, "Music festival: three days of music, dancing, and no sleep.", { wtu: w });
+                        }
+                    };
+                })(),
                 { sectionHeader: true, label: "Care" },
-                {
-                    label: "Read (Free) — " + describeEffects({ smarts: 5 }),
-                    handler: function () {
-                        runLifestyleActivity(0, { smarts: 5 }, "You read and learned something new.");
-                    }
-                },
+                (function () {
+                    var w = 8;
+                    var g = activityAvailability(0, w);
+                    return {
+                        label: lifestyleActionLabel("Read", 0, { smarts: 5 }, w),
+                        disabled: g.disabled,
+                        disabledReason: g.disabledReason,
+                        handler: function () {
+                            runLifestyleActivity(0, { smarts: 5 }, "You read and learned something new.", { wtu: w });
+                        }
+                    };
+                })(),
                 {
                     label: "Visit Doctor",
                     handler: function () {
@@ -6999,9 +7392,17 @@
                     }
                 }
             ];
+            computeTimeSunkInWork();
+            var wtuLeft = activityWtuAvailable();
             openModal(
                 "Activities",
-                "Unique lifestyle options to boost Health, Smarts, and Happiness. Prices and outcomes are shown on each button.",
+                "You have <strong>" +
+                    wtuLeft +
+                    "</strong> weekly time units left after work (work drains " +
+                    (state.timeSunkInWork || 0) +
+                    " / " +
+                    (state.weeklyTimeUnits || 100) +
+                    "). Activities cost WTU plus cash.",
                 actions,
                 { scrollActivities: true }
             );
@@ -7161,52 +7562,138 @@
         }
 
         function openRelationshipsMenu() {
-            openModal("Relationships", "Invest in your connections to improve quality of life.", [
-                {
-                    label: "Date Night ($1.5k) + trivia",
-                    handler: function () {
-                        if (state.isDead) return;
-                        if (state.cash < 1500) {
-                            logEvent("You couldn't afford date night.");
-                            return;
-                        }
-                        closeModal();
-                        state.cash -= 1500;
-                        logEvent("You invested in a date night — now answer a trivia question to charm your date.");
-                        syncFinancialAliases();
-                        updateUI();
-                        openDateTriviaAfterDateNightPayment();
-                    }
-                },
-                {
-                    label: "Call Family (Free)",
-                    handler: function () {
-                        applyActionWithRefresh("You called family and recharged emotionally.", function () {
-                            state.happiness += 10;
-                        });
-                    }
-                },
-                {
-                    label: "Networking Event ($1k)",
-                    handler: function () {
-                        applyActionWithRefresh("You attended a networking event.", function () {
-                            if (state.cash >= 1000) {
-                                state.cash -= 1000;
-                                state.salary *= 1.05;
-                                state.happiness -= 4;
-                            } else {
-                                logEvent("You couldn't afford the networking event.");
-                            }
-                        });
-                    }
-                },
-                {
-                    label: "Close",
-                    handler: function () {
-                        closeModal();
-                    }
+            ensureMarriedIfAdult();
+            computeTimeSunkInWork();
+            var sp = state.spouse || { name: "", relationshipLevel: 0, isMarried: false };
+            var ch = state.children || { count: 0, happiness: 70 };
+            var dash =
+                "<strong>Relationship dashboard</strong><br>" +
+                "Spouse: " +
+                (sp.isMarried ? sp.name + " — bond " + sp.relationshipLevel + "/100" : "Single") +
+                "<br>Children: " +
+                ch.count +
+                " | Kids&apos; wellbeing: " +
+                ch.happiness +
+                "/100<br>" +
+                "Quality time this year: " +
+                (state.qualityTimeCountThisYear || 0) +
+                " / 2 needed to avoid neglect<br>" +
+                "WTU left after work: " +
+                activityWtuAvailable() +
+                " / " +
+                (state.weeklyTimeUnits || 100) +
+                "<br><br>";
+
+            var qtCost = activityCost(50);
+            var qtW = 20;
+            var qtAvail = activityAvailability(qtCost, qtW);
+
+            var dateW = 18;
+            var dateAvail = activityAvailability(1500, dateW);
+
+            var netAvail = activityAvailability(1000, 14);
+
+            var actions = [];
+
+            actions.push({
+                label: lifestyleActionLabel("Spend Quality Time", qtCost, { happiness: 8 }, qtW),
+                disabled: !sp.isMarried || qtAvail.disabled,
+                disabledReason: !sp.isMarried ? "You are not married." : qtAvail.disabledReason,
+                handler: function () {
+                    if (!state.spouse || !state.spouse.isMarried) return;
+                    runLifestyleActivity(
+                        qtCost,
+                        { happiness: 8 },
+                        "Quality time with your partner: bond strengthened.",
+                        { wtu: qtW, qualityTime: true }
+                    );
                 }
-            ]);
+            });
+
+            actions.push({
+                label: lifestyleActionLabel("Date Night", 1500, {}, dateW) + " + trivia",
+                disabled: dateAvail.disabled,
+                disabledReason: dateAvail.disabledReason,
+                handler: function () {
+                    if (state.isDead) return;
+                    computeTimeSunkInWork();
+                    if (activityWtuAvailable() < dateW) {
+                        logEvent("Too exhausted from work.");
+                        return;
+                    }
+                    if (state.cash < 1500) {
+                        logEvent("You couldn't afford date night.");
+                        return;
+                    }
+                    state.activityWtuSpentThisWeek = (state.activityWtuSpentThisWeek || 0) + dateW;
+                    closeModal();
+                    state.cash -= 1500;
+                    logEvent("You invested in a date night — now answer a trivia question to charm your date.");
+                    syncFinancialAliases();
+                    updateUI();
+                    openDateTriviaAfterDateNightPayment();
+                }
+            });
+
+            actions.push({
+                label: lifestyleActionLabel("Call Family", 0, { happiness: 10 }, 6),
+                disabled: activityAvailability(0, 6).disabled,
+                disabledReason: activityAvailability(0, 6).disabledReason,
+                handler: function () {
+                    runLifestyleActivity(0, { happiness: 10 }, "You called family and recharged emotionally.", { wtu: 6 });
+                }
+            });
+
+            actions.push({
+                label: lifestyleActionLabel("Networking Event", 1000, {}, 14),
+                disabled: netAvail.disabled,
+                disabledReason: netAvail.disabledReason,
+                handler: function () {
+                    computeTimeSunkInWork();
+                    if (activityWtuAvailable() < 14) {
+                        logEvent("Too exhausted from work.");
+                        return;
+                    }
+                    if (state.cash < 1000) {
+                        logEvent("You couldn't afford the networking event.");
+                        return;
+                    }
+                    state.activityWtuSpentThisWeek = (state.activityWtuSpentThisWeek || 0) + 14;
+                    state.cash -= 1000;
+                    state.salary *= 1.05;
+                    state.annualIncome = state.salary;
+                    state.happiness -= 4;
+                    logEvent("Networking event: salary +5%, Happiness -4.");
+                    state.happiness = clampStat(state.happiness);
+                    syncFinancialAliases();
+                    updateUI();
+                    closeModal();
+                }
+            });
+
+            if (state.preventAutoRemarry && !sp.isMarried) {
+                actions.push({
+                    label: "Remarry (narrative reset)",
+                    handler: function () {
+                        state.preventAutoRemarry = false;
+                        state.alimonyObligationActive = false;
+                        state._alimonyStartsNextYear = false;
+                        ensureMarriedIfAdult();
+                        logEvent("You remarried — alimony obligation ends; fresh start with your partner.");
+                        closeModal();
+                        updateUI();
+                    }
+                });
+            }
+
+            actions.push({
+                label: "Close",
+                handler: function () {
+                    closeModal();
+                }
+            });
+
+            openModal("Relationships", dash + "Invest in connections. Career jobs drain weekly time (WTU).", actions);
         }
 
         function triggerRandomEvent() {
@@ -7254,6 +7741,7 @@
             closeInflationOverlay();
             closeMortgagePaidOverlay();
             closeForeclosureOverlay();
+            closeDivorceOverlay();
             closeEvictionOverlay();
             closeDiagnosisOverlay();
             gameUI.style.display = "none";
@@ -7366,7 +7854,7 @@
         }
 
         function ageUp() {
-            if (state.isDead || !state.playerPath || state.isExamModalOpen || state.isExamActive || state.isDiagnosisOverlayOpen || state.isPromotionOverlayOpen || state.isPerformanceReviewOverlayOpen || state.isCareerExamOpen || state.isFiredOverlayOpen || state.isRetirementOverlayOpen || state.isDateTriviaOpen || state.isCopingOverlayOpen || state.isNervousBreakdownOverlayOpen || state.isLayoffOverlayOpen || state.isInflationOverlayOpen || state.isMortgagePaidOverlayOpen || state.isForeclosureOverlayOpen || state.isEvictionOverlayOpen) return;
+            if (state.isDead || !state.playerPath || state.isExamModalOpen || state.isExamActive || state.isDiagnosisOverlayOpen || state.isPromotionOverlayOpen || state.isPerformanceReviewOverlayOpen || state.isCareerExamOpen || state.isFiredOverlayOpen || state.isRetirementOverlayOpen || state.isDateTriviaOpen || state.isCopingOverlayOpen || state.isNervousBreakdownOverlayOpen || state.isLayoffOverlayOpen || state.isInflationOverlayOpen || state.isMortgagePaidOverlayOpen || state.isForeclosureOverlayOpen || state.isDivorceOverlayOpen || state.isEvictionOverlayOpen) return;
 
             if (state.isInSchool && state.currentlyPursuing) {
                 openYearlyExamOverlay();
@@ -7444,16 +7932,19 @@
 
         document.getElementById("age-up-btn").addEventListener("click", ageUp);
         document.getElementById("education-nav-btn").addEventListener("click", function () {
-            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isPerformanceReviewOverlayOpen && !state.isCareerExamOpen && !state.isFiredOverlayOpen && !state.isRetirementOverlayOpen && !state.isDateTriviaOpen && !state.isCopingOverlayOpen && !state.isNervousBreakdownOverlayOpen && !state.isLayoffOverlayOpen && !state.isInflationOverlayOpen && !state.isMortgagePaidOverlayOpen && !state.isForeclosureOverlayOpen && !state.isEvictionOverlayOpen) openEducationTab();
+            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isPerformanceReviewOverlayOpen && !state.isCareerExamOpen && !state.isFiredOverlayOpen && !state.isRetirementOverlayOpen && !state.isDateTriviaOpen && !state.isCopingOverlayOpen && !state.isNervousBreakdownOverlayOpen && !state.isLayoffOverlayOpen && !state.isInflationOverlayOpen && !state.isMortgagePaidOverlayOpen && !state.isForeclosureOverlayOpen && !state.isDivorceOverlayOpen && !state.isEvictionOverlayOpen) openEducationTab();
         });
         document.getElementById("careers-nav-btn").addEventListener("click", function () {
-            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isPerformanceReviewOverlayOpen && !state.isCareerExamOpen && !state.isFiredOverlayOpen && !state.isRetirementOverlayOpen && !state.isDateTriviaOpen && !state.isCopingOverlayOpen && !state.isNervousBreakdownOverlayOpen && !state.isLayoffOverlayOpen && !state.isInflationOverlayOpen && !state.isMortgagePaidOverlayOpen && !state.isForeclosureOverlayOpen && !state.isEvictionOverlayOpen) openCareersTab();
+            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isPerformanceReviewOverlayOpen && !state.isCareerExamOpen && !state.isFiredOverlayOpen && !state.isRetirementOverlayOpen && !state.isDateTriviaOpen && !state.isCopingOverlayOpen && !state.isNervousBreakdownOverlayOpen && !state.isLayoffOverlayOpen && !state.isInflationOverlayOpen && !state.isMortgagePaidOverlayOpen && !state.isForeclosureOverlayOpen && !state.isDivorceOverlayOpen && !state.isEvictionOverlayOpen) openCareersTab();
+        });
+        document.getElementById("relationships-nav-btn").addEventListener("click", function () {
+            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isPerformanceReviewOverlayOpen && !state.isCareerExamOpen && !state.isFiredOverlayOpen && !state.isRetirementOverlayOpen && !state.isDateTriviaOpen && !state.isCopingOverlayOpen && !state.isNervousBreakdownOverlayOpen && !state.isLayoffOverlayOpen && !state.isInflationOverlayOpen && !state.isMortgagePaidOverlayOpen && !state.isForeclosureOverlayOpen && !state.isDivorceOverlayOpen && !state.isEvictionOverlayOpen) openRelationshipsMenu();
         });
         document.getElementById("activities-nav-btn").addEventListener("click", function () {
-            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isPerformanceReviewOverlayOpen && !state.isCareerExamOpen && !state.isFiredOverlayOpen && !state.isRetirementOverlayOpen && !state.isDateTriviaOpen && !state.isCopingOverlayOpen && !state.isNervousBreakdownOverlayOpen && !state.isLayoffOverlayOpen && !state.isInflationOverlayOpen && !state.isMortgagePaidOverlayOpen && !state.isForeclosureOverlayOpen && !state.isEvictionOverlayOpen) openActivitiesMenu();
+            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isPerformanceReviewOverlayOpen && !state.isCareerExamOpen && !state.isFiredOverlayOpen && !state.isRetirementOverlayOpen && !state.isDateTriviaOpen && !state.isCopingOverlayOpen && !state.isNervousBreakdownOverlayOpen && !state.isLayoffOverlayOpen && !state.isInflationOverlayOpen && !state.isMortgagePaidOverlayOpen && !state.isForeclosureOverlayOpen && !state.isDivorceOverlayOpen && !state.isEvictionOverlayOpen) openActivitiesMenu();
         });
         document.getElementById("assets-nav-btn").addEventListener("click", function () {
-            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isPerformanceReviewOverlayOpen && !state.isCareerExamOpen && !state.isFiredOverlayOpen && !state.isRetirementOverlayOpen && !state.isDateTriviaOpen && !state.isCopingOverlayOpen && !state.isNervousBreakdownOverlayOpen && !state.isLayoffOverlayOpen && !state.isInflationOverlayOpen && !state.isMortgagePaidOverlayOpen && !state.isForeclosureOverlayOpen && !state.isEvictionOverlayOpen) openAssetsMenu();
+            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isPerformanceReviewOverlayOpen && !state.isCareerExamOpen && !state.isFiredOverlayOpen && !state.isRetirementOverlayOpen && !state.isDateTriviaOpen && !state.isCopingOverlayOpen && !state.isNervousBreakdownOverlayOpen && !state.isLayoffOverlayOpen && !state.isInflationOverlayOpen && !state.isMortgagePaidOverlayOpen && !state.isForeclosureOverlayOpen && !state.isDivorceOverlayOpen && !state.isEvictionOverlayOpen) openAssetsMenu();
         });
         document.getElementById("play-again-btn").addEventListener("click", function () {
             location.reload();
