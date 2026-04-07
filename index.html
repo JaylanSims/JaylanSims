@@ -1945,6 +1945,7 @@
     <div id="divorce-overlay-root"></div>
     <div id="heart-attack-overlay-root"></div>
     <div id="tombstone-overlay-root"></div>
+    <div id="car-scrapped-overlay-root"></div>
     <div id="eviction-overlay-root"></div>
     <div id="app-container">
         <div id="intro-screen">
@@ -2128,6 +2129,10 @@
             isMortgagePaidOverlayOpen: false,
             isForeclosureOverlayOpen: false,
             _postMortgageHousingResume: null,
+            ownedVehicle: null,
+            isCarScrappedOverlayOpen: false,
+            _pendingCarScrappedName: null,
+            _postCarScrappedResume: null,
             graduationTier: null,
             examPerformanceTier: null,
             totalWorkExperience: 0,
@@ -2166,6 +2171,30 @@
             isNervousBreakdownOverlayOpen: false,
             isLayoffOverlayOpen: false
         };
+
+        const CAR_MARKET_LISTINGS = [
+            {
+                name: "The Beater",
+                type: "Beater",
+                purchasePrice: 2500,
+                annualMaintenance: 300,
+                blurb: "It barely runs, but it gets you from A to B."
+            },
+            {
+                name: "The Daily Driver",
+                type: "Sedan",
+                purchasePrice: 35000,
+                annualMaintenance: 1200,
+                blurb: "A reliable mid-priced sedan."
+            },
+            {
+                name: "The Supercar",
+                type: "Supercar",
+                purchasePrice: 250000,
+                annualMaintenance: 15000,
+                blurb: "A masterpiece of engineering that costs a fortune to keep on the road."
+            }
+        ];
 
         const RENTAL_LISTINGS = [
             { id: "dorm", name: "University Dorm", annualCost: 6000, roommateEligible: false, requiresEnrollment: true },
@@ -2226,6 +2255,8 @@
         let divorceOverlayReactRoot = null;
         const heartAttackOverlayMount = document.getElementById("heart-attack-overlay-root");
         let heartAttackOverlayReactRoot = null;
+        const carScrappedOverlayMount = document.getElementById("car-scrapped-overlay-root");
+        let carScrappedOverlayReactRoot = null;
         const evictionOverlayMount = document.getElementById("eviction-overlay-root");
         let evictionOverlayReactRoot = null;
         let higherEdCatalogRoot = null;
@@ -3708,6 +3739,44 @@
             return true;
         }
 
+        function getInflatedVehicleMaintenanceCost() {
+            var v = state.ownedVehicle;
+            if (!v) return 0;
+            return Math.round((v.annualMaintenance || 0) * (state.inflationMultiplier || 1));
+        }
+
+        function processVehicleYearlyMaintenance(doneFn) {
+            if (state.isDead || !state.ownedVehicle) {
+                if (typeof doneFn === "function") doneFn();
+                return;
+            }
+            var v = state.ownedVehicle;
+            var cost = getInflatedVehicleMaintenanceCost();
+            syncFinancialAliases();
+            if (state.bankBalance >= cost) {
+                state.cash -= cost;
+                state.bankBalance = state.cash;
+                syncFinancialAliases();
+                v.condition = Math.min(100, Math.round((v.condition != null ? v.condition : 100) + 5));
+                logEvent("Vehicle maintenance: paid " + formatMoney(cost) + " for " + v.name + ". Condition now " + v.condition + "/100.");
+                if (typeof doneFn === "function") doneFn();
+                return;
+            }
+            v.condition = Math.max(0, Math.round((v.condition != null ? v.condition : 100) - 25));
+            showPurchaseToastMessage("You couldn't afford car maintenance. Your " + v.name + " is starting to fall apart.");
+            logEvent("Vehicle maintenance skipped (insufficient funds). " + v.name + " condition -25.");
+            if (v.condition <= 0) {
+                state._pendingCarScrappedName = v.name;
+                state._postCarScrappedResume = doneFn;
+                state.isCarScrappedOverlayOpen = true;
+                renderCarScrappedOverlay();
+                updateUI();
+                return;
+            }
+            syncFinancialAliases();
+            if (typeof doneFn === "function") doneFn();
+        }
+
         function walkStressBiologyAfterIncome(resumeFn) {
             refreshStressHappinessMultiplier();
             if (state.stressLevel > 80) {
@@ -3732,12 +3801,68 @@
                     "Your chest feels tight and you're struggling to breathe. The stress is taking a serious toll on your body."
                 );
             }
-            if (maybeInterceptHeartAttackStress(resumeFn)) {
+            function afterVehicleMaintenance() {
+                if (maybeInterceptHeartAttackStress(resumeFn)) {
+                    return;
+                }
+                if (typeof resumeFn === "function") {
+                    resumeFn();
+                }
+            }
+            processVehicleYearlyMaintenance(afterVehicleMaintenance);
+        }
+
+        function CarScrappedOverlay(props) {
+            var nm = props.vehicleName || "Your vehicle";
+            return (
+                <div id="car-scrapped-overlay" role="dialog" aria-modal="true" aria-label="Vehicle scrapped">
+                    <div className="car-scrapped-card">
+                        <h2>VEHICLE UNOPERATIONAL 🛠️</h2>
+                        <p>
+                            {"Your " + nm + " has completely broken down due to lack of maintenance. It is no longer safe to drive and has been towed away for scrap."}
+                        </p>
+                        <button type="button" className="car-scrapped-ack-btn" onClick={props.onAcknowledge}>
+                            Acknowledge
+                        </button>
+                    </div>
+                </div>
+            );
+        }
+
+        function renderCarScrappedOverlay() {
+            if (!carScrappedOverlayMount) return;
+            if (!state.isCarScrappedOverlayOpen) {
+                if (carScrappedOverlayReactRoot) carScrappedOverlayReactRoot.render(null);
                 return;
             }
-            if (typeof resumeFn === "function") {
-                resumeFn();
+            if (!carScrappedOverlayReactRoot) {
+                carScrappedOverlayReactRoot = ReactDOM.createRoot(carScrappedOverlayMount);
             }
+            carScrappedOverlayReactRoot.render(
+                <CarScrappedOverlay vehicleName={state._pendingCarScrappedName || "vehicle"} onAcknowledge={handleCarScrappedAcknowledge} />
+            );
+        }
+
+        function closeCarScrappedOverlay() {
+            state.isCarScrappedOverlayOpen = false;
+            state._pendingCarScrappedName = null;
+            if (carScrappedOverlayReactRoot) {
+                carScrappedOverlayReactRoot.render(null);
+            }
+        }
+
+        function handleCarScrappedAcknowledge() {
+            var fn = state._postCarScrappedResume;
+            state._postCarScrappedResume = null;
+            state.ownedVehicle = null;
+            loseHappiness(10);
+            state.happiness = clampStat(state.happiness);
+            logEvent("Vehicle scrapped: beyond repair. Happiness -10.");
+            closeCarScrappedOverlay();
+            if (typeof fn === "function") {
+                fn();
+            }
+            updateUI();
         }
 
         function HeartAttackOverlay(props) {
@@ -4373,7 +4498,7 @@
 
         function openModal(title, description, actions, options) {
             options = options || {};
-            if (state.isDead || state.isExamModalOpen || state.isExamActive || state.isDiagnosisOverlayOpen || state.isPromotionOverlayOpen || state.isPerformanceReviewOverlayOpen || state.isCareerExamOpen || state.isFiredOverlayOpen || state.isRetirementOverlayOpen || state.isDateTriviaOpen || state.isCopingOverlayOpen || state.isNervousBreakdownOverlayOpen || state.isLayoffOverlayOpen || state.isInflationOverlayOpen || state.isMortgagePaidOverlayOpen || state.isForeclosureOverlayOpen || state.isDivorceOverlayOpen || state.isHeartAttackOverlayOpen || state.isEvictionOverlayOpen) return;
+            if (state.isDead || state.isExamModalOpen || state.isExamActive || state.isDiagnosisOverlayOpen || state.isPromotionOverlayOpen || state.isPerformanceReviewOverlayOpen || state.isCareerExamOpen || state.isFiredOverlayOpen || state.isRetirementOverlayOpen || state.isDateTriviaOpen || state.isCopingOverlayOpen || state.isNervousBreakdownOverlayOpen || state.isLayoffOverlayOpen || state.isInflationOverlayOpen || state.isMortgagePaidOverlayOpen || state.isForeclosureOverlayOpen || state.isDivorceOverlayOpen || state.isHeartAttackOverlayOpen || state.isCarScrappedOverlayOpen || state.isEvictionOverlayOpen) return;
             if (higherEdCatalogRoot) {
                 higherEdCatalogRoot.render(null);
             }
@@ -6350,6 +6475,39 @@
             updateUI();
         }
 
+        function buildVehicleProfileHtml() {
+            var v = state.ownedVehicle;
+            if (!v) {
+                return (
+                    '<div class="careers-vehicle-block">' +
+                    "<h4>My Vehicle</h4>" +
+                    '<div style="color:#bdbdbd;font-size:0.9rem;">No vehicle owned. Buy one in <strong>Assets</strong> under Car Marketplace.</div>' +
+                    "</div>"
+                );
+            }
+            var cond = typeof v.condition === "number" ? Math.max(0, Math.min(100, Math.round(v.condition))) : 100;
+            var maint = getInflatedVehicleMaintenanceCost();
+            return (
+                '<div class="careers-vehicle-block">' +
+                "<h4>My Vehicle</h4>" +
+                "<div><strong>" +
+                v.name +
+                "</strong> (" +
+                (v.type || "Vehicle") +
+                ")</div>" +
+                "<div style=\"margin-top:6px;font-size:0.9rem;color:#bdbdbd;\">Annual maintenance (inflated): <strong>" +
+                formatMoney(maint) +
+                "</strong></div>" +
+                "<div style=\"margin-top:6px;font-size:0.85rem;color:#9e9e9e;\">Condition: " +
+                cond +
+                "/100</div>" +
+                '<div class="careers-vehicle-condition-bar"><div class="careers-vehicle-condition-fill" style="width:' +
+                cond +
+                '%;"></div></div>' +
+                "</div>"
+            );
+        }
+
         function buildProfessionalProfileHtml() {
             var exp = state.totalWorkExperience || 0;
             var tf = state.timesFired || 0;
@@ -6376,8 +6534,38 @@
                 "</strong> Years</div>" +
                 termRow +
                 warn +
+                buildVehicleProfileHtml() +
                 "</div>"
             );
+        }
+
+        function purchaseVehicle(listing) {
+            if (!listing) return;
+            if (state.ownedVehicle) {
+                showPurchaseToastMessage("You already own a vehicle. Sell or scrap it before buying another.");
+                logEvent("Car purchase blocked: garage full.");
+                return;
+            }
+            syncFinancialAliases();
+            var price = listing.purchasePrice || 0;
+            if (state.bankBalance < price) {
+                showPurchaseToastMessage("Insufficient funds for " + listing.name + " (need " + formatMoney(price) + ").");
+                return;
+            }
+            state.cash -= price;
+            state.bankBalance = state.cash;
+            state.ownedVehicle = {
+                name: listing.name,
+                type: listing.type,
+                purchasePrice: price,
+                annualMaintenance: listing.annualMaintenance,
+                condition: 100
+            };
+            syncFinancialAliases();
+            logEvent("Purchased " + listing.name + " for " + formatMoney(price) + ". Annual maintenance base " + formatMoney(listing.annualMaintenance) + "/yr.");
+            showPurchaseToastMessage("You bought " + listing.name + "!");
+            closeModal();
+            updateUI();
         }
 
         function openJobBoard() {
@@ -6498,6 +6686,7 @@
         }
 
         function openCareersTab() {
+            if (state.isCarScrappedOverlayOpen) return;
             const mlYears = state.medicalLeaveYearsRemaining || 0;
             const medicalLeaveBanner =
                 mlYears > 0
@@ -6869,6 +7058,7 @@
         }
 
         function openEducationTab() {
+            if (state.isCarScrappedOverlayOpen) return;
             syncCurrentEnrollment();
             const program = state.currentlyPursuing ? EDUCATION_PROGRAMS[state.currentlyPursuing] : null;
             const progress = program
@@ -7732,6 +7922,7 @@
         }
 
         function openActivitiesMenu() {
+            if (state.isCarScrappedOverlayOpen) return;
             var actions = [
                 { sectionHeader: true, label: "Health & Wellness" },
                 (function () {
@@ -7973,6 +8164,7 @@
         }
 
         function openAssetsMenu(focusPsychiatrist) {
+            if (state.isCarScrappedOverlayOpen) return;
             if (state.realEstateListings.length === 0) {
                 generateRealEstateMarket();
             }
@@ -8013,6 +8205,17 @@
                     formatMoney(listing.price) + " (Upkeep " + formatMoney(listing.annualUpkeep) + "/yr)</div>";
             }).join("");
 
+            const carMarketHtml = CAR_MARKET_LISTINGS.map(function (car) {
+                var infMaint = Math.round(car.annualMaintenance * (state.inflationMultiplier || 1));
+                return "<div style=\"margin-bottom:10px;padding:8px;background:rgba(0,0,0,0.2);border-radius:8px;\">" +
+                    "<strong>" + car.name + "</strong> (" + car.type + ") — " + formatMoney(car.purchasePrice) + "<br>" +
+                    "<span style=\"color:#bdbdbd;font-size:0.88rem;\">Maintenance: " + formatMoney(car.annualMaintenance) +
+                    "/yr base → <strong>" + formatMoney(infMaint) + "</strong>/yr with inflation</span><br>" +
+                    "<span style=\"color:#9e9e9e;font-size:0.85rem;\">" + car.blurb + "</span></div>";
+            }).join("");
+
+            const bankBal = state.bankBalance;
+
             const actions = [];
             state.ownedAssets.forEach(function (property) {
                 actions.push({
@@ -8023,7 +8226,22 @@
                 });
             });
 
-            const bankBal = state.bankBalance;
+            CAR_MARKET_LISTINGS.forEach(function (car) {
+                var price = car.purchasePrice || 0;
+                var hasCar = !!state.ownedVehicle;
+                var canBuyCar = !hasCar && bankBal >= price;
+                actions.push({
+                    label: hasCar
+                        ? car.name + " (Garage full)"
+                        : canBuyCar
+                            ? "Buy " + car.name + " — " + formatMoney(price)
+                            : "Buy " + car.name + " — Need " + formatMoney(price),
+                    disabled: !canBuyCar,
+                    handler: function () {
+                        purchaseVehicle(car);
+                    }
+                });
+            });
             state.realEstateListings.forEach(function (listing) {
                 const downPayment = Math.round(listing.price * 0.20);
                 const canPayFull = bankBal >= listing.price;
@@ -8099,6 +8317,7 @@
             openModal(
                 "Assets",
                 marketLabel + "<br><br>" + housingStatusLine + "<strong>My Properties</strong><br>" + myPropertiesHtml +
+                "<br><strong>Car Marketplace</strong><br>" + carMarketHtml +
                 "<br><strong>Broker Listings</strong><br>" + listingsHtml,
                 actions
             );
@@ -8126,6 +8345,7 @@
         }
 
         function openRelationshipsMenu() {
+            if (state.isCarScrappedOverlayOpen) return;
             ensureMarriedIfAdult();
             computeTimeSunkInWork();
             var sp = state.spouse || { name: "", relationshipLevel: 0, isMarried: false };
@@ -8317,6 +8537,7 @@
             closeForeclosureOverlay();
             closeDivorceOverlay();
             closeHeartAttackOverlay();
+            closeCarScrappedOverlay();
             closeEvictionOverlay();
             closeDiagnosisOverlay();
             if (gameUI) gameUI.style.display = "none";
@@ -8412,7 +8633,7 @@
         }
 
         function ageUp() {
-            if (state.isDead || !state.playerPath || state.legacyAnalysis || state.isExamModalOpen || state.isExamActive || state.isDiagnosisOverlayOpen || state.isPromotionOverlayOpen || state.isPerformanceReviewOverlayOpen || state.isCareerExamOpen || state.isFiredOverlayOpen || state.isRetirementOverlayOpen || state.isDateTriviaOpen || state.isCopingOverlayOpen || state.isNervousBreakdownOverlayOpen || state.isLayoffOverlayOpen || state.isInflationOverlayOpen || state.isMortgagePaidOverlayOpen || state.isForeclosureOverlayOpen || state.isDivorceOverlayOpen || state.isHeartAttackOverlayOpen || state.isEvictionOverlayOpen) return;
+            if (state.isDead || !state.playerPath || state.legacyAnalysis || state.isExamModalOpen || state.isExamActive || state.isDiagnosisOverlayOpen || state.isPromotionOverlayOpen || state.isPerformanceReviewOverlayOpen || state.isCareerExamOpen || state.isFiredOverlayOpen || state.isRetirementOverlayOpen || state.isDateTriviaOpen || state.isCopingOverlayOpen || state.isNervousBreakdownOverlayOpen || state.isLayoffOverlayOpen || state.isInflationOverlayOpen || state.isMortgagePaidOverlayOpen || state.isForeclosureOverlayOpen || state.isDivorceOverlayOpen || state.isHeartAttackOverlayOpen || state.isCarScrappedOverlayOpen || state.isEvictionOverlayOpen) return;
 
             if (state.isInSchool && state.currentlyPursuing) {
                 openYearlyExamOverlay();
@@ -8493,19 +8714,19 @@
 
         document.getElementById("age-up-btn").addEventListener("click", ageUp);
         document.getElementById("education-nav-btn").addEventListener("click", function () {
-            if (!state.isDead && state.playerPath && !state.legacyAnalysis && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isPerformanceReviewOverlayOpen && !state.isCareerExamOpen && !state.isFiredOverlayOpen && !state.isRetirementOverlayOpen && !state.isDateTriviaOpen && !state.isCopingOverlayOpen && !state.isNervousBreakdownOverlayOpen && !state.isLayoffOverlayOpen && !state.isInflationOverlayOpen && !state.isMortgagePaidOverlayOpen && !state.isForeclosureOverlayOpen && !state.isDivorceOverlayOpen && !state.isHeartAttackOverlayOpen && !state.isEvictionOverlayOpen) openEducationTab();
+            if (!state.isDead && state.playerPath && !state.legacyAnalysis && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isPerformanceReviewOverlayOpen && !state.isCareerExamOpen && !state.isFiredOverlayOpen && !state.isRetirementOverlayOpen && !state.isDateTriviaOpen && !state.isCopingOverlayOpen && !state.isNervousBreakdownOverlayOpen && !state.isLayoffOverlayOpen && !state.isInflationOverlayOpen && !state.isMortgagePaidOverlayOpen && !state.isForeclosureOverlayOpen && !state.isDivorceOverlayOpen && !state.isHeartAttackOverlayOpen && !state.isCarScrappedOverlayOpen && !state.isEvictionOverlayOpen) openEducationTab();
         });
         document.getElementById("careers-nav-btn").addEventListener("click", function () {
-            if (!state.isDead && state.playerPath && !state.legacyAnalysis && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isPerformanceReviewOverlayOpen && !state.isCareerExamOpen && !state.isFiredOverlayOpen && !state.isRetirementOverlayOpen && !state.isDateTriviaOpen && !state.isCopingOverlayOpen && !state.isNervousBreakdownOverlayOpen && !state.isLayoffOverlayOpen && !state.isInflationOverlayOpen && !state.isMortgagePaidOverlayOpen && !state.isForeclosureOverlayOpen && !state.isDivorceOverlayOpen && !state.isHeartAttackOverlayOpen && !state.isEvictionOverlayOpen) openCareersTab();
+            if (!state.isDead && state.playerPath && !state.legacyAnalysis && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isPerformanceReviewOverlayOpen && !state.isCareerExamOpen && !state.isFiredOverlayOpen && !state.isRetirementOverlayOpen && !state.isDateTriviaOpen && !state.isCopingOverlayOpen && !state.isNervousBreakdownOverlayOpen && !state.isLayoffOverlayOpen && !state.isInflationOverlayOpen && !state.isMortgagePaidOverlayOpen && !state.isForeclosureOverlayOpen && !state.isDivorceOverlayOpen && !state.isHeartAttackOverlayOpen && !state.isCarScrappedOverlayOpen && !state.isEvictionOverlayOpen) openCareersTab();
         });
         document.getElementById("relationships-nav-btn").addEventListener("click", function () {
-            if (!state.isDead && state.playerPath && !state.legacyAnalysis && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isPerformanceReviewOverlayOpen && !state.isCareerExamOpen && !state.isFiredOverlayOpen && !state.isRetirementOverlayOpen && !state.isDateTriviaOpen && !state.isCopingOverlayOpen && !state.isNervousBreakdownOverlayOpen && !state.isLayoffOverlayOpen && !state.isInflationOverlayOpen && !state.isMortgagePaidOverlayOpen && !state.isForeclosureOverlayOpen && !state.isDivorceOverlayOpen && !state.isHeartAttackOverlayOpen && !state.isEvictionOverlayOpen) openRelationshipsMenu();
+            if (!state.isDead && state.playerPath && !state.legacyAnalysis && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isPerformanceReviewOverlayOpen && !state.isCareerExamOpen && !state.isFiredOverlayOpen && !state.isRetirementOverlayOpen && !state.isDateTriviaOpen && !state.isCopingOverlayOpen && !state.isNervousBreakdownOverlayOpen && !state.isLayoffOverlayOpen && !state.isInflationOverlayOpen && !state.isMortgagePaidOverlayOpen && !state.isForeclosureOverlayOpen && !state.isDivorceOverlayOpen && !state.isHeartAttackOverlayOpen && !state.isCarScrappedOverlayOpen && !state.isEvictionOverlayOpen) openRelationshipsMenu();
         });
         document.getElementById("activities-nav-btn").addEventListener("click", function () {
-            if (!state.isDead && state.playerPath && !state.legacyAnalysis && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isPerformanceReviewOverlayOpen && !state.isCareerExamOpen && !state.isFiredOverlayOpen && !state.isRetirementOverlayOpen && !state.isDateTriviaOpen && !state.isCopingOverlayOpen && !state.isNervousBreakdownOverlayOpen && !state.isLayoffOverlayOpen && !state.isInflationOverlayOpen && !state.isMortgagePaidOverlayOpen && !state.isForeclosureOverlayOpen && !state.isDivorceOverlayOpen && !state.isHeartAttackOverlayOpen && !state.isEvictionOverlayOpen) openActivitiesMenu();
+            if (!state.isDead && state.playerPath && !state.legacyAnalysis && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isPerformanceReviewOverlayOpen && !state.isCareerExamOpen && !state.isFiredOverlayOpen && !state.isRetirementOverlayOpen && !state.isDateTriviaOpen && !state.isCopingOverlayOpen && !state.isNervousBreakdownOverlayOpen && !state.isLayoffOverlayOpen && !state.isInflationOverlayOpen && !state.isMortgagePaidOverlayOpen && !state.isForeclosureOverlayOpen && !state.isDivorceOverlayOpen && !state.isHeartAttackOverlayOpen && !state.isCarScrappedOverlayOpen && !state.isEvictionOverlayOpen) openActivitiesMenu();
         });
         document.getElementById("assets-nav-btn").addEventListener("click", function () {
-            if (!state.isDead && state.playerPath && !state.legacyAnalysis && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isPerformanceReviewOverlayOpen && !state.isCareerExamOpen && !state.isFiredOverlayOpen && !state.isRetirementOverlayOpen && !state.isDateTriviaOpen && !state.isCopingOverlayOpen && !state.isNervousBreakdownOverlayOpen && !state.isLayoffOverlayOpen && !state.isInflationOverlayOpen && !state.isMortgagePaidOverlayOpen && !state.isForeclosureOverlayOpen && !state.isDivorceOverlayOpen && !state.isHeartAttackOverlayOpen && !state.isEvictionOverlayOpen) openAssetsMenu();
+            if (!state.isDead && state.playerPath && !state.legacyAnalysis && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isPerformanceReviewOverlayOpen && !state.isCareerExamOpen && !state.isFiredOverlayOpen && !state.isRetirementOverlayOpen && !state.isDateTriviaOpen && !state.isCopingOverlayOpen && !state.isNervousBreakdownOverlayOpen && !state.isLayoffOverlayOpen && !state.isInflationOverlayOpen && !state.isMortgagePaidOverlayOpen && !state.isForeclosureOverlayOpen && !state.isDivorceOverlayOpen && !state.isHeartAttackOverlayOpen && !state.isCarScrappedOverlayOpen && !state.isEvictionOverlayOpen) openAssetsMenu();
         });
         document.getElementById("resignation-confirm-btn").addEventListener("click", function () {
             closeResignationConfirm();
