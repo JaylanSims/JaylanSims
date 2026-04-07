@@ -638,6 +638,89 @@
             text-align: center;
         }
 
+        #promotion-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 10005;
+            background: rgba(0, 0, 0, 0.95);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: #fff;
+            padding: 24px;
+            box-sizing: border-box;
+        }
+
+        .promotion-card {
+            width: 100%;
+            max-width: 480px;
+            background: #1a1a1a;
+            border: 1px solid #333;
+            border-radius: 16px;
+            padding: 24px 22px;
+            box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+        }
+
+        .promotion-card h2 {
+            margin: 0 0 16px;
+            font-size: 1.35rem;
+            text-align: center;
+        }
+
+        .promotion-card p {
+            margin: 0 0 12px;
+            line-height: 1.45;
+            color: #e0e0e0;
+            font-size: 0.98rem;
+        }
+
+        .promotion-financials {
+            font-size: 1.05rem;
+            font-weight: 600;
+            color: #81c784;
+        }
+
+        .promotion-warning {
+            color: #ffb74d !important;
+            font-size: 0.92rem !important;
+            margin-top: 16px !important;
+            padding: 12px;
+            background: rgba(183, 28, 28, 0.2);
+            border-radius: 10px;
+            border: 1px solid rgba(255, 112, 67, 0.35);
+        }
+
+        .promotion-actions {
+            display: grid;
+            gap: 12px;
+            margin-top: 22px;
+        }
+
+        .promotion-btn {
+            width: 100%;
+            padding: 14px 16px;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 700;
+            cursor: pointer;
+            border: 1px solid #444;
+        }
+
+        .promotion-btn-accept {
+            background: linear-gradient(180deg, #2e7d32, #1b5e20);
+            color: #fff;
+            border-color: #4caf50;
+        }
+
+        .promotion-btn-decline {
+            background: #2a2a2a;
+            color: #e0e0e0;
+        }
+
         #diagnosis-overlay {
             position: fixed;
             inset: 0;
@@ -756,6 +839,7 @@
 </head>
 <body>
     <div id="yearly-exam-react-root"></div>
+    <div id="promotion-overlay-root"></div>
     <div id="app-container">
         <div id="intro-screen">
             <img src="js-games-logo.png" alt="JS Games" id="intro-logo" onerror="this.onerror=null;this.src='./js-games-logo.png';">
@@ -894,7 +978,11 @@
             isEnrolled: false,
             degreeHistory: [],
             currentEnrollment: null,
-            _savedJobBeforeSchoolYear: null
+            _savedJobBeforeSchoolYear: null,
+            yearsAtCurrentJob: 0,
+            currentJobLevel: 1,
+            pendingPromotion: null,
+            isPromotionOverlayOpen: false
         };
 
         const TRACK_DEBT_BASE = {
@@ -921,6 +1009,8 @@
         const resignationText = document.getElementById("resignation-text");
         const yearlyExamReactMount = document.getElementById("yearly-exam-react-root");
         let yearlyExamReactRoot = null;
+        const promotionOverlayMount = document.getElementById("promotion-overlay-root");
+        let promotionOverlayReactRoot = null;
         let higherEdCatalogRoot = null;
         const diagnosisOverlayRoot = document.getElementById("diagnosis-overlay-root");
         const deathScreen = document.getElementById("death-screen");
@@ -1732,7 +1822,7 @@
         }
 
         function openModal(title, description, actions) {
-            if (state.isExamModalOpen || state.isExamActive || state.isDiagnosisOverlayOpen) return;
+            if (state.isExamModalOpen || state.isExamActive || state.isDiagnosisOverlayOpen || state.isPromotionOverlayOpen) return;
             if (higherEdCatalogRoot) {
                 higherEdCatalogRoot.render(null);
             }
@@ -1770,6 +1860,127 @@
             if (higherEdCatalogRoot) {
                 higherEdCatalogRoot.render(null);
             }
+        }
+
+        function stripPromotionPrefixesFromTitle(title) {
+            var t = String(title || "");
+            if (t.indexOf("Senior ") === 0) return t.slice(7);
+            if (t.indexOf("Lead ") === 0) return t.slice(5);
+            if (t.indexOf("Master ") === 0) return t.slice(7);
+            if (t.indexOf("Director of ") === 0) return t.slice(12);
+            if (t.length > 15 && t.slice(-15) === " Business Owner") return t.slice(0, -15);
+            return t;
+        }
+
+        function generatePromotion(currentTitle, currentSalary, currentLevel, track) {
+            var baseTitle = stripPromotionPrefixesFromTitle(currentTitle);
+            var nextLevel = currentLevel + 1;
+            var newTitle = "";
+            var mult = 1;
+            if (currentLevel === 1) {
+                newTitle = "Senior " + baseTitle;
+                mult = 1.30;
+            } else if (currentLevel === 2) {
+                newTitle = track === "Trades" ? "Master " + baseTitle : "Lead " + baseTitle;
+                mult = 1.35;
+            } else if (currentLevel === 3) {
+                newTitle = track === "Trades" ? baseTitle + " Business Owner" : "Director of " + baseTitle;
+                mult = 1.50;
+            } else {
+                return null;
+            }
+            return {
+                newTitle: newTitle,
+                newSalary: Math.round(currentSalary * mult),
+                level: nextLevel
+            };
+        }
+
+        function renderPromotionOverlay() {
+            if (!promotionOverlayMount) return;
+            if (!state.isPromotionOverlayOpen || !state.pendingPromotion) {
+                state.isPromotionOverlayOpen = false;
+                if (promotionOverlayReactRoot) {
+                    promotionOverlayReactRoot.render(null);
+                }
+                return;
+            }
+            if (!promotionOverlayReactRoot) {
+                promotionOverlayReactRoot = ReactDOM.createRoot(promotionOverlayMount);
+            }
+            var p = state.pendingPromotion;
+            promotionOverlayReactRoot.render(
+                <PromotionOverlay
+                    newTitle={p.newTitle}
+                    newSalary={p.newSalary}
+                    currentSalary={p.previousSalary}
+                    onAccept={handlePromotionAccept}
+                    onDecline={handlePromotionDecline}
+                />
+            );
+        }
+
+        function closePromotionOverlay() {
+            state.isPromotionOverlayOpen = false;
+            state.pendingPromotion = null;
+            if (promotionOverlayReactRoot) {
+                promotionOverlayReactRoot.render(null);
+            }
+        }
+
+        function handlePromotionAccept() {
+            var p = state.pendingPromotion;
+            if (!p) {
+                closePromotionOverlay();
+                runAgeUpWorkYearAfterPromotion();
+                updateUI();
+                return;
+            }
+            state.jobTitle = p.newTitle;
+            state.annualIncome = p.newSalary;
+            state.salary = p.newSalary;
+            state.currentJobLevel = p.level;
+            state.yearsAtCurrentJob = 0;
+            state.happiness -= 15;
+            logEvent("You accepted a promotion to " + p.newTitle + " with a salary of " + formatMoney(p.newSalary) + ". Stress from the role reduced Happiness by 15.");
+            closePromotionOverlay();
+            runAgeUpWorkYearAfterPromotion();
+            updateUI();
+        }
+
+        function handlePromotionDecline() {
+            if (state.pendingPromotion) {
+                logEvent("You declined the promotion to " + state.pendingPromotion.newTitle + " and felt relief (+5 Happiness).");
+            }
+            state.happiness += 5;
+            closePromotionOverlay();
+            runAgeUpWorkYearAfterPromotion();
+            updateUI();
+        }
+
+        function PromotionOverlay(props) {
+            return (
+                <div id="promotion-overlay" role="dialog" aria-modal="true" aria-label="Promotion offer">
+                    <div className="promotion-card">
+                        <h2>PROMOTION OFFERED 📈</h2>
+                        <p>Your hard work has paid off. You have been offered a promotion to <strong>{props.newTitle}</strong>!</p>
+                        <p className="promotion-financials">
+                            New Salary: {formatMoney(props.newSalary)} (Up from {formatMoney(props.currentSalary)})
+                        </p>
+                        <p className="promotion-warning">
+                            Warning: Taking on this new leadership role will increase your stress, permanently reducing your Happiness by 15 points upon acceptance.
+                        </p>
+                        <div className="promotion-actions">
+                            <button type="button" className="promotion-btn promotion-btn-accept" onClick={props.onAccept}>
+                                Accept Promotion
+                            </button>
+                            <button type="button" className="promotion-btn promotion-btn-decline" onClick={props.onDecline}>
+                                Decline Offer
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            );
         }
 
         function YearlyExamOverlay(props) {
@@ -2439,6 +2650,13 @@
             state.annualIncome = 0;
             state.salary = 0;
             state.isEmployed = false;
+            state.yearsAtCurrentJob = 0;
+            state.currentJobLevel = 1;
+            state.pendingPromotion = null;
+            state.isPromotionOverlayOpen = false;
+            if (promotionOverlayReactRoot) {
+                promotionOverlayReactRoot.render(null);
+            }
             logEvent("You resigned from your position. You are now unemployed with $0 annual salary.");
             syncFinancialAliases();
             updateUI();
@@ -2466,6 +2684,13 @@
                 state.jobTitle = job.title;
                 state.salary = job.salary;
                 state.isEmployed = true;
+                state.yearsAtCurrentJob = 0;
+                state.currentJobLevel = 1;
+                state.pendingPromotion = null;
+                state.isPromotionOverlayOpen = false;
+                if (promotionOverlayReactRoot) {
+                    promotionOverlayReactRoot.render(null);
+                }
                 alert("You were hired as a " + job.title + " earning " + formatMoney(job.salary) + " a year!");
                 logEvent("You were hired as a " + job.title + ".");
             } else {
@@ -3604,6 +3829,7 @@
             state.isDead = true;
             closeModal();
             closeYearlyExamOverlay();
+            closePromotionOverlay();
             closeDiagnosisOverlay();
             gameUI.style.display = "none";
             deathScreen.style.display = "flex";
@@ -3637,30 +3863,7 @@
             console.log("Player has died!");
         }
 
-        function ageUp() {
-            if (state.isDead || !state.playerPath || state.isExamModalOpen || state.isExamActive || state.isDiagnosisOverlayOpen) return;
-
-            if (state.isInSchool && state.currentlyPursuing) {
-                openYearlyExamOverlay();
-                return;
-            }
-
-            state.age += 1;
-            state.cash -= state.annualExpenses;
-            state.health -= 1;
-            state.happiness -= 1;
-
-            const netIncome = state.annualIncome * 0.75;
-            state.cash += netIncome;
-            state.salary = state.annualIncome;
-            syncFinancialAliases();
-
-            if (state.annualIncome > 0) {
-                logEvent("Age " + state.age + ": You worked as " + state.jobTitle + " and took home " + formatMoney(netIncome) + " after taxes.");
-            } else {
-                logEvent("Age " + state.age + ": You had no income this year.");
-            }
-
+        function runAgeUpWorkYearAfterPromotion() {
             state.investments *= (1 + (Math.random() * 0.25 - 0.10));
             applyHousingMarketForYear();
 
@@ -3711,6 +3914,62 @@
 
             yearlyResetMentalSuppression();
             triggerProceduralYearEvents();
+            updateUI();
+        }
+
+        function ageUp() {
+            if (state.isDead || !state.playerPath || state.isExamModalOpen || state.isExamActive || state.isDiagnosisOverlayOpen || state.isPromotionOverlayOpen) return;
+
+            if (state.isInSchool && state.currentlyPursuing) {
+                openYearlyExamOverlay();
+                return;
+            }
+
+            state.age += 1;
+            state.cash -= state.annualExpenses;
+            state.health -= 1;
+            state.happiness -= 1;
+
+            const netIncome = state.annualIncome * 0.75;
+            state.cash += netIncome;
+            state.salary = state.annualIncome;
+            syncFinancialAliases();
+
+            if (state.annualIncome > 0) {
+                logEvent("Age " + state.age + ": You worked as " + state.jobTitle + " and took home " + formatMoney(netIncome) + " after taxes.");
+            } else {
+                logEvent("Age " + state.age + ": You had no income this year.");
+            }
+
+            if (state.isEmployed && state.jobTitle !== "Student" && state.jobTitle !== "Unemployed") {
+                state.yearsAtCurrentJob += 1;
+            }
+
+            if (
+                state.isEmployed &&
+                state.jobTitle !== "Student" &&
+                state.jobTitle !== "Unemployed" &&
+                state.yearsAtCurrentJob >= 3 &&
+                state.currentJobLevel < 4 &&
+                Math.random() < 0.3
+            ) {
+                const promo = generatePromotion(state.jobTitle, state.annualIncome, state.currentJobLevel, state.playerPath);
+                if (promo) {
+                    state.pendingPromotion = {
+                        newTitle: promo.newTitle,
+                        newSalary: promo.newSalary,
+                        level: promo.level,
+                        previousSalary: state.annualIncome
+                    };
+                    state.isPromotionOverlayOpen = true;
+                    renderPromotionOverlay();
+                    updateUI();
+                    return;
+                }
+            }
+
+            runAgeUpWorkYearAfterPromotion();
+            updateUI();
         }
 
         function choosePath(path) {
@@ -3746,16 +4005,16 @@
 
         document.getElementById("age-up-btn").addEventListener("click", ageUp);
         document.getElementById("education-nav-btn").addEventListener("click", function () {
-            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen) openEducationTab();
+            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen) openEducationTab();
         });
         document.getElementById("careers-nav-btn").addEventListener("click", function () {
-            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen) openCareersTab();
+            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen) openCareersTab();
         });
         document.getElementById("activities-nav-btn").addEventListener("click", function () {
-            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen) openActivitiesMenu();
+            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen) openActivitiesMenu();
         });
         document.getElementById("assets-nav-btn").addEventListener("click", function () {
-            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen) openAssetsMenu();
+            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen) openAssetsMenu();
         });
         document.getElementById("play-again-btn").addEventListener("click", function () {
             location.reload();
