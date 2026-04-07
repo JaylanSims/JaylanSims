@@ -1154,6 +1154,123 @@
             cursor: pointer;
         }
 
+        #nervous-breakdown-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 10012;
+            background: linear-gradient(160deg, #3a0508 0%, #120505 50%, #1a0808 100%);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: #fff;
+            padding: 24px;
+            box-sizing: border-box;
+        }
+
+        .nervous-breakdown-card {
+            max-width: 520px;
+            width: 100%;
+            background: rgba(50, 8, 12, 0.95);
+            border: 2px solid #e53935;
+            border-radius: 16px;
+            padding: 26px 22px;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+            text-align: center;
+        }
+
+        .nervous-breakdown-card h2 {
+            margin: 0 0 16px;
+            color: #ff5252;
+            font-size: 1.2rem;
+        }
+
+        .nervous-breakdown-card p {
+            margin: 0 0 20px;
+            line-height: 1.55;
+            color: #ffcdd2;
+            font-size: 0.95rem;
+        }
+
+        .nervous-breakdown-ack-btn {
+            width: 100%;
+            padding: 14px;
+            border-radius: 12px;
+            border: 1px solid #ff8a80;
+            background: linear-gradient(180deg, #c62828, #7f0000);
+            color: #fff;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        #layoff-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 10013;
+            background: linear-gradient(165deg, #2d1a05 0%, #1a1510 55%, #0d0d0d 100%);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: #fff;
+            padding: 24px;
+            box-sizing: border-box;
+        }
+
+        .layoff-card {
+            max-width: 520px;
+            width: 100%;
+            background: rgba(45, 30, 12, 0.95);
+            border: 2px solid #ff9800;
+            border-radius: 16px;
+            padding: 26px 22px;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55);
+            text-align: center;
+        }
+
+        .layoff-card h2 {
+            margin: 0 0 16px;
+            color: #ffb74d;
+            font-size: 1.2rem;
+        }
+
+        .layoff-card p {
+            margin: 0 0 20px;
+            line-height: 1.55;
+            color: #ffe0b2;
+            font-size: 0.95rem;
+        }
+
+        .layoff-ack-btn {
+            width: 100%;
+            padding: 14px;
+            border-radius: 12px;
+            border: 1px solid #ffa726;
+            background: linear-gradient(180deg, #ef6c00, #e65100);
+            color: #fff;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .careers-medical-leave-banner {
+            margin: 0 0 16px;
+            padding: 14px 16px;
+            border-radius: 12px;
+            border: 2px solid #c62828;
+            background: rgba(80, 10, 10, 0.55);
+            color: #ffcdd2;
+            font-size: 0.95rem;
+            font-weight: 700;
+            line-height: 1.45;
+            text-align: center;
+        }
+
         #fired-overlay {
             position: fixed;
             top: 0;
@@ -1464,6 +1581,8 @@
     <div id="retirement-overlay-root"></div>
     <div id="date-trivia-react-root"></div>
     <div id="coping-overlay-root"></div>
+    <div id="nervous-breakdown-overlay-root"></div>
+    <div id="layoff-overlay-root"></div>
     <div id="eviction-overlay-root"></div>
     <div id="app-container">
         <div id="intro-screen">
@@ -1641,7 +1760,11 @@
             dateTriviaShowFeedback: false,
             isCopingOverlayOpen: false,
             pendingCopingEvent: null,
-            _copingCheckedThisAgeTick: false
+            _copingCheckedThisAgeTick: false,
+            medicalLeaveYearsRemaining: 0,
+            disabilityIncome: 0,
+            isNervousBreakdownOverlayOpen: false,
+            isLayoffOverlayOpen: false
         };
 
         const RENTAL_LISTINGS = [
@@ -1689,6 +1812,10 @@
         let dateTriviaReactRoot = null;
         const copingOverlayMount = document.getElementById("coping-overlay-root");
         let copingOverlayReactRoot = null;
+        const nervousBreakdownOverlayMount = document.getElementById("nervous-breakdown-overlay-root");
+        let nervousBreakdownOverlayReactRoot = null;
+        const layoffOverlayMount = document.getElementById("layoff-overlay-root");
+        let layoffOverlayReactRoot = null;
         const evictionOverlayMount = document.getElementById("eviction-overlay-root");
         let evictionOverlayReactRoot = null;
         let higherEdCatalogRoot = null;
@@ -2991,7 +3118,7 @@
 
         function openModal(title, description, actions, options) {
             options = options || {};
-            if (state.isExamModalOpen || state.isExamActive || state.isDiagnosisOverlayOpen || state.isPromotionOverlayOpen || state.isPerformanceReviewOverlayOpen || state.isCareerExamOpen || state.isFiredOverlayOpen || state.isRetirementOverlayOpen || state.isDateTriviaOpen || state.isCopingOverlayOpen || state.isEvictionOverlayOpen) return;
+            if (state.isExamModalOpen || state.isExamActive || state.isDiagnosisOverlayOpen || state.isPromotionOverlayOpen || state.isPerformanceReviewOverlayOpen || state.isCareerExamOpen || state.isFiredOverlayOpen || state.isRetirementOverlayOpen || state.isDateTriviaOpen || state.isCopingOverlayOpen || state.isNervousBreakdownOverlayOpen || state.isLayoffOverlayOpen || state.isEvictionOverlayOpen) return;
             if (higherEdCatalogRoot) {
                 higherEdCatalogRoot.render(null);
             }
@@ -3212,7 +3339,180 @@
             return true;
         }
 
+        function maybeInterceptHumanitiesLayoff() {
+            if (
+                !state.isEmployed ||
+                state.jobType !== "Career" ||
+                state.playerPath !== "Humanities" ||
+                state.isRetired
+            ) {
+                return false;
+            }
+            if (Math.random() > 0.1) return false;
+            state.isLayoffOverlayOpen = true;
+            renderLayoffOverlay();
+            return true;
+        }
+
+        function applyHumanitiesLayoffEffects() {
+            state.isEmployed = false;
+            state.jobTitle = "Unemployed";
+            state.annualIncome = 0;
+            state.salary = 0;
+            state.jobType = "None";
+            state.yearsAtCurrentJob = 0;
+            state.currentJobLevel = 1;
+            state.pendingPromotion = null;
+            state.isPromotionOverlayOpen = false;
+            if (promotionOverlayReactRoot) promotionOverlayReactRoot.render(null);
+            resetPerformanceReviewTracking();
+            resetCareerPerformanceScore();
+            state.happiness -= 15;
+            logEvent("Humanities sector layoff: position eliminated. Happiness -15 (not counted as a firing).");
+            syncFinancialAliases();
+            state.happiness = clampStat(state.happiness);
+        }
+
+        function closeLayoffOverlay() {
+            state.isLayoffOverlayOpen = false;
+            if (layoffOverlayReactRoot) {
+                layoffOverlayReactRoot.render(null);
+            }
+        }
+
+        function LayoffOverlay(props) {
+            return (
+                <div id="layoff-overlay" role="dialog" aria-modal="true" aria-label="Layoff">
+                    <div className="layoff-card">
+                        <h2>LAID OFF 📉</h2>
+                        <p>
+                            The economy has shifted and funding for your department was cut. Your position has been eliminated. This won&apos;t go on your permanent record as a firing, but you are now unemployed.
+                        </p>
+                        <button type="button" className="layoff-ack-btn" onClick={props.onAcknowledge}>
+                            Pack Your Desk
+                        </button>
+                    </div>
+                </div>
+            );
+        }
+
+        function renderLayoffOverlay() {
+            if (!layoffOverlayMount) return;
+            if (!state.isLayoffOverlayOpen) {
+                if (layoffOverlayReactRoot) layoffOverlayReactRoot.render(null);
+                return;
+            }
+            if (!layoffOverlayReactRoot) {
+                layoffOverlayReactRoot = ReactDOM.createRoot(layoffOverlayMount);
+            }
+            layoffOverlayReactRoot.render(<LayoffOverlay onAcknowledge={handleLayoffAcknowledge} />);
+        }
+
+        function handleLayoffAcknowledge() {
+            applyHumanitiesLayoffEffects();
+            closeLayoffOverlay();
+            finishWorkYearCareerPhase();
+        }
+
+        function triggerNervousBreakdownMedicalLeave() {
+            var prevGross = state.isEmployed ? state.annualIncome || 0 : 0;
+            state._breakdownPrevAnnualGross = prevGross;
+            state.disabilityIncome = state.isEmployed ? Math.round(prevGross * 0.3) : 0;
+            state.isEmployed = false;
+            state.jobTitle = "Medical Leave (Disability)";
+            state.annualIncome = state.disabilityIncome;
+            state.salary = state.disabilityIncome;
+            state.jobType = "None";
+            state.yearsAtCurrentJob = 0;
+            state.currentJobLevel = 1;
+            state.pendingPromotion = null;
+            state.isPromotionOverlayOpen = false;
+            if (promotionOverlayReactRoot) promotionOverlayReactRoot.render(null);
+            resetPerformanceReviewTracking();
+            resetCareerPerformanceScore();
+            state.medicalLeaveYearsRemaining = 3;
+            state.happiness += 30;
+            logEvent(
+                "Nervous breakdown: mandatory medical leave for 3 years. Disability pay " + formatMoney(state.disabilityIncome) + "/yr."
+            );
+            syncFinancialAliases();
+            state.happiness = clampStat(state.happiness);
+            state.isNervousBreakdownOverlayOpen = true;
+            renderNervousBreakdownOverlay();
+        }
+
+        function closeNervousBreakdownOverlay() {
+            state.isNervousBreakdownOverlayOpen = false;
+            if (nervousBreakdownOverlayReactRoot) {
+                nervousBreakdownOverlayReactRoot.render(null);
+            }
+        }
+
+        function NervousBreakdownOverlay(props) {
+            return (
+                <div id="nervous-breakdown-overlay" role="dialog" aria-modal="true" aria-label="Nervous breakdown">
+                    <div className="nervous-breakdown-card">
+                        <h2>NERVOUS BREAKDOWN 🚑</h2>
+                        <p>
+                            Your body and mind have completely given out. You suffered a severe nervous breakdown and have been placed on mandatory Medical Leave for 3 years. You cannot work, and you will only receive 30% of your previous pay as disability.
+                        </p>
+                        <button type="button" className="nervous-breakdown-ack-btn" onClick={props.onAcknowledge}>
+                            Acknowledge
+                        </button>
+                    </div>
+                </div>
+            );
+        }
+
+        function renderNervousBreakdownOverlay() {
+            if (!nervousBreakdownOverlayMount) return;
+            if (!state.isNervousBreakdownOverlayOpen) {
+                if (nervousBreakdownOverlayReactRoot) nervousBreakdownOverlayReactRoot.render(null);
+                return;
+            }
+            if (!nervousBreakdownOverlayReactRoot) {
+                nervousBreakdownOverlayReactRoot = ReactDOM.createRoot(nervousBreakdownOverlayMount);
+            }
+            nervousBreakdownOverlayReactRoot.render(<NervousBreakdownOverlay onAcknowledge={handleNervousBreakdownAcknowledge} />);
+        }
+
+        function handleNervousBreakdownAcknowledge() {
+            closeNervousBreakdownOverlay();
+            var prevGross = state._breakdownPrevAnnualGross || 0;
+            var dis = state.disabilityIncome || 0;
+            state.cash += dis * 0.75 - prevGross * 0.75;
+            state.annualIncome = dis;
+            state.salary = dis;
+            delete state._breakdownPrevAnnualGross;
+            syncFinancialAliases();
+            logEvent(
+                "Income adjusted for disability: take-home now reflects " + formatMoney(dis * 0.75) + " after taxes this year."
+            );
+            finishEndOfWorkYearAfterBreakdownTriggers();
+            updateUI();
+        }
+
+        function tickMedicalLeaveCountdown() {
+            if (state.medicalLeaveYearsRemaining <= 0) return;
+            state.medicalLeaveYearsRemaining -= 1;
+            if (state.medicalLeaveYearsRemaining === 0) {
+                state.jobTitle = "Unemployed";
+                state.annualIncome = 0;
+                state.salary = 0;
+                state.disabilityIncome = 0;
+                state.isEmployed = false;
+                state.jobType = "None";
+                showPurchaseToastMessage("Your medical leave has ended. You are cleared to re-enter the workforce.");
+                logEvent("Medical leave ended: cleared to return to work.");
+                syncFinancialAliases();
+            }
+        }
+
         function finishWorkYearCareerPhase() {
+            if (maybeInterceptHumanitiesLayoff()) {
+                updateUI();
+                return;
+            }
             if (maybeInterceptDestructiveCoping()) {
                 updateUI();
                 return;
@@ -3697,7 +3997,14 @@
             state.cash -= state.annualExpenses;
             state.health -= 1;
             state.happiness -= 1;
-            var gross = state.isRetired ? (state.pensionIncome || 0) : (state.annualIncome || 0);
+            var gross;
+            if (state.isRetired) {
+                gross = state.pensionIncome || 0;
+            } else if (state.medicalLeaveYearsRemaining > 0) {
+                gross = state.disabilityIncome || 0;
+            } else {
+                gross = state.annualIncome || 0;
+            }
             var netIncome = gross * 0.75;
             state.cash += netIncome;
             state.salary = gross;
@@ -3705,6 +4012,10 @@
             if (gross > 0) {
                 if (state.isRetired) {
                     logEvent("Age " + state.age + ": Pension income — took home " + formatMoney(netIncome) + " after taxes.");
+                } else if (state.medicalLeaveYearsRemaining > 0) {
+                    logEvent(
+                        "Age " + state.age + ": Disability pay on medical leave — took home " + formatMoney(netIncome) + " after taxes."
+                    );
                 } else {
                     logEvent("Age " + state.age + ": You worked as " + state.jobTitle + " and took home " + formatMoney(netIncome) + " after taxes.");
                 }
@@ -3714,6 +4025,7 @@
             if (state.isEmployed && state.jobTitle !== "Student" && state.jobTitle !== "Unemployed") {
                 state.yearsAtCurrentJob += 1;
             }
+            tickMedicalLeaveCountdown();
             finishWorkYearCareerPhase();
         }
 
@@ -4608,6 +4920,10 @@
         }
 
         function quitJob() {
+            if (state.medicalLeaveYearsRemaining > 0) {
+                logEvent("You cannot quit a job while on mandatory medical leave.");
+                return;
+            }
             const prog = state.currentlyPursuing ? EDUCATION_PROGRAMS[state.currentlyPursuing] : null;
             if (prog && prog.pipeline === "residency") {
                 logEvent("You cannot quit during Medical Residency.");
@@ -4649,6 +4965,10 @@
         }
 
         function applyForJob(job) {
+            if (state.medicalLeaveYearsRemaining > 0) {
+                logEvent("You cannot apply for jobs while on mandatory medical leave.");
+                return;
+            }
             if (state.isRetired) {
                 logEvent("You are retired and are not seeking new employment.");
                 return;
@@ -4717,6 +5037,12 @@
         }
 
         function openJobBoard() {
+            if (state.medicalLeaveYearsRemaining > 0) {
+                openModal("Career Path (Locked)", "You are on mandatory medical leave and cannot apply for work.", [
+                    { label: "Close", handler: function () { closeModal(); } }
+                ]);
+                return;
+            }
             const enrProg = state.currentlyPursuing ? EDUCATION_PROGRAMS[state.currentlyPursuing] : null;
             if (enrProg && enrProg.pipeline === "residency") {
                 openModal("Career Path Jobs", "You cannot take a standard job during Medical Residency.", [
@@ -4790,6 +5116,12 @@
         }
 
         function openOddJobsBoard() {
+            if (state.medicalLeaveYearsRemaining > 0) {
+                openModal("Odd Jobs (Locked)", "You are on mandatory medical leave and cannot apply for work.", [
+                    { label: "Close", handler: function () { closeModal(); } }
+                ]);
+                return;
+            }
             const enrProg = state.currentlyPursuing ? EDUCATION_PROGRAMS[state.currentlyPursuing] : null;
             if (enrProg && enrProg.pipeline === "residency") {
                 openModal("Odd Jobs & Part-Time", "No side jobs during Medical Residency.", [
@@ -4822,10 +5154,21 @@
         }
 
         function openCareersTab() {
+            const mlYears = state.medicalLeaveYearsRemaining || 0;
+            const medicalLeaveBanner =
+                mlYears > 0
+                    ? '<div class="careers-medical-leave-banner">🔒 CLEARANCE DENIED: You are currently on mandatory Medical Leave for ' +
+                        mlYears +
+                        " more year" +
+                        (mlYears === 1 ? "" : "s") +
+                        ". Focus on your recovery.</div>"
+                    : "";
             const enrProg = state.currentlyPursuing ? EDUCATION_PROGRAMS[state.currentlyPursuing] : null;
             const residencyBlock = enrProg && enrProg.pipeline === "residency";
-            const canCareerBoard = !state.isEmployed && !state.currentlyPursuing && !state.jobSearchBlocked && !residencyBlock;
-            const canOddJobsBoard = !state.isEmployed && state.playerPath && !residencyBlock;
+            const medicalLeaveLock = mlYears > 0;
+            const canCareerBoard =
+                !medicalLeaveLock && !state.isEmployed && !state.currentlyPursuing && !state.jobSearchBlocked && !residencyBlock;
+            const canOddJobsBoard = !medicalLeaveLock && !state.isEmployed && state.playerPath && !residencyBlock;
             const lockReason = state.currentlyPursuing
                 ? "You are currently enrolled in school."
                 : state.jobSearchBlocked
@@ -4858,7 +5201,8 @@
 
             openModal(
                 "Careers",
-                "Status: " + state.jobTitle + " | Annual Income: " + formatMoney(state.annualIncome) + "<br>" + lockReason +
+                medicalLeaveBanner +
+                    "Status: " + state.jobTitle + " | Annual Income: " + formatMoney(state.annualIncome) + "<br>" + lockReason +
                     buildProfessionalProfileHtml() +
                     "<strong>Choose a job board:</strong>",
                 [
@@ -6300,6 +6644,8 @@
             closeRetirementOverlay();
             closeDateTriviaOverlay();
             closeCopingOverlay();
+            closeNervousBreakdownOverlay();
+            closeLayoffOverlay();
             closeEvictionOverlay();
             closeDiagnosisOverlay();
             gameUI.style.display = "none";
@@ -6332,6 +6678,41 @@
             deathSound.play();
             triggerDeath(customDeathMessage);
             console.log("Player has died!");
+        }
+
+        function finishEndOfWorkYearAfterBreakdownTriggers() {
+            if (state.happiness <= 0 && state.medicalLeaveYearsRemaining === 0) {
+                triggerNervousBreakdownMedicalLeave();
+                updateUI();
+                return;
+            }
+
+            if (state.happiness <= 0) {
+                state.happinessZeroStreakYears += 1;
+            } else {
+                state.happinessZeroStreakYears = 0;
+            }
+            if (state.happinessZeroStreakYears >= 2) {
+                handleSuicideDeath();
+                yearlyResetMentalSuppression();
+                return;
+            }
+
+            if (state.health <= 0) {
+                onPlayerDeath(GENERIC_HEALTH_DEATH_MESSAGE);
+                yearlyResetMentalSuppression();
+                return;
+            }
+
+            pushYearEndHappinessAndReviewTick();
+            if (maybeOpenPerformanceReviewOverlay()) {
+                updateUI();
+                return;
+            }
+
+            yearlyResetMentalSuppression();
+            triggerProceduralYearEvents();
+            updateUI();
         }
 
         function runAgeUpWorkYearAfterPromotion() {
@@ -6373,36 +6754,11 @@
                 return;
             }
 
-            if (state.happiness <= 0) {
-                state.happinessZeroStreakYears += 1;
-            } else {
-                state.happinessZeroStreakYears = 0;
-            }
-            if (state.happinessZeroStreakYears >= 2) {
-                handleSuicideDeath();
-                yearlyResetMentalSuppression();
-                return;
-            }
-
-            if (state.health <= 0) {
-                onPlayerDeath(GENERIC_HEALTH_DEATH_MESSAGE);
-                yearlyResetMentalSuppression();
-                return;
-            }
-
-            pushYearEndHappinessAndReviewTick();
-            if (maybeOpenPerformanceReviewOverlay()) {
-                updateUI();
-                return;
-            }
-
-            yearlyResetMentalSuppression();
-            triggerProceduralYearEvents();
-            updateUI();
+            finishEndOfWorkYearAfterBreakdownTriggers();
         }
 
         function ageUp() {
-            if (state.isDead || !state.playerPath || state.isExamModalOpen || state.isExamActive || state.isDiagnosisOverlayOpen || state.isPromotionOverlayOpen || state.isPerformanceReviewOverlayOpen || state.isCareerExamOpen || state.isFiredOverlayOpen || state.isRetirementOverlayOpen || state.isDateTriviaOpen || state.isCopingOverlayOpen || state.isEvictionOverlayOpen) return;
+            if (state.isDead || !state.playerPath || state.isExamModalOpen || state.isExamActive || state.isDiagnosisOverlayOpen || state.isPromotionOverlayOpen || state.isPerformanceReviewOverlayOpen || state.isCareerExamOpen || state.isFiredOverlayOpen || state.isRetirementOverlayOpen || state.isDateTriviaOpen || state.isCopingOverlayOpen || state.isNervousBreakdownOverlayOpen || state.isLayoffOverlayOpen || state.isEvictionOverlayOpen) return;
 
             if (state.isInSchool && state.currentlyPursuing) {
                 openYearlyExamOverlay();
@@ -6477,16 +6833,16 @@
 
         document.getElementById("age-up-btn").addEventListener("click", ageUp);
         document.getElementById("education-nav-btn").addEventListener("click", function () {
-            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isPerformanceReviewOverlayOpen && !state.isCareerExamOpen && !state.isFiredOverlayOpen && !state.isRetirementOverlayOpen && !state.isDateTriviaOpen && !state.isCopingOverlayOpen && !state.isEvictionOverlayOpen) openEducationTab();
+            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isPerformanceReviewOverlayOpen && !state.isCareerExamOpen && !state.isFiredOverlayOpen && !state.isRetirementOverlayOpen && !state.isDateTriviaOpen && !state.isCopingOverlayOpen && !state.isNervousBreakdownOverlayOpen && !state.isLayoffOverlayOpen && !state.isEvictionOverlayOpen) openEducationTab();
         });
         document.getElementById("careers-nav-btn").addEventListener("click", function () {
-            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isPerformanceReviewOverlayOpen && !state.isCareerExamOpen && !state.isFiredOverlayOpen && !state.isRetirementOverlayOpen && !state.isDateTriviaOpen && !state.isCopingOverlayOpen && !state.isEvictionOverlayOpen) openCareersTab();
+            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isPerformanceReviewOverlayOpen && !state.isCareerExamOpen && !state.isFiredOverlayOpen && !state.isRetirementOverlayOpen && !state.isDateTriviaOpen && !state.isCopingOverlayOpen && !state.isNervousBreakdownOverlayOpen && !state.isLayoffOverlayOpen && !state.isEvictionOverlayOpen) openCareersTab();
         });
         document.getElementById("activities-nav-btn").addEventListener("click", function () {
-            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isPerformanceReviewOverlayOpen && !state.isCareerExamOpen && !state.isFiredOverlayOpen && !state.isRetirementOverlayOpen && !state.isDateTriviaOpen && !state.isCopingOverlayOpen && !state.isEvictionOverlayOpen) openActivitiesMenu();
+            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isPerformanceReviewOverlayOpen && !state.isCareerExamOpen && !state.isFiredOverlayOpen && !state.isRetirementOverlayOpen && !state.isDateTriviaOpen && !state.isCopingOverlayOpen && !state.isNervousBreakdownOverlayOpen && !state.isLayoffOverlayOpen && !state.isEvictionOverlayOpen) openActivitiesMenu();
         });
         document.getElementById("assets-nav-btn").addEventListener("click", function () {
-            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isPerformanceReviewOverlayOpen && !state.isCareerExamOpen && !state.isFiredOverlayOpen && !state.isRetirementOverlayOpen && !state.isDateTriviaOpen && !state.isCopingOverlayOpen && !state.isEvictionOverlayOpen) openAssetsMenu();
+            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isPerformanceReviewOverlayOpen && !state.isCareerExamOpen && !state.isFiredOverlayOpen && !state.isRetirementOverlayOpen && !state.isDateTriviaOpen && !state.isCopingOverlayOpen && !state.isNervousBreakdownOverlayOpen && !state.isLayoffOverlayOpen && !state.isEvictionOverlayOpen) openAssetsMenu();
         });
         document.getElementById("play-again-btn").addEventListener("click", function () {
             location.reload();
