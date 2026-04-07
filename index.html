@@ -563,7 +563,7 @@
             width: 100vw;
             height: 100vh;
             z-index: 9999;
-            background: rgba(0, 0, 0, 0.98);
+            background: rgba(0, 0, 0, 0.95);
             display: none;
             flex-direction: column;
             align-items: center;
@@ -2276,7 +2276,7 @@
 
         function startExamYearQuestionQueue(path) {
             const bank = EXAM_QUESTION_BANKS[path] || [];
-            if (bank.length < 2) {
+            if (bank.length < 1) {
                 state.examYearQuestionQueue = [];
                 return;
             }
@@ -2288,16 +2288,16 @@
                 indices[j] = t;
             }
             var pick = [];
-            for (var k = 0; k < indices.length && pick.length < 2; k++) {
+            for (var k = 0; k < indices.length && pick.length < 1; k++) {
                 var idx = indices[k];
                 var id = examQuestionId(path, idx);
                 if (state.examYearUsedQuestionIds.indexOf(id) === -1) {
                     pick.push(idx);
                 }
             }
-            if (pick.length < 2) {
+            if (pick.length < 1) {
                 state.examYearUsedQuestionIds = [];
-                pick = indices.slice(0, 2);
+                pick = indices.slice(0, 1);
             }
             pick.forEach(function (idx) {
                 state.examYearUsedQuestionIds.push(examQuestionId(path, idx));
@@ -2620,15 +2620,11 @@
         }
 
         function getRequiredExamPassesForProgram(program) {
-            var totalQuestions = program.yearsRequired * 2;
+            var totalQuestions = program.yearsRequired;
             if (program && program.pipeline && program.pipeline !== "undergrad") {
                 return Math.ceil(totalQuestions * 0.5);
             }
-            var byRatio = Math.ceil(totalQuestions * 0.75);
-            if (program.yearsRequired >= 4) {
-                return Math.max(6, byRatio);
-            }
-            return byRatio;
+            return Math.ceil(totalQuestions * 0.75);
         }
 
         function clearEnrollmentAfterDismissalOrQuit() {
@@ -2659,7 +2655,7 @@
             openModal(
                 "Academic Dismissal",
                 "<strong>You did not pass at least 50% of the required exam questions for " + program.degreeName + ".</strong><br><br>" +
-                "You passed " + passedCount + "/" + (program.yearsRequired * 2) + " exam questions (minimum required: " + requiredPasses + "). " +
+                "You passed " + passedCount + "/" + program.yearsRequired + " exam questions (minimum required: " + requiredPasses + "). " +
                 "You are not awarded this degree. Accumulated program debt remains on your record.<br><br>" + debtLine,
                 [{ label: "Continue", handler: function () { closeModal(); updateUI(); } }]
             );
@@ -2695,7 +2691,7 @@
 
             openModal(
                 "Academic Dismissal — Failed Final Year",
-                "<strong>You did not meet the graduation exam requirement.</strong><br><br>You passed " + passedCount + "/" + (program.yearsRequired * 2) +
+                "<strong>You did not meet the graduation exam requirement.</strong><br><br>You passed " + passedCount + "/" + program.yearsRequired +
                 " exam questions (minimum required: " + requiredPasses + "). You must restart " +
                 program.degreeName + " from Year 1. Careers and Find a Job stay locked until you graduate successfully.<br><br>" + debtLine,
                 [
@@ -2766,7 +2762,7 @@
             syncCurrentEnrollment();
 
             logEvent(
-                "Age " + state.age + ": Completed " + (state.examQuestionsThisYearTotal || 2) + " final exam questions. " +
+                "Age " + state.age + ": Completed " + (state.examQuestionsThisYearTotal || 1) + " final exam question. " +
                 "School year " + state.yearsInSchool + "/" + program.yearsRequired + " in " + program.degreeName + "."
             );
 
@@ -2836,7 +2832,7 @@
             }
 
             closeModal();
-            state.examQuestionsThisYearTotal = 2;
+            state.examQuestionsThisYearTotal = 1;
             state.examQuestionsThisYearAnswered = 0;
             state.isExamModalOpen = true;
             state.currentExamQuestion = first;
@@ -2877,12 +2873,12 @@
 
         function getHireChance() {
             if (state.playerPath === "Trades") {
-                return 0.75 + Math.random() * 0.15;
+                return 0.85;
             }
             if (state.playerPath === "STEM") {
-                return 0.50 + Math.random() * 0.20;
+                return 0.60;
             }
-            return 0.15 + Math.random() * 0.15;
+            return 0.20;
         }
 
         function quitJob() {
@@ -3344,7 +3340,7 @@
                 : "You are not currently enrolled in school.";
             const examProgress = program
                 ? "Exam questions (this degree): " + state.examsPassedThisDegree + "/" + state.examsTakenThisDegree +
-                    " (2 per year; need " + getRequiredExamPassesForProgram(program) + "+ correct to graduate)."
+                    " (1 per year; need " + getRequiredExamPassesForProgram(program) + "+ correct to graduate)."
                 : "";
             const enrollLine = state.currentEnrollment
                 ? "<br><strong>Current enrollment:</strong> " + state.currentEnrollment.degreeName +
@@ -3597,7 +3593,7 @@
             getGlobalHousingMarketShiftForYear();
 
             state.ownedAssets.forEach(function (property) {
-                const marketFluctuation = Math.random() * 0.12 - 0.05;
+                const marketFluctuation = Math.random() * 0.10 - 0.05;
                 const totalShift = marketFluctuation + state.currentHousingMarketShift;
                 property.currentValue = Math.max(10000, Math.round(property.currentValue * (1 + totalShift)));
                 property.lastMarketFluctuation = totalShift;
