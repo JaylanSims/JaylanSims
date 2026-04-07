@@ -33,6 +33,8 @@
     var ctx = null;
     var heartbeatTimer = null;
     var lastStressHeartbeatLevel = null;
+    var lastWebHeartbeatInterval = null;
+    var lastWebHeartbeatVolKey = null;
     var introHowl = null;
     var introSoundId = null;
     var introFadeTimer = null;
@@ -260,11 +262,17 @@
         osc.stop(t + 0.16);
     }
 
-    function stopHeartbeatLoop() {
+    function clearWebHeartbeatTimer() {
         if (heartbeatTimer) {
             clearInterval(heartbeatTimer);
             heartbeatTimer = null;
         }
+        lastWebHeartbeatInterval = null;
+        lastWebHeartbeatVolKey = null;
+    }
+
+    function stopStressHeartbeatFull() {
+        clearWebHeartbeatTimer();
         var h = howls.heart_beat;
         if (h) {
             try {
@@ -274,7 +282,7 @@
     }
 
     function startHeartbeatWebLoop(intervalMs, gainVal) {
-        stopHeartbeatLoop();
+        clearWebHeartbeatTimer();
         var c = getAudioContext();
         if (!c || muted) return;
         heartbeatTimer = setInterval(function () {
@@ -355,14 +363,8 @@
 
         stop: function (id) {
             if (id === "heart_beat") {
-                stopHeartbeatLoop();
                 lastStressHeartbeatLevel = null;
-                var hb = howls.heart_beat;
-                if (hb) {
-                    try {
-                        hb.stop();
-                    } catch (e) {}
-                }
+                stopStressHeartbeatFull();
                 return;
             }
             if (id === "intro_ambience") {
@@ -381,8 +383,8 @@
             muted = !!m;
             persistMuted();
             if (muted) {
-                stopHeartbeatLoop();
                 lastStressHeartbeatLevel = null;
+                stopStressHeartbeatFull();
                 Object.keys(howls).forEach(function (k) {
                     try {
                         howls[k].stop();
@@ -431,13 +433,7 @@
             unlockAudio();
             if (muted || stressLevel == null || stressLevel <= 80) {
                 lastStressHeartbeatLevel = null;
-                stopHeartbeatLoop();
-                var hh = howls.heart_beat;
-                if (hh) {
-                    try {
-                        hh.stop();
-                    } catch (e) {}
-                }
+                stopStressHeartbeatFull();
                 return;
             }
             lastStressHeartbeatLevel = stressLevel;
@@ -445,7 +441,16 @@
             var rate = stressToPlaybackRate(stressLevel);
             var h = ensureHowl("heart_beat");
             if (h && !howlLoadFailed.heart_beat) {
-                stopHeartbeatLoop();
+                clearWebHeartbeatTimer();
+                var alreadyPlaying = false;
+                try {
+                    alreadyPlaying = typeof h.playing === "function" && h.playing();
+                } catch (e2) {}
+                if (alreadyPlaying) {
+                    h.rate(rate);
+                    h.volume(effectiveVolume(vol));
+                    return;
+                }
                 h.loop(true);
                 h.rate(rate);
                 h.volume(effectiveVolume(vol));
@@ -453,6 +458,12 @@
                 return;
             }
             var interval = Math.max(280, Math.round(520 - (stressLevel - 80) * 12));
+            var volKey = Math.round(vol * 100) + ":" + interval;
+            if (heartbeatTimer && lastWebHeartbeatInterval === interval && lastWebHeartbeatVolKey === volKey) {
+                return;
+            }
+            lastWebHeartbeatInterval = interval;
+            lastWebHeartbeatVolKey = volKey;
             startHeartbeatWebLoop(interval, vol);
         },
 
