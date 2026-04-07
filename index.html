@@ -1320,6 +1320,110 @@
             cursor: pointer;
         }
 
+        #mortgage-paid-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 10015;
+            background: linear-gradient(165deg, #0d2818 0%, #0d1f14 50%, #0a0a0a 100%);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: #fff;
+            padding: 24px;
+            box-sizing: border-box;
+        }
+
+        .mortgage-paid-card {
+            max-width: 520px;
+            width: 100%;
+            background: rgba(20, 50, 30, 0.95);
+            border: 2px solid #66bb6a;
+            border-radius: 16px;
+            padding: 26px 22px;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55);
+            text-align: center;
+        }
+
+        .mortgage-paid-card h2 {
+            margin: 0 0 16px;
+            color: #c8e6c9;
+            font-size: 1.2rem;
+        }
+
+        .mortgage-paid-card p {
+            margin: 0 0 20px;
+            line-height: 1.55;
+            color: #e8f5e9;
+            font-size: 0.95rem;
+        }
+
+        .mortgage-paid-ack-btn {
+            width: 100%;
+            padding: 14px;
+            border-radius: 12px;
+            border: 1px solid #81c784;
+            background: linear-gradient(180deg, #43a047, #2e7d32);
+            color: #fff;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        #foreclosure-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 10016;
+            background: linear-gradient(165deg, #1a0505 0%, #0d0d0d 55%, #120202 100%);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: #fff;
+            padding: 24px;
+            box-sizing: border-box;
+        }
+
+        .foreclosure-card {
+            max-width: 520px;
+            width: 100%;
+            background: rgba(40, 8, 8, 0.95);
+            border: 2px solid #e53935;
+            border-radius: 16px;
+            padding: 26px 22px;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+            text-align: center;
+        }
+
+        .foreclosure-card h2 {
+            margin: 0 0 16px;
+            color: #ff8a80;
+            font-size: 1.2rem;
+        }
+
+        .foreclosure-card p {
+            margin: 0 0 20px;
+            line-height: 1.55;
+            color: #ffcdd2;
+            font-size: 0.95rem;
+        }
+
+        .foreclosure-ack-btn {
+            width: 100%;
+            padding: 14px;
+            border-radius: 12px;
+            border: 1px solid #e57373;
+            background: linear-gradient(180deg, #c62828, #7f0000);
+            color: #fff;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
         .careers-medical-leave-banner {
             margin: 0 0 16px;
             padding: 14px 16px;
@@ -1646,6 +1750,8 @@
     <div id="nervous-breakdown-overlay-root"></div>
     <div id="layoff-overlay-root"></div>
     <div id="inflation-overlay-root"></div>
+    <div id="mortgage-paid-overlay-root"></div>
+    <div id="foreclosure-overlay-root"></div>
     <div id="eviction-overlay-root"></div>
     <div id="app-container">
         <div id="intro-screen">
@@ -1811,6 +1917,12 @@
             currentHousing: null,
             roommate: null,
             rentExpenseInBudget: 0,
+            housingStatus: "Renting",
+            mortgageBalance: 0,
+            annualMortgagePayment: 0,
+            isMortgagePaidOverlayOpen: false,
+            isForeclosureOverlayOpen: false,
+            _postMortgageHousingResume: null,
             graduationTier: null,
             examPerformanceTier: null,
             totalWorkExperience: 0,
@@ -1892,6 +2004,10 @@
         let layoffOverlayReactRoot = null;
         const inflationOverlayMount = document.getElementById("inflation-overlay-root");
         let inflationOverlayReactRoot = null;
+        const mortgagePaidOverlayMount = document.getElementById("mortgage-paid-overlay-root");
+        let mortgagePaidOverlayReactRoot = null;
+        const foreclosureOverlayMount = document.getElementById("foreclosure-overlay-root");
+        let foreclosureOverlayReactRoot = null;
         const evictionOverlayMount = document.getElementById("eviction-overlay-root");
         let evictionOverlayReactRoot = null;
         let higherEdCatalogRoot = null;
@@ -3208,6 +3324,176 @@
             }
         }
 
+        function processMortgageAfterYearIncome(doneFn) {
+            var onDone = typeof doneFn === "function" ? doneFn : finishWorkYearCareerPhase;
+            var prop = getMortgagedProperty();
+            if (!prop) {
+                onDone();
+                return;
+            }
+            if (prop.mortgagePaymentBase == null && typeof prop.mortgagePayment === "number") {
+                prop.mortgagePaymentBase = prop.mortgagePayment;
+            }
+            var payBase = typeof prop.mortgagePaymentBase === "number" ? prop.mortgagePaymentBase : 0;
+            var annualPay = inflScale(payBase);
+            state.annualMortgagePayment = annualPay;
+            state.mortgageBalance = Math.round(prop.remainingBalance);
+            state.cash -= annualPay;
+            state.bankBalance = state.cash;
+            prop.remainingBalance = Math.max(0, prop.remainingBalance - annualPay);
+            logEvent(
+                "Mortgage payment: " + formatMoney(annualPay) + ". Remaining balance: " + formatMoney(prop.remainingBalance) + "."
+            );
+
+            if (state.cash < 0) {
+                state._postMortgageHousingResume = function () {
+                    onDone();
+                };
+                state.isForeclosureOverlayOpen = true;
+                renderForeclosureOverlay();
+                updateUI();
+                return;
+            }
+
+            if (prop.remainingBalance <= 0) {
+                prop.remainingBalance = 0;
+                prop.isMortgaged = false;
+                prop.mortgagePayment = 0;
+                prop.mortgagePaymentBase = 0;
+                state.housingStatus = "Owned";
+                state.mortgageBalance = 0;
+                state.annualMortgagePayment = 0;
+                syncFinancialAliases();
+                state._postMortgageHousingResume = function () {
+                    onDone();
+                };
+                state.isMortgagePaidOverlayOpen = true;
+                renderMortgagePaidOverlay();
+                updateUI();
+                return;
+            }
+
+            syncFinancialAliases();
+            onDone();
+        }
+
+        function MortgagePaidOverlay(props) {
+            return (
+                <div id="mortgage-paid-overlay" role="dialog" aria-modal="true" aria-label="Mortgage paid off">
+                    <div className="mortgage-paid-card">
+                        <h2>MORTGAGE PAID OFF 🏡</h2>
+                        <p>
+                            Congratulations! You have made your final payment. You now own your home free and clear. You will no longer have an annual housing payment.
+                        </p>
+                        <button type="button" className="mortgage-paid-ack-btn" onClick={props.onAcknowledge}>
+                            Celebrate
+                        </button>
+                    </div>
+                </div>
+            );
+        }
+
+        function renderMortgagePaidOverlay() {
+            if (!mortgagePaidOverlayMount) return;
+            if (!state.isMortgagePaidOverlayOpen) {
+                if (mortgagePaidOverlayReactRoot) mortgagePaidOverlayReactRoot.render(null);
+                return;
+            }
+            if (!mortgagePaidOverlayReactRoot) {
+                mortgagePaidOverlayReactRoot = ReactDOM.createRoot(mortgagePaidOverlayMount);
+            }
+            mortgagePaidOverlayReactRoot.render(<MortgagePaidOverlay onAcknowledge={handleMortgagePaidAcknowledge} />);
+        }
+
+        function closeMortgagePaidOverlay() {
+            state.isMortgagePaidOverlayOpen = false;
+            if (mortgagePaidOverlayReactRoot) {
+                mortgagePaidOverlayReactRoot.render(null);
+            }
+        }
+
+        function handleMortgagePaidAcknowledge() {
+            state.happiness += 25;
+            state.happiness = clampStat(state.happiness);
+            logEvent("Mortgage paid off: +25 Happiness — you own your home outright.");
+            closeMortgagePaidOverlay();
+            var fn = state._postMortgageHousingResume;
+            state._postMortgageHousingResume = null;
+            if (typeof fn === "function") {
+                fn();
+            }
+            updateUI();
+        }
+
+        function ForeclosureOverlay(props) {
+            return (
+                <div id="foreclosure-overlay" role="dialog" aria-modal="true" aria-label="Foreclosure">
+                    <div className="foreclosure-card">
+                        <h2>FORECLOSURE 🚨</h2>
+                        <p>
+                            Your bank account was empty and you missed your mortgage payments. The bank has foreclosed on your property and evicted you. You lost all the equity you put into the house and are now forced back into a cheap rental.
+                        </p>
+                        <button type="button" className="foreclosure-ack-btn" onClick={props.onAcknowledge}>
+                            Move Out
+                        </button>
+                    </div>
+                </div>
+            );
+        }
+
+        function renderForeclosureOverlay() {
+            if (!foreclosureOverlayMount) return;
+            if (!state.isForeclosureOverlayOpen) {
+                if (foreclosureOverlayReactRoot) foreclosureOverlayReactRoot.render(null);
+                return;
+            }
+            if (!foreclosureOverlayReactRoot) {
+                foreclosureOverlayReactRoot = ReactDOM.createRoot(foreclosureOverlayMount);
+            }
+            foreclosureOverlayReactRoot.render(<ForeclosureOverlay onAcknowledge={handleForeclosureAcknowledge} />);
+        }
+
+        function closeForeclosureOverlay() {
+            state.isForeclosureOverlayOpen = false;
+            if (foreclosureOverlayReactRoot) {
+                foreclosureOverlayReactRoot.render(null);
+            }
+        }
+
+        function handleForeclosureAcknowledge() {
+            state.ownedAssets = [];
+            state.housingStatus = "Renting";
+            state.mortgageBalance = 0;
+            state.annualMortgagePayment = 0;
+            state.cash = 0;
+            state.bankBalance = 0;
+            var studio = getRentalListingById("studio");
+            if (studio) {
+                state.currentHousing = {
+                    type: "Rent",
+                    name: studio.name,
+                    annualCost: studio.annualCost,
+                    rentalId: studio.id
+                };
+                state.roommate = null;
+                logEvent("Foreclosure: bank seized the home; you move into a basic studio with $0 in the bank (bankruptcy reset).");
+            } else {
+                state.currentHousing = null;
+                state.roommate = null;
+                logEvent("Foreclosure: property seized; no studio listing available — you have no lease.");
+            }
+            state.happiness -= 50;
+            state.happiness = clampStat(state.happiness);
+            syncFinancialAliases();
+            closeForeclosureOverlay();
+            var fn = state._postMortgageHousingResume;
+            state._postMortgageHousingResume = null;
+            if (typeof fn === "function") {
+                fn();
+            }
+            updateUI();
+        }
+
         function updateUI() {
             syncCurrentEnrollment();
             evictDormIfNotEnrolled(true);
@@ -3308,7 +3594,7 @@
 
         function openModal(title, description, actions, options) {
             options = options || {};
-            if (state.isExamModalOpen || state.isExamActive || state.isDiagnosisOverlayOpen || state.isPromotionOverlayOpen || state.isPerformanceReviewOverlayOpen || state.isCareerExamOpen || state.isFiredOverlayOpen || state.isRetirementOverlayOpen || state.isDateTriviaOpen || state.isCopingOverlayOpen || state.isNervousBreakdownOverlayOpen || state.isLayoffOverlayOpen || state.isInflationOverlayOpen || state.isEvictionOverlayOpen) return;
+            if (state.isExamModalOpen || state.isExamActive || state.isDiagnosisOverlayOpen || state.isPromotionOverlayOpen || state.isPerformanceReviewOverlayOpen || state.isCareerExamOpen || state.isFiredOverlayOpen || state.isRetirementOverlayOpen || state.isDateTriviaOpen || state.isCopingOverlayOpen || state.isNervousBreakdownOverlayOpen || state.isLayoffOverlayOpen || state.isInflationOverlayOpen || state.isMortgagePaidOverlayOpen || state.isForeclosureOverlayOpen || state.isEvictionOverlayOpen) return;
             if (higherEdCatalogRoot) {
                 higherEdCatalogRoot.render(null);
             }
@@ -4232,7 +4518,7 @@
                 state.yearsAtCurrentJob += 1;
             }
             tickMedicalLeaveCountdown();
-            finishWorkYearCareerPhase();
+            processMortgageAfterYearIncome();
         }
 
         function RetirementOverlay(props) {
@@ -5046,7 +5332,9 @@
                 state.age += 1;
                 state.yearsInSchool += 1;
                 schoolYearAfterIncomeAndCosts();
-                schoolYearAfterGraduationOrRetirement();
+                processMortgageAfterYearIncome(function () {
+                    schoolYearAfterGraduationOrRetirement();
+                });
             }
 
             if (runAfterInflationOrNow(resumeSchoolYear)) {
@@ -5840,6 +6128,39 @@
             return inflated;
         }
 
+        function getMortgagedProperty() {
+            for (var i = 0; i < state.ownedAssets.length; i++) {
+                var p = state.ownedAssets[i];
+                if (p.isMortgaged && p.remainingBalance > 0) {
+                    return p;
+                }
+            }
+            return null;
+        }
+
+        function syncHousingStatusFromAssets() {
+            var mort = getMortgagedProperty();
+            if (mort) {
+                state.housingStatus = "Mortgage";
+                state.mortgageBalance = Math.round(mort.remainingBalance);
+                if (mort.mortgagePaymentBase == null && typeof mort.mortgagePayment === "number") {
+                    mort.mortgagePaymentBase = mort.mortgagePayment;
+                }
+                var mb = typeof mort.mortgagePaymentBase === "number" ? mort.mortgagePaymentBase : 0;
+                state.annualMortgagePayment = inflScale(mb);
+                return;
+            }
+            if (state.ownedAssets.length > 0) {
+                state.housingStatus = "Owned";
+                state.mortgageBalance = 0;
+                state.annualMortgagePayment = 0;
+                return;
+            }
+            state.housingStatus = "Renting";
+            state.mortgageBalance = 0;
+            state.annualMortgagePayment = 0;
+        }
+
         function syncFinancialAliases() {
             var mult = state.inflationMultiplier || 1;
             if (mult <= 0) mult = 1;
@@ -5851,13 +6172,6 @@
                 }
                 var upBase = typeof p.annualUpkeepBase === "number" ? p.annualUpkeepBase : 0;
                 propTotal += inflScale(upBase);
-                if (p.isMortgaged && (p.mortgagePayment > 0 || p.mortgagePaymentBase > 0)) {
-                    if (p.mortgagePaymentBase == null && typeof p.mortgagePayment === "number") {
-                        p.mortgagePaymentBase = p.mortgagePayment;
-                    }
-                    var mortBase = typeof p.mortgagePaymentBase === "number" ? p.mortgagePaymentBase : 0;
-                    propTotal += inflScale(mortBase);
-                }
             });
             state._annualPropertyCosts = propTotal;
             state.annualExpenses = core + propTotal;
@@ -5868,6 +6182,7 @@
             state.bankBalance = state.cash;
             state.expenses = state.annualExpenses;
             state.debt = getDisplayedStudentDebt();
+            syncHousingStatusFromAssets();
         }
 
         function getRentalListingById(id) {
@@ -6066,23 +6381,10 @@
                 const totalShift = marketFluctuation + state.currentHousingMarketShift;
                 property.currentValue = Math.max(10000, Math.round(property.currentValue * (1 + totalShift)));
                 property.lastMarketFluctuation = totalShift;
-
-                if (property.isMortgaged && property.remainingBalance > 0) {
-                    const principalPaydown = Math.min(property.remainingBalance, Math.max(0, Math.round(property.mortgagePayment * 0.55)));
-                    property.remainingBalance -= principalPaydown;
-                    if (property.remainingBalance <= 0) {
-                        property.remainingBalance = 0;
-                        property.isMortgaged = false;
-                        if (property.mortgagePayment > 0) {
-                            property.mortgagePayment = 0;
-                            property.mortgagePaymentBase = 0;
-                        }
-                        logEvent(property.propertyType + " mortgage has been fully paid off.");
-                    }
-                }
             });
 
             syncFinancialAliases();
+            syncHousingStatusFromAssets();
             generateRealEstateMarket();
         }
 
@@ -6170,6 +6472,7 @@
                 logEvent("You bought " + listing.propertyType + " outright for " + formatMoney(listing.price) + ".");
             }
 
+            syncFinancialAliases();
             closeModal();
             updateUI();
         }
@@ -6717,6 +7020,13 @@
                     ? "<span style=\"color:#69f0ae;\">Market Mood: Boom (+20%)</span>"
                     : "<span style=\"color:#bdbdbd;\">Market Mood: Stable</span>";
 
+            const housingStatusLine =
+                "<div style=\"margin-bottom:10px;color:#e0e0e0;\">Housing: <strong>" + state.housingStatus + "</strong>" +
+                (state.housingStatus === "Mortgage"
+                    ? " | Balance: " + formatMoney(state.mortgageBalance) + " | Annual payment: " + formatMoney(state.annualMortgagePayment)
+                    : "") +
+                "</div>";
+
             const myPropertiesHtml = state.ownedAssets.length
                 ? state.ownedAssets.map(function (property) {
                     const delta = getPropertyMarketDelta(property);
@@ -6823,7 +7133,7 @@
 
             openModal(
                 "Assets",
-                marketLabel + "<br><br><strong>My Properties</strong><br>" + myPropertiesHtml +
+                marketLabel + "<br><br>" + housingStatusLine + "<strong>My Properties</strong><br>" + myPropertiesHtml +
                 "<br><strong>Broker Listings</strong><br>" + listingsHtml,
                 actions
             );
@@ -6942,6 +7252,8 @@
             closeNervousBreakdownOverlay();
             closeLayoffOverlay();
             closeInflationOverlay();
+            closeMortgagePaidOverlay();
+            closeForeclosureOverlay();
             closeEvictionOverlay();
             closeDiagnosisOverlay();
             gameUI.style.display = "none";
@@ -7054,7 +7366,7 @@
         }
 
         function ageUp() {
-            if (state.isDead || !state.playerPath || state.isExamModalOpen || state.isExamActive || state.isDiagnosisOverlayOpen || state.isPromotionOverlayOpen || state.isPerformanceReviewOverlayOpen || state.isCareerExamOpen || state.isFiredOverlayOpen || state.isRetirementOverlayOpen || state.isDateTriviaOpen || state.isCopingOverlayOpen || state.isNervousBreakdownOverlayOpen || state.isLayoffOverlayOpen || state.isInflationOverlayOpen || state.isEvictionOverlayOpen) return;
+            if (state.isDead || !state.playerPath || state.isExamModalOpen || state.isExamActive || state.isDiagnosisOverlayOpen || state.isPromotionOverlayOpen || state.isPerformanceReviewOverlayOpen || state.isCareerExamOpen || state.isFiredOverlayOpen || state.isRetirementOverlayOpen || state.isDateTriviaOpen || state.isCopingOverlayOpen || state.isNervousBreakdownOverlayOpen || state.isLayoffOverlayOpen || state.isInflationOverlayOpen || state.isMortgagePaidOverlayOpen || state.isForeclosureOverlayOpen || state.isEvictionOverlayOpen) return;
 
             if (state.isInSchool && state.currentlyPursuing) {
                 openYearlyExamOverlay();
@@ -7132,16 +7444,16 @@
 
         document.getElementById("age-up-btn").addEventListener("click", ageUp);
         document.getElementById("education-nav-btn").addEventListener("click", function () {
-            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isPerformanceReviewOverlayOpen && !state.isCareerExamOpen && !state.isFiredOverlayOpen && !state.isRetirementOverlayOpen && !state.isDateTriviaOpen && !state.isCopingOverlayOpen && !state.isNervousBreakdownOverlayOpen && !state.isLayoffOverlayOpen && !state.isInflationOverlayOpen && !state.isEvictionOverlayOpen) openEducationTab();
+            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isPerformanceReviewOverlayOpen && !state.isCareerExamOpen && !state.isFiredOverlayOpen && !state.isRetirementOverlayOpen && !state.isDateTriviaOpen && !state.isCopingOverlayOpen && !state.isNervousBreakdownOverlayOpen && !state.isLayoffOverlayOpen && !state.isInflationOverlayOpen && !state.isMortgagePaidOverlayOpen && !state.isForeclosureOverlayOpen && !state.isEvictionOverlayOpen) openEducationTab();
         });
         document.getElementById("careers-nav-btn").addEventListener("click", function () {
-            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isPerformanceReviewOverlayOpen && !state.isCareerExamOpen && !state.isFiredOverlayOpen && !state.isRetirementOverlayOpen && !state.isDateTriviaOpen && !state.isCopingOverlayOpen && !state.isNervousBreakdownOverlayOpen && !state.isLayoffOverlayOpen && !state.isInflationOverlayOpen && !state.isEvictionOverlayOpen) openCareersTab();
+            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isPerformanceReviewOverlayOpen && !state.isCareerExamOpen && !state.isFiredOverlayOpen && !state.isRetirementOverlayOpen && !state.isDateTriviaOpen && !state.isCopingOverlayOpen && !state.isNervousBreakdownOverlayOpen && !state.isLayoffOverlayOpen && !state.isInflationOverlayOpen && !state.isMortgagePaidOverlayOpen && !state.isForeclosureOverlayOpen && !state.isEvictionOverlayOpen) openCareersTab();
         });
         document.getElementById("activities-nav-btn").addEventListener("click", function () {
-            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isPerformanceReviewOverlayOpen && !state.isCareerExamOpen && !state.isFiredOverlayOpen && !state.isRetirementOverlayOpen && !state.isDateTriviaOpen && !state.isCopingOverlayOpen && !state.isNervousBreakdownOverlayOpen && !state.isLayoffOverlayOpen && !state.isInflationOverlayOpen && !state.isEvictionOverlayOpen) openActivitiesMenu();
+            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isPerformanceReviewOverlayOpen && !state.isCareerExamOpen && !state.isFiredOverlayOpen && !state.isRetirementOverlayOpen && !state.isDateTriviaOpen && !state.isCopingOverlayOpen && !state.isNervousBreakdownOverlayOpen && !state.isLayoffOverlayOpen && !state.isInflationOverlayOpen && !state.isMortgagePaidOverlayOpen && !state.isForeclosureOverlayOpen && !state.isEvictionOverlayOpen) openActivitiesMenu();
         });
         document.getElementById("assets-nav-btn").addEventListener("click", function () {
-            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isPerformanceReviewOverlayOpen && !state.isCareerExamOpen && !state.isFiredOverlayOpen && !state.isRetirementOverlayOpen && !state.isDateTriviaOpen && !state.isCopingOverlayOpen && !state.isNervousBreakdownOverlayOpen && !state.isLayoffOverlayOpen && !state.isInflationOverlayOpen && !state.isEvictionOverlayOpen) openAssetsMenu();
+            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isPerformanceReviewOverlayOpen && !state.isCareerExamOpen && !state.isFiredOverlayOpen && !state.isRetirementOverlayOpen && !state.isDateTriviaOpen && !state.isCopingOverlayOpen && !state.isNervousBreakdownOverlayOpen && !state.isLayoffOverlayOpen && !state.isInflationOverlayOpen && !state.isMortgagePaidOverlayOpen && !state.isForeclosureOverlayOpen && !state.isEvictionOverlayOpen) openAssetsMenu();
         });
         document.getElementById("play-again-btn").addEventListener("click", function () {
             location.reload();
