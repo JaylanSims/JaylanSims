@@ -330,6 +330,74 @@
             gap: 10px;
         }
 
+        #resignation-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 10050;
+            background: rgba(0, 0, 0, 0.96);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            box-sizing: border-box;
+        }
+
+        #resignation-overlay.open {
+            display: flex;
+        }
+
+        #resignation-card {
+            width: 100%;
+            max-width: 440px;
+            background: #1a1a1a;
+            border: 1px solid #444;
+            border-radius: 14px;
+            padding: 22px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.75);
+        }
+
+        #resignation-card h2 {
+            margin: 0 0 14px;
+            font-size: 1.2rem;
+        }
+
+        #resignation-card p {
+            margin: 0 0 20px;
+            color: #d0d0d0;
+            line-height: 1.45;
+            font-size: 0.98rem;
+        }
+
+        #resignation-actions {
+            display: grid;
+            gap: 10px;
+        }
+
+        .resignation-btn {
+            width: 100%;
+            border-radius: 10px;
+            padding: 14px;
+            font-size: 1rem;
+            cursor: pointer;
+            border: 1px solid #3a3a3a;
+        }
+
+        .resignation-btn-confirm {
+            background: #c62828;
+            color: #fff;
+            border-color: #e57373;
+            font-weight: 700;
+        }
+
+        .resignation-btn-stay {
+            background: #2a2a2a;
+            color: #fff;
+        }
+
         .modal-btn {
             border: 1px solid #3a3a3a;
             border-radius: 10px;
@@ -629,6 +697,17 @@
             </div>
         </div>
 
+        <div id="resignation-overlay" aria-hidden="true">
+            <div id="resignation-card">
+                <h2 id="resignation-title">Confirm resignation</h2>
+                <p id="resignation-text"></p>
+                <div id="resignation-actions">
+                    <button type="button" class="resignation-btn resignation-btn-confirm" id="resignation-confirm-btn">Confirm Resignation</button>
+                    <button type="button" class="resignation-btn resignation-btn-stay" id="resignation-stay-btn">Stay at Job</button>
+                </div>
+            </div>
+        </div>
+
         <div id="diagnosis-overlay-root"></div>
 
         <div id="death-screen">
@@ -661,7 +740,8 @@
             isInSchool: false,
             isExamActive: false,
             degreeWrongAnswersThisEnrollment: 0,
-            hudDebtSalaryUnlocked: false
+            hudDebtSalaryUnlocked: false,
+            isEmployed: false
         };
 
         const TRACK_DEBT_BASE = {
@@ -682,6 +762,8 @@
         const modalTitle = document.getElementById("modal-title");
         const modalDescription = document.getElementById("modal-description");
         const modalActions = document.getElementById("modal-actions");
+        const resignationOverlay = document.getElementById("resignation-overlay");
+        const resignationText = document.getElementById("resignation-text");
         const yearlyExamReactMount = document.getElementById("yearly-exam-react-root");
         let yearlyExamReactRoot = null;
         const diagnosisOverlayRoot = document.getElementById("diagnosis-overlay-root");
@@ -1765,6 +1847,7 @@
             state.annualIncome = 0;
             state.salary = 0;
             state.jobTitle = "Student";
+            state.isEmployed = false;
             state.yearsInSchool += 1;
             state.smarts += 2;
             state.happiness -= 1;
@@ -1876,12 +1959,38 @@
             return 0.15 + Math.random() * 0.15;
         }
 
+        function quitJob() {
+            state.jobTitle = "Unemployed";
+            state.annualIncome = 0;
+            state.salary = 0;
+            state.isEmployed = false;
+            logEvent("You resigned from your position. You are now unemployed with $0 annual salary.");
+            syncFinancialAliases();
+            updateUI();
+        }
+
+        function openResignationConfirm() {
+            if (!resignationOverlay || !resignationText) return;
+            resignationText.textContent =
+                "Are you sure you want to quit your position as a " + state.jobTitle +
+                "? Your annual salary of " + formatMoney(state.annualIncome) + " will immediately drop to $0.";
+            resignationOverlay.classList.add("open");
+            resignationOverlay.setAttribute("aria-hidden", "false");
+        }
+
+        function closeResignationConfirm() {
+            if (!resignationOverlay) return;
+            resignationOverlay.classList.remove("open");
+            resignationOverlay.setAttribute("aria-hidden", "true");
+        }
+
         function applyForJob(job) {
             const chance = getHireChance();
             if (Math.random() < chance) {
                 state.annualIncome = job.salary;
                 state.jobTitle = job.title;
                 state.salary = job.salary;
+                state.isEmployed = true;
                 alert("You were hired as a " + job.title + " earning " + formatMoney(job.salary) + " a year!");
                 logEvent("You were hired as a " + job.title + ".");
             } else {
@@ -1893,6 +2002,12 @@
         }
 
         function openJobBoard() {
+            if (state.isEmployed) {
+                openModal("Find a Job", "You already have a job. Open Careers and use Quit Job if you want to apply elsewhere.", [
+                    { label: "Close", handler: function () { closeModal(); } }
+                ]);
+                return;
+            }
             if (state.currentlyPursuing || state.jobSearchBlocked) {
                 const blockReason = state.currentlyPursuing
                     ? "You are still in school. Graduate first to apply for jobs."
@@ -1921,15 +2036,38 @@
         }
 
         function openCareersTab() {
-            const canFindJob = !state.currentlyPursuing && !state.jobSearchBlocked;
+            const canFindJob = !state.currentlyPursuing && !state.jobSearchBlocked && !state.isEmployed;
             const lockReason = state.currentlyPursuing
                 ? "You are currently enrolled in school."
                 : state.jobSearchBlocked
                     ? "Career applications are locked due to academic dismissal."
                     : "Career applications are available.";
+
+            if (state.isEmployed) {
+                const panel =
+                    "<strong>Active Career</strong><br><br>" +
+                    "Current Position: " + state.jobTitle + "<br>" +
+                    "Current Salary: " + formatMoney(state.annualIncome) + " / year<br><br>" +
+                    "<span style=\"color:#bdbdbd;font-size:0.9rem;\">Jobs are limited to your " + state.playerPath + " path and your earned credentials.</span>";
+                openModal(
+                    "Careers",
+                    panel,
+                    [
+                        { label: "Close", handler: function () { closeModal(); } },
+                        {
+                            label: "Quit Job",
+                            handler: function () {
+                                openResignationConfirm();
+                            }
+                        }
+                    ]
+                );
+                return;
+            }
+
             openModal(
                 "Careers",
-                "Current Job: " + state.jobTitle + " | Annual Income: " + formatMoney(state.annualIncome) + "<br>" + lockReason,
+                "Status: " + state.jobTitle + " | Annual Income: " + formatMoney(state.annualIncome) + "<br>" + lockReason,
                 [
                     { label: canFindJob ? "Find a Job" : "Find a Job (Locked)", disabled: !canFindJob, handler: function () { if (canFindJob) openJobBoard(); } },
                     { label: "Close", handler: function () { closeModal(); } }
@@ -1956,6 +2094,7 @@
             state.annualIncome = 0;
             state.salary = 0;
             state.jobTitle = "Student";
+            state.isEmployed = false;
             logEvent("You enrolled in " + program.degreeName + ".");
             updateUI();
         }
@@ -2003,6 +2142,7 @@
             state.isExamActive = false;
             state.academicDismissed = false;
             state.jobSearchBlocked = false;
+            state.isEmployed = false;
             state.educationLevel = program.educationLevel;
             program.credentials.forEach(addCredential);
             logEvent("Graduation: You earned " + program.degreeName + ".");
@@ -2968,6 +3108,15 @@
         });
         document.getElementById("play-again-btn").addEventListener("click", function () {
             location.reload();
+        });
+
+        document.getElementById("resignation-confirm-btn").addEventListener("click", function () {
+            closeResignationConfirm();
+            quitJob();
+            closeModal();
+        });
+        document.getElementById("resignation-stay-btn").addEventListener("click", function () {
+            closeResignationConfirm();
         });
 
         modalOverlay.addEventListener("click", function (event) {
