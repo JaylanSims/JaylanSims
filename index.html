@@ -1258,6 +1258,68 @@
             cursor: pointer;
         }
 
+        #inflation-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 10014;
+            background: linear-gradient(165deg, #2d2208 0%, #1a1510 50%, #0d0d0d 100%);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: #fff;
+            padding: 24px;
+            box-sizing: border-box;
+        }
+
+        .inflation-card {
+            max-width: 520px;
+            width: 100%;
+            background: rgba(45, 35, 12, 0.95);
+            border: 2px solid #ffb300;
+            border-radius: 16px;
+            padding: 26px 22px;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55);
+            text-align: center;
+        }
+
+        .inflation-card h2 {
+            margin: 0 0 16px;
+            color: #ffca28;
+            font-size: 1.2rem;
+        }
+
+        .inflation-card .inflation-body {
+            margin: 0 0 12px;
+            line-height: 1.55;
+            color: #ffe082;
+            font-size: 0.95rem;
+        }
+
+        .inflation-card .inflation-impact {
+            margin: 0 0 20px;
+            padding: 12px;
+            background: rgba(0, 0, 0, 0.35);
+            border-radius: 10px;
+            font-size: 0.88rem;
+            color: #ffecb3;
+            line-height: 1.45;
+        }
+
+        .inflation-ack-btn {
+            width: 100%;
+            padding: 14px;
+            border-radius: 12px;
+            border: 1px solid #ffc107;
+            background: linear-gradient(180deg, #f9a825, #f57f17);
+            color: #1a1a1a;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
         .careers-medical-leave-banner {
             margin: 0 0 16px;
             padding: 14px 16px;
@@ -1583,6 +1645,7 @@
     <div id="coping-overlay-root"></div>
     <div id="nervous-breakdown-overlay-root"></div>
     <div id="layoff-overlay-root"></div>
+    <div id="inflation-overlay-root"></div>
     <div id="eviction-overlay-root"></div>
     <div id="app-container">
         <div id="intro-screen">
@@ -1708,6 +1771,12 @@
         let state = {
             age: 18, health: 100, happiness: 100, smarts: 50,
             cash: 0, investments: 0, debt: 0, existingDebt: 0, salary: 0, expenses: 25000, annualExpenses: 25000, bankBalance: 0,
+            inflationMultiplier: 1.0,
+            baseCoreLivingExpenses: 25000,
+            _annualPropertyCosts: 0,
+            isInflationOverlayOpen: false,
+            _postInflationResume: null,
+            oddJobBaseSalary: null,
             major: null, isDead: false, currentIllnesses: [], illnessYears: {},
             ownedAssets: [], realEstateListings: [], nextPropertyId: 1, nextListingId: 1,
             currentHousingMarketShift: 0, currentHousingMarketEvent: "stable",
@@ -1821,6 +1890,8 @@
         let nervousBreakdownOverlayReactRoot = null;
         const layoffOverlayMount = document.getElementById("layoff-overlay-root");
         let layoffOverlayReactRoot = null;
+        const inflationOverlayMount = document.getElementById("inflation-overlay-root");
+        let inflationOverlayReactRoot = null;
         const evictionOverlayMount = document.getElementById("eviction-overlay-root");
         let evictionOverlayReactRoot = null;
         let higherEdCatalogRoot = null;
@@ -2058,34 +2129,41 @@
         assignSalaryTiersToJobMarket();
 
         const ODD_JOBS_GENERAL = [
-            { title: "Barista", salary: 24000, requiredEducation: "None", jobKind: "OddJob" },
-            { title: "Retail Cashier", salary: 22000, requiredEducation: "None", jobKind: "OddJob" },
-            { title: "Ride-Share Driver", salary: 28000, requiredEducation: "None", jobKind: "OddJob" },
-            { title: "Campus Dining Staff", salary: 20000, requiredEducation: "None", jobKind: "OddJob" }
+            { title: "Barista", baseSalary: 24000, requiredEducation: "None", jobKind: "OddJob" },
+            { title: "Retail Cashier", baseSalary: 22000, requiredEducation: "None", jobKind: "OddJob" },
+            { title: "Ride-Share Driver", baseSalary: 28000, requiredEducation: "None", jobKind: "OddJob" },
+            { title: "Campus Dining Staff", baseSalary: 20000, requiredEducation: "None", jobKind: "OddJob" }
         ];
 
         const ODD_JOBS_BY_PATH = {
             STEM: [
-                { title: "Math/Science Tutor", salary: 26000, requiredEducation: "None", jobKind: "OddJob" },
-                { title: "IT Help Desk Assistant", salary: 30000, requiredEducation: "None", jobKind: "OddJob" },
-                { title: "Undergraduate Lab Tech", salary: 28000, requiredEducation: "None", jobKind: "OddJob" }
+                { title: "Math/Science Tutor", baseSalary: 26000, requiredEducation: "None", jobKind: "OddJob" },
+                { title: "IT Help Desk Assistant", baseSalary: 30000, requiredEducation: "None", jobKind: "OddJob" },
+                { title: "Undergraduate Lab Tech", baseSalary: 28000, requiredEducation: "None", jobKind: "OddJob" }
             ],
             Humanities: [
-                { title: "Freelance Writer/Blogger", salary: 25000, requiredEducation: "None", jobKind: "OddJob" },
-                { title: "Local Museum Guide", salary: 24000, requiredEducation: "None", jobKind: "OddJob" },
-                { title: "Social Media Assistant", salary: 27000, requiredEducation: "None", jobKind: "OddJob" }
+                { title: "Freelance Writer/Blogger", baseSalary: 25000, requiredEducation: "None", jobKind: "OddJob" },
+                { title: "Local Museum Guide", baseSalary: 24000, requiredEducation: "None", jobKind: "OddJob" },
+                { title: "Social Media Assistant", baseSalary: 27000, requiredEducation: "None", jobKind: "OddJob" }
             ],
             Trades: [
-                { title: "General Construction Laborer", salary: 32000, requiredEducation: "None", jobKind: "OddJob" },
-                { title: "Apprentice / Tool Fetcher", salary: 28000, requiredEducation: "None", jobKind: "OddJob" },
-                { title: "Handyman/Tasker", salary: 30000, requiredEducation: "None", jobKind: "OddJob" }
+                { title: "General Construction Laborer", baseSalary: 32000, requiredEducation: "None", jobKind: "OddJob" },
+                { title: "Apprentice / Tool Fetcher", baseSalary: 28000, requiredEducation: "None", jobKind: "OddJob" },
+                { title: "Handyman/Tasker", baseSalary: 30000, requiredEducation: "None", jobKind: "OddJob" }
             ]
         };
 
         function getOddJobsListForPlayer() {
             var path = state.playerPath;
-            var track = ODD_JOBS_BY_PATH[path] || [];
-            return ODD_JOBS_GENERAL.concat(track);
+            var mult = state.inflationMultiplier || 1;
+            var track = (ODD_JOBS_BY_PATH[path] || []).map(function (j) {
+                var base = typeof j.baseSalary === "number" ? j.baseSalary : j.salary || 0;
+                return Object.assign({}, j, { salary: Math.round(base * mult), baseSalary: base });
+            });
+            return ODD_JOBS_GENERAL.map(function (j) {
+                var base = typeof j.baseSalary === "number" ? j.baseSalary : j.salary || 0;
+                return Object.assign({}, j, { salary: Math.round(base * mult), baseSalary: base });
+            }).concat(track);
         }
 
         function shuffleExamOptionsInPlace(arr) {
@@ -3048,6 +3126,88 @@
             return { gross: g, totalTaxes: totalTaxes, netIncome: g - totalTaxes };
         }
 
+        function inflScale(baseAmount) {
+            var m = state.inflationMultiplier || 1;
+            if (m <= 0) m = 1;
+            return Math.round((Number(baseAmount) || 0) * m);
+        }
+
+        function applyInflationStep() {
+            var prev = state.inflationMultiplier || 1;
+            state.inflationMultiplier = prev * 1.25;
+            if (state.jobType === "OddJob" && state.isEmployed && typeof state.oddJobBaseSalary === "number") {
+                state.annualIncome = Math.round(state.oddJobBaseSalary * state.inflationMultiplier);
+                state.salary = state.annualIncome;
+            }
+            logEvent(
+                "Cost of living crisis: inflation multiplier is now " + state.inflationMultiplier.toFixed(2) + "× (was " + prev.toFixed(2) + "×)."
+            );
+            syncFinancialAliases();
+        }
+
+        function maybeInterceptInflationDecade(resumeFn) {
+            var nextAge = state.age + 1;
+            if (nextAge <= 18 || (nextAge - 18) % 10 !== 0) return false;
+            state._postInflationResume = resumeFn;
+            state.isInflationOverlayOpen = true;
+            renderInflationOverlay();
+            return true;
+        }
+
+        function runAfterInflationOrNow(resumeFn) {
+            if (maybeInterceptInflationDecade(resumeFn)) return true;
+            resumeFn();
+            return false;
+        }
+
+        function InflationOverlay(props) {
+            return (
+                <div id="inflation-overlay" role="dialog" aria-modal="true" aria-label="Inflation">
+                    <div className="inflation-card">
+                        <h2>COST OF LIVING CRISIS 📈</h2>
+                        <p className="inflation-body">
+                            A decade has passed and inflation has driven up the cost of everything. Rent, groceries, and activities are now 25% more expensive.
+                        </p>
+                        <p className="inflation-impact">
+                            Your salary has NOT automatically increased to match this. If you haven&apos;t been promoted recently, your purchasing power has just plummeted.
+                        </p>
+                        <button type="button" className="inflation-ack-btn" onClick={props.onAcknowledge}>
+                            Adjust Budget
+                        </button>
+                    </div>
+                </div>
+            );
+        }
+
+        function renderInflationOverlay() {
+            if (!inflationOverlayMount) return;
+            if (!state.isInflationOverlayOpen) {
+                if (inflationOverlayReactRoot) inflationOverlayReactRoot.render(null);
+                return;
+            }
+            if (!inflationOverlayReactRoot) {
+                inflationOverlayReactRoot = ReactDOM.createRoot(inflationOverlayMount);
+            }
+            inflationOverlayReactRoot.render(<InflationOverlay onAcknowledge={handleInflationAcknowledge} />);
+        }
+
+        function closeInflationOverlay() {
+            state.isInflationOverlayOpen = false;
+            if (inflationOverlayReactRoot) {
+                inflationOverlayReactRoot.render(null);
+            }
+        }
+
+        function handleInflationAcknowledge() {
+            applyInflationStep();
+            closeInflationOverlay();
+            var fn = state._postInflationResume;
+            state._postInflationResume = null;
+            if (typeof fn === "function") {
+                fn();
+            }
+        }
+
         function updateUI() {
             syncCurrentEnrollment();
             evictDormIfNotEnrolled(true);
@@ -3148,7 +3308,7 @@
 
         function openModal(title, description, actions, options) {
             options = options || {};
-            if (state.isExamModalOpen || state.isExamActive || state.isDiagnosisOverlayOpen || state.isPromotionOverlayOpen || state.isPerformanceReviewOverlayOpen || state.isCareerExamOpen || state.isFiredOverlayOpen || state.isRetirementOverlayOpen || state.isDateTriviaOpen || state.isCopingOverlayOpen || state.isNervousBreakdownOverlayOpen || state.isLayoffOverlayOpen || state.isEvictionOverlayOpen) return;
+            if (state.isExamModalOpen || state.isExamActive || state.isDiagnosisOverlayOpen || state.isPromotionOverlayOpen || state.isPerformanceReviewOverlayOpen || state.isCareerExamOpen || state.isFiredOverlayOpen || state.isRetirementOverlayOpen || state.isDateTriviaOpen || state.isCopingOverlayOpen || state.isNervousBreakdownOverlayOpen || state.isLayoffOverlayOpen || state.isInflationOverlayOpen || state.isEvictionOverlayOpen) return;
             if (higherEdCatalogRoot) {
                 higherEdCatalogRoot.render(null);
             }
@@ -3390,6 +3550,7 @@
             state.annualIncome = 0;
             state.salary = 0;
             state.jobType = "None";
+            state.oddJobBaseSalary = null;
             state.yearsAtCurrentJob = 0;
             state.currentJobLevel = 1;
             state.pendingPromotion = null;
@@ -3453,6 +3614,7 @@
             state.annualIncome = state.disabilityIncome;
             state.salary = state.disabilityIncome;
             state.jobType = "None";
+            state.oddJobBaseSalary = null;
             state.yearsAtCurrentJob = 0;
             state.currentJobLevel = 1;
             state.pendingPromotion = null;
@@ -3535,6 +3697,7 @@
                 state.disabilityIncome = 0;
                 state.isEmployed = false;
                 state.jobType = "None";
+                state.oddJobBaseSalary = null;
                 showPurchaseToastMessage("Your medical leave has ended. You are cleared to re-enter the workforce.");
                 logEvent("Medical leave ended: cleared to return to work.");
                 syncFinancialAliases();
@@ -3692,6 +3855,7 @@
             state.salary = 0;
             state.isEmployed = false;
             state.jobType = "None";
+            state.oddJobBaseSalary = null;
             state.yearsAtCurrentJob = 0;
             state.currentJobLevel = 1;
             state.pendingPromotion = null;
@@ -3819,6 +3983,7 @@
                 state.salary = 0;
                 state.isEmployed = false;
                 state.jobType = "None";
+                state.oddJobBaseSalary = null;
                 state.yearsAtCurrentJob = 0;
                 state.currentJobLevel = 1;
                 state.pendingPromotion = null;
@@ -4020,6 +4185,7 @@
         }
 
         function applySchoolYearRetirementLivingCosts() {
+            syncFinancialAliases();
             state.cash -= state.annualExpenses;
             syncFinancialAliases();
             logEvent("Age " + state.age + ": Annual living expenses deducted after school year.");
@@ -4027,6 +4193,7 @@
 
         function completeAgeUpTick() {
             state._copingCheckedThisAgeTick = false;
+            syncFinancialAliases();
             state.cash -= state.annualExpenses;
             state.health -= 1;
             state.happiness -= 1;
@@ -4123,6 +4290,7 @@
             state.salary = offer;
             state.isEmployed = false;
             state.jobType = "None";
+            state.oddJobBaseSalary = null;
             state.jobTitle = "Retired";
             state.yearsAtCurrentJob = 0;
             state.currentJobLevel = 1;
@@ -4166,14 +4334,17 @@
             state.roommate = null;
             state.happiness -= 20;
             logEvent("Roommate conflict: your roommate ended the arrangement. Happiness -20; you now pay full rent.");
-            state.age += 1;
-            syncFinancialAliases();
-            if (maybeInterceptRetirementAt72(false)) {
+            function resumeAfterEviction() {
+                state.age += 1;
+                syncFinancialAliases();
+                if (maybeInterceptRetirementAt72(false)) {
+                    updateUI();
+                    return;
+                }
+                completeAgeUpTick();
                 updateUI();
-                return;
             }
-            completeAgeUpTick();
-            updateUI();
+            if (runAfterInflationOrNow(resumeAfterEviction)) return;
         }
 
         function PromotionOverlay(props) {
@@ -4759,20 +4930,18 @@
             updateUI();
         }
 
-        function finalizeSchoolYearAfterExams() {
+        function schoolYearAfterIncomeAndCosts() {
             const program = state.currentlyPursuing ? EDUCATION_PROGRAMS[state.currentlyPursuing] : null;
             if (!program) return;
 
             const savedJob = state._savedJobBeforeSchoolYear;
-
-            state.age += 1;
-            state.yearsInSchool += 1;
 
             if (program.pipeline === "residency") {
                 state.jobTitle = "Medical Resident";
                 state.annualIncome = typeof program.residencyStipend === "number" ? program.residencyStipend : 45000;
                 state.salary = state.annualIncome;
                 state.isEmployed = true;
+                state.oddJobBaseSalary = null;
                 state._savedJobBeforeSchoolYear = null;
                 var stipendTr = calculateTaxes(state.annualIncome);
                 state.cash += stipendTr.netIncome;
@@ -4782,11 +4951,17 @@
                 );
             } else if (program.pipeline !== "undergrad" && savedJob && savedJob.isEmployed) {
                 state.jobTitle = savedJob.jobTitle;
-                state.annualIncome = savedJob.annualIncome;
-                state.salary = savedJob.salary;
                 state.isEmployed = true;
                 state.jobType = savedJob.jobType === "OddJob" ? "OddJob" : "Career";
                 state._savedJobBeforeSchoolYear = null;
+                if (state.jobType === "OddJob" && typeof savedJob.oddJobBaseSalary === "number") {
+                    state.oddJobBaseSalary = savedJob.oddJobBaseSalary;
+                    state.annualIncome = Math.round(savedJob.oddJobBaseSalary * (state.inflationMultiplier || 1));
+                } else {
+                    state.oddJobBaseSalary = null;
+                    state.annualIncome = savedJob.annualIncome;
+                }
+                state.salary = state.annualIncome;
                 var hustleTr = calculateTaxes(state.annualIncome);
                 state.cash += hustleTr.netIncome;
                 state.lastTaxesPaid = hustleTr.totalTaxes;
@@ -4798,6 +4973,7 @@
                 state.salary = 0;
                 state.jobTitle = "Student";
                 state.isEmployed = false;
+                state.oddJobBaseSalary = null;
             }
 
             if (program.pipeline !== "residency") {
@@ -4828,6 +5004,12 @@
 
             syncFinancialAliases();
             addCareerExperienceIfEligible();
+        }
+
+        function schoolYearAfterGraduationOrRetirement() {
+            const program = state.currentlyPursuing ? EDUCATION_PROGRAMS[state.currentlyPursuing] : null;
+            if (!program) return;
+
             if (state.health <= 0) {
                 onPlayerDeath(GENERIC_HEALTH_DEATH_MESSAGE);
                 return;
@@ -4854,6 +5036,23 @@
             }
 
             updateUI();
+        }
+
+        function finalizeSchoolYearAfterExams() {
+            const program = state.currentlyPursuing ? EDUCATION_PROGRAMS[state.currentlyPursuing] : null;
+            if (!program) return;
+
+            function resumeSchoolYear() {
+                state.age += 1;
+                state.yearsInSchool += 1;
+                schoolYearAfterIncomeAndCosts();
+                schoolYearAfterGraduationOrRetirement();
+            }
+
+            if (runAfterInflationOrNow(resumeSchoolYear)) {
+                updateUI();
+                return;
+            }
         }
 
         function handleYearlyExamAnswer(selectedOptionIndex) {
@@ -4979,6 +5178,7 @@
             state.salary = 0;
             state.isEmployed = false;
             state.jobType = "None";
+            state.oddJobBaseSalary = null;
             state.yearsAtCurrentJob = 0;
             state.currentJobLevel = 1;
             state.pendingPromotion = null;
@@ -5025,11 +5225,21 @@
             }
             const chance = isOddJob ? 0.95 : getCareerHireChanceWithRecord();
             if (Math.random() < chance) {
-                state.annualIncome = job.salary;
                 state.jobTitle = job.title;
-                state.salary = job.salary;
                 state.isEmployed = true;
                 state.jobType = isOddJob ? "OddJob" : "Career";
+                if (isOddJob) {
+                    var ob =
+                        typeof job.baseSalary === "number"
+                            ? job.baseSalary
+                            : Math.round((job.salary || 0) / (state.inflationMultiplier || 1));
+                    state.oddJobBaseSalary = ob;
+                    state.annualIncome = Math.round(ob * (state.inflationMultiplier || 1));
+                } else {
+                    state.oddJobBaseSalary = null;
+                    state.annualIncome = job.salary;
+                }
+                state.salary = state.annualIncome;
                 state.yearsAtCurrentJob = 0;
                 state.currentJobLevel = 1;
                 state.pendingPromotion = null;
@@ -5310,7 +5520,8 @@
                     annualIncome: state.annualIncome,
                     salary: state.salary,
                     isEmployed: true,
-                    jobType: "OddJob"
+                    jobType: "OddJob",
+                    oddJobBaseSalary: state.oddJobBaseSalary
                 };
                 state.jobTitle = "Student";
                 state.annualIncome = 0;
@@ -5323,7 +5534,8 @@
                     annualIncome: state.annualIncome,
                     salary: state.salary,
                     isEmployed: true,
-                    jobType: state.jobType
+                    jobType: state.jobType,
+                    oddJobBaseSalary: state.jobType === "OddJob" ? state.oddJobBaseSalary : null
                 };
                 state.jobTitle = "Student";
                 state.annualIncome = 0;
@@ -5344,16 +5556,20 @@
 
         function takeGapYear() {
             if (state.isDead) return;
-            state.age += 1;
-            state.annualIncome = 0;
-            state.salary = 0;
-            state.bankBalance -= state.annualExpenses;
-            state.cash = state.bankBalance;
-            state.happiness += 10;
-            state.health -= 1;
-            logEvent("You spent a year traveling and discovering yourself.");
-            alert("You spent a year traveling and discovering yourself.");
-            updateUI();
+            function finishGapYear() {
+                state.age += 1;
+                state.annualIncome = 0;
+                state.salary = 0;
+                syncFinancialAliases();
+                state.bankBalance -= state.annualExpenses;
+                state.cash = state.bankBalance;
+                state.happiness += 10;
+                state.health -= 1;
+                logEvent("You spent a year traveling and discovering yourself.");
+                alert("You spent a year traveling and discovering yourself.");
+                updateUI();
+            }
+            if (runAfterInflationOrNow(finishGapYear)) return;
         }
 
         function HigherEducationCatalog(props) {
@@ -5488,12 +5704,19 @@
                 state.annualIncome = 0;
                 state.salary = 0;
                 state.isEmployed = false;
+                state.oddJobBaseSalary = null;
             } else if (savedJob && savedJob.isEmployed) {
                 state.jobTitle = savedJob.jobTitle;
-                state.annualIncome = savedJob.annualIncome;
-                state.salary = savedJob.salary;
                 state.isEmployed = true;
                 state.jobType = savedJob.jobType === "OddJob" ? "OddJob" : "Career";
+                if (state.jobType === "OddJob" && typeof savedJob.oddJobBaseSalary === "number") {
+                    state.oddJobBaseSalary = savedJob.oddJobBaseSalary;
+                    state.annualIncome = Math.round(savedJob.oddJobBaseSalary * (state.inflationMultiplier || 1));
+                } else {
+                    state.oddJobBaseSalary = null;
+                    state.annualIncome = savedJob.annualIncome;
+                }
+                state.salary = state.annualIncome;
             }
 
             logEvent("Graduation: You earned " + program.degreeName + ".");
@@ -5610,13 +5833,34 @@
                 return 0;
             }
             var base = state.currentHousing.annualCost;
+            var inflated = inflScale(base);
             if (state.roommate && (state.roommate.status === "Good" || state.roommate.status === "Bad")) {
-                return Math.round(base * 0.5);
+                return Math.round(inflated * 0.5);
             }
-            return base;
+            return inflated;
         }
 
         function syncFinancialAliases() {
+            var mult = state.inflationMultiplier || 1;
+            if (mult <= 0) mult = 1;
+            var core = Math.round((state.baseCoreLivingExpenses || 25000) * mult);
+            var propTotal = 0;
+            state.ownedAssets.forEach(function (p) {
+                if (p.annualUpkeepBase == null && typeof p.annualUpkeep === "number") {
+                    p.annualUpkeepBase = p.annualUpkeep;
+                }
+                var upBase = typeof p.annualUpkeepBase === "number" ? p.annualUpkeepBase : 0;
+                propTotal += inflScale(upBase);
+                if (p.isMortgaged && (p.mortgagePayment > 0 || p.mortgagePaymentBase > 0)) {
+                    if (p.mortgagePaymentBase == null && typeof p.mortgagePayment === "number") {
+                        p.mortgagePaymentBase = p.mortgagePayment;
+                    }
+                    var mortBase = typeof p.mortgagePaymentBase === "number" ? p.mortgagePaymentBase : 0;
+                    propTotal += inflScale(mortBase);
+                }
+            });
+            state._annualPropertyCosts = propTotal;
+            state.annualExpenses = core + propTotal;
             state.annualExpenses = Math.max(0, state.annualExpenses - state.rentExpenseInBudget);
             var newRent = getEffectiveAnnualRentCost();
             state.annualExpenses += newRent;
@@ -5666,11 +5910,12 @@
                 return;
             }
             var balance = state.bankBalance;
-            if (balance < listing.annualCost) {
-                showPurchaseToastMessage("Insufficient funds. First year rent requires " + formatMoney(listing.annualCost) + " available.");
+            var firstYearRent = inflScale(listing.annualCost);
+            if (balance < firstYearRent) {
+                showPurchaseToastMessage("Insufficient funds. First year rent requires " + formatMoney(firstYearRent) + " available.");
                 return;
             }
-            state.cash -= listing.annualCost;
+            state.cash -= firstYearRent;
             state.currentHousing = {
                 type: "Rent",
                 name: listing.name,
@@ -5678,7 +5923,7 @@
                 rentalId: listing.id
             };
             state.roommate = null;
-            logEvent("You signed a lease: " + listing.name + ". Paid " + formatMoney(listing.annualCost) + " for the first year upfront.");
+            logEvent("You signed a lease: " + listing.name + ". Paid " + formatMoney(firstYearRent) + " for the first year upfront (inflation-adjusted).");
             syncFinancialAliases();
             updateUI();
         }
@@ -5829,9 +6074,9 @@
                         property.remainingBalance = 0;
                         property.isMortgaged = false;
                         if (property.mortgagePayment > 0) {
-                            state.annualExpenses = Math.max(0, state.annualExpenses - property.mortgagePayment);
+                            property.mortgagePayment = 0;
+                            property.mortgagePaymentBase = 0;
                         }
-                        property.mortgagePayment = 0;
                         logEvent(property.propertyType + " mortgage has been fully paid off.");
                     }
                 }
@@ -5899,7 +6144,6 @@
             }
 
             state.cash -= paidNow;
-            state.annualExpenses += listing.annualUpkeep + mortgagePayment;
             syncFinancialAliases();
 
             state.ownedAssets.push({
@@ -5908,9 +6152,11 @@
                 originalPrice: listing.price,
                 currentValue: listing.price,
                 annualUpkeep: listing.annualUpkeep,
+                annualUpkeepBase: listing.annualUpkeep,
                 isMortgaged: isMortgaged,
                 remainingBalance: remainingBalance,
                 mortgagePayment: mortgagePayment,
+                mortgagePaymentBase: mortgagePayment,
                 lastMarketFluctuation: 0
             });
 
@@ -5938,7 +6184,6 @@
             const proceeds = salePrice - mortgageBalance;
 
             state.cash += proceeds;
-            state.annualExpenses = Math.max(0, state.annualExpenses - property.annualUpkeep - (property.isMortgaged ? property.mortgagePayment : 0));
             syncFinancialAliases();
 
             state.ownedAssets.splice(index, 1);
@@ -6289,6 +6534,11 @@
             ]);
         }
 
+        function activityCost(baseCost) {
+            var b = typeof baseCost === "number" ? baseCost : 0;
+            return b > 0 ? inflScale(b) : 0;
+        }
+
         function runLifestyleActivity(cost, effects, logMessage) {
             if (state.isDead) return;
             var c = typeof cost === "number" ? cost : 0;
@@ -6335,83 +6585,83 @@
             var actions = [
                 { sectionHeader: true, label: "Health & Wellness" },
                 {
-                    label: lifestyleActionLabel("Go Bouldering", 40, { health: 15, happiness: 5 }),
+                    label: lifestyleActionLabel("Go Bouldering", activityCost(40), { health: 15, happiness: 5 }),
                     handler: function () {
-                        runLifestyleActivity(40, { health: 15, happiness: 5 }, "Go Bouldering: a challenging full-body workout.");
+                        runLifestyleActivity(activityCost(40), { health: 15, happiness: 5 }, "Go Bouldering: a challenging full-body workout.");
                     }
                 },
                 {
-                    label: lifestyleActionLabel("Book a Spa Day", 250, { health: 5, happiness: 30 }),
+                    label: lifestyleActionLabel("Book a Spa Day", activityCost(250), { health: 5, happiness: 30 }),
                     handler: function () {
-                        runLifestyleActivity(250, { health: 5, happiness: 30 }, "Spa day: deep tissue massage and sauna recovery.");
+                        runLifestyleActivity(activityCost(250), { health: 5, happiness: 30 }, "Spa day: deep tissue massage and sauna recovery.");
                     }
                 },
                 {
-                    label: lifestyleActionLabel("Try Acupuncture", 80, { health: 10 }),
+                    label: lifestyleActionLabel("Try Acupuncture", activityCost(80), { health: 10 }),
                     handler: function () {
-                        runLifestyleActivity(80, { health: 10 }, "Acupuncture: alternative medicine to relieve chronic tension.");
+                        runLifestyleActivity(activityCost(80), { health: 10 }, "Acupuncture: alternative medicine to relieve chronic tension.");
                     }
                 },
                 {
-                    label: lifestyleActionLabel("Do a 3-Day Juice Cleanse", 150, { health: 15, happiness: -10 }),
+                    label: lifestyleActionLabel("Do a 3-Day Juice Cleanse", activityCost(150), { health: 15, happiness: -10 }),
                     handler: function () {
-                        runLifestyleActivity(150, { health: 15, happiness: -10 }, "Juice cleanse: you feel purified, but you are incredibly cranky.");
+                        runLifestyleActivity(activityCost(150), { health: 15, happiness: -10 }, "Juice cleanse: you feel purified, but you are incredibly cranky.");
                     }
                 },
                 {
-                    label: lifestyleActionLabel("See a Therapist", 200, { health: 5, happiness: 25 }),
+                    label: lifestyleActionLabel("See a Therapist", activityCost(200), { health: 5, happiness: 25 }),
                     handler: function () {
-                        runLifestyleActivity(200, { health: 5, happiness: 25 }, "Therapy: working through stress and trauma.");
+                        runLifestyleActivity(activityCost(200), { health: 5, happiness: 25 }, "Therapy: working through stress and trauma.");
                     }
                 },
                 { sectionHeader: true, label: "Smarts & Enrichment" },
                 {
-                    label: lifestyleActionLabel("Attend a TED Talk", 100, { smarts: 20 }),
+                    label: lifestyleActionLabel("Attend a TED Talk", activityCost(100), { smarts: 20 }),
                     handler: function () {
-                        runLifestyleActivity(100, { smarts: 20 }, "TED Talk: industry leaders expanded your mind.");
+                        runLifestyleActivity(activityCost(100), { smarts: 20 }, "TED Talk: industry leaders expanded your mind.");
                     }
                 },
                 {
-                    label: lifestyleActionLabel("Buy a Language App Subscription", 60, { smarts: 15 }),
+                    label: lifestyleActionLabel("Buy a Language App Subscription", activityCost(60), { smarts: 15 }),
                     handler: function () {
-                        runLifestyleActivity(60, { smarts: 15 }, "Language app: practicing Spanish 15 minutes a day.");
+                        runLifestyleActivity(activityCost(60), { smarts: 15 }, "Language app: practicing Spanish 15 minutes a day.");
                     }
                 },
                 {
-                    label: lifestyleActionLabel("Go to an Escape Room", 40, { smarts: 10, happiness: 15 }),
+                    label: lifestyleActionLabel("Go to an Escape Room", activityCost(40), { smarts: 10, happiness: 15 }),
                     handler: function () {
-                        runLifestyleActivity(40, { smarts: 10, happiness: 15 }, "Escape room: puzzles under pressure.");
+                        runLifestyleActivity(activityCost(40), { smarts: 10, happiness: 15 }, "Escape room: puzzles under pressure.");
                     }
                 },
                 {
-                    label: lifestyleActionLabel("Visit a Planetarium", 25, { smarts: 10, happiness: 5 }),
+                    label: lifestyleActionLabel("Visit a Planetarium", activityCost(25), { smarts: 10, happiness: 5 }),
                     handler: function () {
-                        runLifestyleActivity(25, { smarts: 10, happiness: 5 }, "Planetarium: astrophysics and the cosmos.");
+                        runLifestyleActivity(activityCost(25), { smarts: 10, happiness: 5 }, "Planetarium: astrophysics and the cosmos.");
                     }
                 },
                 {
-                    label: lifestyleActionLabel("Take a Masterclass", 180, { smarts: 25 }),
+                    label: lifestyleActionLabel("Take a Masterclass", activityCost(180), { smarts: 25 }),
                     handler: function () {
-                        runLifestyleActivity(180, { smarts: 25 }, "Masterclass: specialized skill from an expert.");
+                        runLifestyleActivity(activityCost(180), { smarts: 25 }, "Masterclass: specialized skill from an expert.");
                     }
                 },
                 { sectionHeader: true, label: "Happiness & Leisure" },
                 {
-                    label: lifestyleActionLabel("Go Skydiving", 400, { happiness: 50, health: -5 }),
+                    label: lifestyleActionLabel("Go Skydiving", activityCost(400), { happiness: 50, health: -5 }),
                     handler: function () {
-                        runLifestyleActivity(400, { happiness: 50, health: -5 }, "Skydiving: adrenaline rush — hard on the joints.");
+                        runLifestyleActivity(activityCost(400), { happiness: 50, health: -5 }, "Skydiving: adrenaline rush — hard on the joints.");
                     }
                 },
                 {
-                    label: lifestyleActionLabel("Attend a Comedy Club", 50, { happiness: 20 }),
+                    label: lifestyleActionLabel("Attend a Comedy Club", activityCost(50), { happiness: 20 }),
                     handler: function () {
-                        runLifestyleActivity(50, { happiness: 20 }, "Comedy club: laughing off workweek stress.");
+                        runLifestyleActivity(activityCost(50), { happiness: 20 }, "Comedy club: laughing off workweek stress.");
                     }
                 },
                 {
-                    label: lifestyleActionLabel("Go to a Wine Tasting", 75, { happiness: 15, health: -5 }),
+                    label: lifestyleActionLabel("Go to a Wine Tasting", activityCost(75), { happiness: 15, health: -5 }),
                     handler: function () {
-                        runLifestyleActivity(75, { happiness: 15, health: -5 }, "Wine tasting: new vintages (and a mild hangover).");
+                        runLifestyleActivity(activityCost(75), { happiness: 15, health: -5 }, "Wine tasting: new vintages (and a mild hangover).");
                     }
                 },
                 {
@@ -6421,9 +6671,9 @@
                     }
                 },
                 {
-                    label: lifestyleActionLabel("Go to a Music Festival", 350, { happiness: 40, health: -10 }),
+                    label: lifestyleActionLabel("Go to a Music Festival", activityCost(350), { happiness: 40, health: -10 }),
                     handler: function () {
-                        runLifestyleActivity(350, { happiness: 40, health: -10 }, "Music festival: three days of music, dancing, and no sleep.");
+                        runLifestyleActivity(activityCost(350), { happiness: 40, health: -10 }, "Music festival: three days of music, dancing, and no sleep.");
                     }
                 },
                 { sectionHeader: true, label: "Care" },
@@ -6691,6 +6941,7 @@
             closeCopingOverlay();
             closeNervousBreakdownOverlay();
             closeLayoffOverlay();
+            closeInflationOverlay();
             closeEvictionOverlay();
             closeDiagnosisOverlay();
             gameUI.style.display = "none";
@@ -6803,7 +7054,7 @@
         }
 
         function ageUp() {
-            if (state.isDead || !state.playerPath || state.isExamModalOpen || state.isExamActive || state.isDiagnosisOverlayOpen || state.isPromotionOverlayOpen || state.isPerformanceReviewOverlayOpen || state.isCareerExamOpen || state.isFiredOverlayOpen || state.isRetirementOverlayOpen || state.isDateTriviaOpen || state.isCopingOverlayOpen || state.isNervousBreakdownOverlayOpen || state.isLayoffOverlayOpen || state.isEvictionOverlayOpen) return;
+            if (state.isDead || !state.playerPath || state.isExamModalOpen || state.isExamActive || state.isDiagnosisOverlayOpen || state.isPromotionOverlayOpen || state.isPerformanceReviewOverlayOpen || state.isCareerExamOpen || state.isFiredOverlayOpen || state.isRetirementOverlayOpen || state.isDateTriviaOpen || state.isCopingOverlayOpen || state.isNervousBreakdownOverlayOpen || state.isLayoffOverlayOpen || state.isInflationOverlayOpen || state.isEvictionOverlayOpen) return;
 
             if (state.isInSchool && state.currentlyPursuing) {
                 openYearlyExamOverlay();
@@ -6817,14 +7068,17 @@
                 return;
             }
 
-            state.age += 1;
-            syncFinancialAliases();
-            if (maybeInterceptRetirementAt72(false)) {
+            function resumeNormalAgeUp() {
+                state.age += 1;
+                syncFinancialAliases();
+                if (maybeInterceptRetirementAt72(false)) {
+                    updateUI();
+                    return;
+                }
+                completeAgeUpTick();
                 updateUI();
-                return;
             }
-            completeAgeUpTick();
-            updateUI();
+            if (runAfterInflationOrNow(resumeNormalAgeUp)) return;
         }
 
         function choosePath(path) {
@@ -6878,16 +7132,16 @@
 
         document.getElementById("age-up-btn").addEventListener("click", ageUp);
         document.getElementById("education-nav-btn").addEventListener("click", function () {
-            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isPerformanceReviewOverlayOpen && !state.isCareerExamOpen && !state.isFiredOverlayOpen && !state.isRetirementOverlayOpen && !state.isDateTriviaOpen && !state.isCopingOverlayOpen && !state.isNervousBreakdownOverlayOpen && !state.isLayoffOverlayOpen && !state.isEvictionOverlayOpen) openEducationTab();
+            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isPerformanceReviewOverlayOpen && !state.isCareerExamOpen && !state.isFiredOverlayOpen && !state.isRetirementOverlayOpen && !state.isDateTriviaOpen && !state.isCopingOverlayOpen && !state.isNervousBreakdownOverlayOpen && !state.isLayoffOverlayOpen && !state.isInflationOverlayOpen && !state.isEvictionOverlayOpen) openEducationTab();
         });
         document.getElementById("careers-nav-btn").addEventListener("click", function () {
-            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isPerformanceReviewOverlayOpen && !state.isCareerExamOpen && !state.isFiredOverlayOpen && !state.isRetirementOverlayOpen && !state.isDateTriviaOpen && !state.isCopingOverlayOpen && !state.isNervousBreakdownOverlayOpen && !state.isLayoffOverlayOpen && !state.isEvictionOverlayOpen) openCareersTab();
+            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isPerformanceReviewOverlayOpen && !state.isCareerExamOpen && !state.isFiredOverlayOpen && !state.isRetirementOverlayOpen && !state.isDateTriviaOpen && !state.isCopingOverlayOpen && !state.isNervousBreakdownOverlayOpen && !state.isLayoffOverlayOpen && !state.isInflationOverlayOpen && !state.isEvictionOverlayOpen) openCareersTab();
         });
         document.getElementById("activities-nav-btn").addEventListener("click", function () {
-            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isPerformanceReviewOverlayOpen && !state.isCareerExamOpen && !state.isFiredOverlayOpen && !state.isRetirementOverlayOpen && !state.isDateTriviaOpen && !state.isCopingOverlayOpen && !state.isNervousBreakdownOverlayOpen && !state.isLayoffOverlayOpen && !state.isEvictionOverlayOpen) openActivitiesMenu();
+            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isPerformanceReviewOverlayOpen && !state.isCareerExamOpen && !state.isFiredOverlayOpen && !state.isRetirementOverlayOpen && !state.isDateTriviaOpen && !state.isCopingOverlayOpen && !state.isNervousBreakdownOverlayOpen && !state.isLayoffOverlayOpen && !state.isInflationOverlayOpen && !state.isEvictionOverlayOpen) openActivitiesMenu();
         });
         document.getElementById("assets-nav-btn").addEventListener("click", function () {
-            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isPerformanceReviewOverlayOpen && !state.isCareerExamOpen && !state.isFiredOverlayOpen && !state.isRetirementOverlayOpen && !state.isDateTriviaOpen && !state.isCopingOverlayOpen && !state.isNervousBreakdownOverlayOpen && !state.isLayoffOverlayOpen && !state.isEvictionOverlayOpen) openAssetsMenu();
+            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isPerformanceReviewOverlayOpen && !state.isCareerExamOpen && !state.isFiredOverlayOpen && !state.isRetirementOverlayOpen && !state.isDateTriviaOpen && !state.isCopingOverlayOpen && !state.isNervousBreakdownOverlayOpen && !state.isLayoffOverlayOpen && !state.isInflationOverlayOpen && !state.isEvictionOverlayOpen) openAssetsMenu();
         });
         document.getElementById("play-again-btn").addEventListener("click", function () {
             location.reload();
