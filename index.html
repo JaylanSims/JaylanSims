@@ -721,6 +721,67 @@
             color: #e0e0e0;
         }
 
+        #eviction-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 10006;
+            background: rgba(0, 0, 0, 0.95);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: #fff;
+            padding: 24px;
+            box-sizing: border-box;
+        }
+
+        .eviction-card {
+            width: 100%;
+            max-width: 480px;
+            background: #1f1410;
+            border: 2px solid #e65100;
+            border-radius: 16px;
+            padding: 24px 22px;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+        }
+
+        .eviction-card h2 {
+            margin: 0 0 16px;
+            font-size: 1.35rem;
+            text-align: center;
+            color: #ff6e40;
+            font-weight: 800;
+            letter-spacing: 0.04em;
+        }
+
+        .eviction-card p {
+            margin: 0 0 14px;
+            line-height: 1.45;
+            color: #ececec;
+            font-size: 0.98rem;
+        }
+
+        .eviction-impact {
+            color: #ffb74d !important;
+            font-weight: 600;
+        }
+
+        .eviction-ack-btn {
+            width: 100%;
+            margin-top: 18px;
+            padding: 14px;
+            border-radius: 12px;
+            border: 1px solid #ff8a65;
+            background: linear-gradient(180deg, #e65100, #bf360c);
+            color: #fff;
+            font-size: 1rem;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
         #diagnosis-overlay {
             position: fixed;
             inset: 0;
@@ -840,6 +901,7 @@
 <body>
     <div id="yearly-exam-react-root"></div>
     <div id="promotion-overlay-root"></div>
+    <div id="eviction-overlay-root"></div>
     <div id="app-container">
         <div id="intro-screen">
             <img src="js-games-logo.png" alt="JS Games" id="intro-logo" onerror="this.onerror=null;this.src='./js-games-logo.png';">
@@ -984,6 +1046,7 @@
             currentJobLevel: 1,
             pendingPromotion: null,
             isPromotionOverlayOpen: false,
+            isEvictionOverlayOpen: false,
             currentHousing: null,
             roommate: null,
             rentExpenseInBudget: 0
@@ -1022,6 +1085,8 @@
         let yearlyExamReactRoot = null;
         const promotionOverlayMount = document.getElementById("promotion-overlay-root");
         let promotionOverlayReactRoot = null;
+        const evictionOverlayMount = document.getElementById("eviction-overlay-root");
+        let evictionOverlayReactRoot = null;
         let higherEdCatalogRoot = null;
         const diagnosisOverlayRoot = document.getElementById("diagnosis-overlay-root");
         const deathScreen = document.getElementById("death-screen");
@@ -1621,6 +1686,24 @@
             return !!MENTAL_ILLNESS_DEFINITIONS[illnessKey];
         }
 
+        function hasUnsuppressedMentalIllness() {
+            for (var i = 0; i < state.currentIllnesses.length; i++) {
+                var key = state.currentIllnesses[i];
+                if (!isMentalIllness(key)) continue;
+                var ms = state.mentalIllnessState[key];
+                if (!ms || ms.isSuppressed !== true) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        function shouldTriggerRoommateEviction() {
+            if (!state.roommate) return false;
+            if (!hasUnsuppressedMentalIllness()) return false;
+            return Math.random() < 0.4;
+        }
+
         function getMentalRiskMultiplier() {
             let mult = state.playerPath === "STEM" ? STEM_MENTAL_RISK_MULTIPLIER : 1;
             if (state.academicDismissed && state.playerPath === "STEM") {
@@ -1883,7 +1966,7 @@
         }
 
         function openModal(title, description, actions) {
-            if (state.isExamModalOpen || state.isExamActive || state.isDiagnosisOverlayOpen || state.isPromotionOverlayOpen) return;
+            if (state.isExamModalOpen || state.isExamActive || state.isDiagnosisOverlayOpen || state.isPromotionOverlayOpen || state.isEvictionOverlayOpen) return;
             if (higherEdCatalogRoot) {
                 higherEdCatalogRoot.render(null);
             }
@@ -2015,6 +2098,107 @@
             }
             state.happiness += 5;
             closePromotionOverlay();
+            runAgeUpWorkYearAfterPromotion();
+            updateUI();
+        }
+
+        function EvictionOverlay(props) {
+            return (
+                <div id="eviction-overlay" role="dialog" aria-modal="true" aria-label="Roommate conflict">
+                    <div className="eviction-card">
+                        <h2>ROOMMATE CONFLICT</h2>
+                        <p>
+                            Your untreated mental health struggles have severely impacted your living situation. Your roommate could no longer handle the environment and has forced you out of the arrangement.
+                        </p>
+                        <p className="eviction-impact">
+                            Happiness dropped by 20. You are now responsible for 100% of your rent.
+                        </p>
+                        <button type="button" className="eviction-ack-btn" onClick={props.onAcknowledge}>
+                            Acknowledge
+                        </button>
+                    </div>
+                </div>
+            );
+        }
+
+        function renderEvictionOverlay() {
+            if (!evictionOverlayMount) return;
+            if (!state.isEvictionOverlayOpen) {
+                if (evictionOverlayReactRoot) {
+                    evictionOverlayReactRoot.render(null);
+                }
+                return;
+            }
+            if (!evictionOverlayReactRoot) {
+                evictionOverlayReactRoot = ReactDOM.createRoot(evictionOverlayMount);
+            }
+            evictionOverlayReactRoot.render(
+                <EvictionOverlay onAcknowledge={handleEvictionAcknowledge} />
+            );
+        }
+
+        function closeEvictionOverlay() {
+            state.isEvictionOverlayOpen = false;
+            if (evictionOverlayReactRoot) {
+                evictionOverlayReactRoot.render(null);
+            }
+        }
+
+        function handleEvictionAcknowledge() {
+            closeEvictionOverlay();
+            continueAgeUpAfterRoommateEviction();
+        }
+
+        function continueAgeUpAfterRoommateEviction() {
+            state.roommate = null;
+            state.happiness -= 20;
+            logEvent("Roommate conflict: your roommate ended the arrangement. Happiness -20; you now pay full rent.");
+            state.age += 1;
+            syncFinancialAliases();
+            state.cash -= state.annualExpenses;
+            state.health -= 1;
+            state.happiness -= 1;
+
+            const netIncome = state.annualIncome * 0.75;
+            state.cash += netIncome;
+            state.salary = state.annualIncome;
+            syncFinancialAliases();
+
+            if (state.annualIncome > 0) {
+                logEvent("Age " + state.age + ": You worked as " + state.jobTitle + " and took home " + formatMoney(netIncome) + " after taxes.");
+            } else {
+                logEvent("Age " + state.age + ": You had no income this year.");
+            }
+
+            if (state.isEmployed && state.jobTitle !== "Student" && state.jobTitle !== "Unemployed") {
+                state.yearsAtCurrentJob += 1;
+            }
+
+            if (
+                state.isEmployed &&
+                state.jobType === "Career" &&
+                state.jobTitle !== "Student" &&
+                state.jobTitle !== "Unemployed" &&
+                state.jobTitle !== "Medical Resident" &&
+                state.yearsAtCurrentJob >= 3 &&
+                state.currentJobLevel < 4 &&
+                Math.random() < 0.3
+            ) {
+                const promo = generatePromotion(state.jobTitle, state.annualIncome, state.currentJobLevel, state.playerPath);
+                if (promo) {
+                    state.pendingPromotion = {
+                        newTitle: promo.newTitle,
+                        newSalary: promo.newSalary,
+                        level: promo.level,
+                        previousSalary: state.annualIncome
+                    };
+                    state.isPromotionOverlayOpen = true;
+                    renderPromotionOverlay();
+                    updateUI();
+                    return;
+                }
+            }
+
             runAgeUpWorkYearAfterPromotion();
             updateUI();
         }
@@ -4062,6 +4246,7 @@
             closeModal();
             closeYearlyExamOverlay();
             closePromotionOverlay();
+            closeEvictionOverlay();
             closeDiagnosisOverlay();
             gameUI.style.display = "none";
             deathScreen.style.display = "flex";
@@ -4150,10 +4335,17 @@
         }
 
         function ageUp() {
-            if (state.isDead || !state.playerPath || state.isExamModalOpen || state.isExamActive || state.isDiagnosisOverlayOpen || state.isPromotionOverlayOpen) return;
+            if (state.isDead || !state.playerPath || state.isExamModalOpen || state.isExamActive || state.isDiagnosisOverlayOpen || state.isPromotionOverlayOpen || state.isEvictionOverlayOpen) return;
 
             if (state.isInSchool && state.currentlyPursuing) {
                 openYearlyExamOverlay();
+                return;
+            }
+
+            if (shouldTriggerRoommateEviction()) {
+                state.isEvictionOverlayOpen = true;
+                renderEvictionOverlay();
+                updateUI();
                 return;
             }
 
@@ -4239,16 +4431,16 @@
 
         document.getElementById("age-up-btn").addEventListener("click", ageUp);
         document.getElementById("education-nav-btn").addEventListener("click", function () {
-            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen) openEducationTab();
+            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isEvictionOverlayOpen) openEducationTab();
         });
         document.getElementById("careers-nav-btn").addEventListener("click", function () {
-            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen) openCareersTab();
+            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isEvictionOverlayOpen) openCareersTab();
         });
         document.getElementById("activities-nav-btn").addEventListener("click", function () {
-            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen) openActivitiesMenu();
+            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isEvictionOverlayOpen) openActivitiesMenu();
         });
         document.getElementById("assets-nav-btn").addEventListener("click", function () {
-            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen) openAssetsMenu();
+            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isEvictionOverlayOpen) openAssetsMenu();
         });
         document.getElementById("play-again-btn").addEventListener("click", function () {
             location.reload();
