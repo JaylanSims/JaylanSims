@@ -491,6 +491,7 @@
                 choices: [
                     {
                         label: "Panic Sell",
+                        requiresInvestments: true,
                         outcome: "Convert 50% of investments to cash and lose the rest.",
                         effect: function () {
                             state.cash += state.investments * 0.5;
@@ -820,6 +821,11 @@
                 const btn = document.createElement("button");
                 btn.className = "modal-btn";
                 btn.textContent = action.label;
+                if (action.disabled) {
+                    btn.disabled = true;
+                    btn.style.opacity = "0.45";
+                    btn.style.cursor = "not-allowed";
+                }
                 btn.addEventListener("click", function () {
                     action.handler();
                 });
@@ -1290,9 +1296,16 @@
             const eventObj = randomEvents[Math.floor(Math.random() * randomEvents.length)];
             logEvent("Event - " + eventObj.name + ": " + eventObj.text);
             const actions = eventObj.choices.map(function (choice) {
+                const unavailable = choice.requiresInvestments && state.investments <= 0;
                 return {
-                    label: choice.label + " (" + choice.outcome + ")",
+                    label: unavailable
+                        ? choice.label + " (Unavailable: no investments)"
+                        : choice.label + " (" + choice.outcome + ")",
+                    disabled: unavailable,
                     handler: function () {
+                        if (unavailable) {
+                            return;
+                        }
                         choice.effect();
                         logEvent("Outcome - " + eventObj.name + ": " + choice.label + " -> " + choice.outcome);
                         if (state.health <= 0) {
