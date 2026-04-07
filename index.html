@@ -1441,7 +1441,7 @@
                 applyMentalDefaultsForIllness(illnessKey, disease);
             }
 
-            if (config.setHappinessZero || illnessKey === "depression") {
+            if (config.setHappinessZero) {
                 state.happiness = 0;
             } else if (!config.skipHappinessPenalty && !alreadyHasIllness) {
                 state.happiness -= HAPPINESS_PENALTY_ON_DIAGNOSIS;
@@ -1563,7 +1563,14 @@
         }
 
         function maybeTriggerPathBasedMentalDiagnosis() {
-            const baselineChance = 0.06;
+            const hasDebtPressure = state.cash < 0 || state.debt > 0;
+            const isJobLossScenario = state.jobTitle !== "Student" && state.jobTitle !== "Unemployed" && state.annualIncome <= 0;
+            const hasAcademicFailure = state.academicDismissed;
+            if (!hasDebtPressure && !isJobLossScenario && !hasAcademicFailure) {
+                return;
+            }
+
+            const baselineChance = 0.18;
             const chance = baselineChance * getMentalRiskMultiplier();
             if (Math.random() >= chance) return;
 
@@ -2275,7 +2282,7 @@
 
         function maybeContractDisease() {
             if (state.currentIllnesses.length >= 4) return;
-            if (Math.random() >= 0.26 * getMentalRiskMultiplier()) return;
+            if (Math.random() >= 0.26) return;
 
             const available = ILLNESS_ROLL_TABLE.filter(function (entry) {
                 return !state.currentIllnesses.includes(entry.key);
@@ -2310,6 +2317,12 @@
                 return {
                     label: disease.name + " (" + formatMoney(disease.cureCost) + ", " + status + ")",
                     handler: function () {
+                        if (isMentalIllness(key)) {
+                            logEvent("Doctor referred you to the Psychiatrist service for " + disease.name + ".");
+                            openAssetsMenu(true);
+                            return;
+                        }
+
                         if (state.cash < disease.cureCost) {
                             logEvent("You couldn't afford treatment for " + disease.name + ".");
                             closeModal();
@@ -2695,27 +2708,33 @@
                 logEvent("Age " + state.age + ": You had no income this year.");
             }
 
-            yearlyResetMentalSuppression();
             state.investments *= (1 + (Math.random() * 0.25 - 0.10));
             applyHousingMarketForYear();
 
             if (processIllnessesForYear()) {
+                yearlyResetMentalSuppression();
                 return;
             }
             applyAnnualMentalHealthLogic();
-            if (state.isDead) return;
+            if (state.isDead) {
+                yearlyResetMentalSuppression();
+                return;
+            }
             maybeTriggerPathBasedMentalDiagnosis();
             if (state.isDiagnosisOverlayOpen || state.isDead) {
+                yearlyResetMentalSuppression();
                 updateUI();
                 return;
             }
             maybeContractDisease();
             if (state.isDiagnosisOverlayOpen || state.isDead) {
+                yearlyResetMentalSuppression();
                 updateUI();
                 return;
             }
             maybeTriggerDepressionFromLowStats();
             if (state.isDiagnosisOverlayOpen || state.isDead) {
+                yearlyResetMentalSuppression();
                 updateUI();
                 return;
             }
@@ -2727,14 +2746,17 @@
             }
             if (state.happinessZeroStreakYears >= 2) {
                 handleSuicideDeath();
+                yearlyResetMentalSuppression();
                 return;
             }
 
             if (state.health <= 0) {
                 onPlayerDeath(GENERIC_HEALTH_DEATH_MESSAGE);
+                yearlyResetMentalSuppression();
                 return;
             }
 
+            yearlyResetMentalSuppression();
             triggerProceduralYearEvents();
         }
 
