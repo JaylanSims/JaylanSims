@@ -1643,6 +1643,11 @@
                         <div class="stat-value" id="salary-text">$0</div>
                         <div class="bar-track"><div class="bar-fill" style="width: 100%; background: #81c784;"></div></div>
                     </div>
+                    <div class="stat-block" id="stat-tax-block">
+                        <div class="stat-name">Tax (last yr)</div>
+                        <div class="stat-value" id="last-tax-text">$0</div>
+                        <div class="bar-track"><div class="bar-fill" style="width: 100%; background: #90a4ae;"></div></div>
+                    </div>
                 </div>
                 <div id="alignment-dashboard" class="alignment-neutral hud-extra-hidden" aria-live="polite"></div>
             </header>
@@ -1706,7 +1711,7 @@
             major: null, isDead: false, currentIllnesses: [], illnessYears: {},
             ownedAssets: [], realEstateListings: [], nextPropertyId: 1, nextListingId: 1,
             currentHousingMarketShift: 0, currentHousingMarketEvent: "stable",
-            playerPath: null, annualIncome: 0, educationLevel: "None", yearsInSchool: 0,
+            playerPath: null, annualIncome: 0, lastTaxesPaid: 0, educationLevel: "None", yearsInSchool: 0,
             currentlyPursuing: null, educationCredentials: [], jobTitle: "Unemployed",
             isExamModalOpen: false, currentExamQuestion: null, examsPassedThisDegree: 0,
             examsTakenThisDegree: 0, examQuestionsThisYearTotal: 0, examQuestionsThisYearAnswered: 0,
@@ -1832,6 +1837,7 @@
         const cashBalanceText = document.getElementById("cash-balance-text");
         const debtText = document.getElementById("debt-text");
         const salaryText = document.getElementById("salary-text");
+        const lastTaxText = document.getElementById("last-tax-text");
         const statsBarDebtSalary = document.getElementById("stats-bar-debt-salary");
         const alignmentDashboard = document.getElementById("alignment-dashboard");
 
@@ -3021,6 +3027,27 @@
             return num;
         }
 
+        function calculateTaxes(grossIncome) {
+            var g = Math.max(0, Math.round(Number(grossIncome) || 0));
+            var remaining = g;
+            var tax = 0;
+            var slice;
+            slice = Math.min(remaining, 15000);
+            remaining -= slice;
+            slice = Math.min(remaining, 30000);
+            tax += slice * 0.12;
+            remaining -= slice;
+            slice = Math.min(remaining, 50000);
+            tax += slice * 0.22;
+            remaining -= slice;
+            slice = Math.min(remaining, 55000);
+            tax += slice * 0.24;
+            remaining -= slice;
+            tax += remaining * 0.32;
+            var totalTaxes = Math.round(tax);
+            return { gross: g, totalTaxes: totalTaxes, netIncome: g - totalTaxes };
+        }
+
         function updateUI() {
             syncCurrentEnrollment();
             evictDormIfNotEnrolled(true);
@@ -3038,6 +3065,9 @@
                 statsBarDebtSalary.classList.remove("hud-extra-hidden");
                 debtText.textContent = formatMoney(getDisplayedStudentDebt());
                 salaryText.textContent = formatMoney(state.salary);
+                if (lastTaxText) {
+                    lastTaxText.textContent = formatMoney(state.lastTaxesPaid || 0);
+                }
             } else if (statsBarDebtSalary) {
                 statsBarDebtSalary.classList.add("hud-extra-hidden");
             }
@@ -3480,13 +3510,16 @@
             closeNervousBreakdownOverlay();
             var prevGross = state._breakdownPrevAnnualGross || 0;
             var dis = state.disabilityIncome || 0;
-            state.cash += dis * 0.75 - prevGross * 0.75;
+            var prevTake = calculateTaxes(prevGross).netIncome;
+            var disTr = calculateTaxes(dis);
+            state.cash += disTr.netIncome - prevTake;
             state.annualIncome = dis;
             state.salary = dis;
+            state.lastTaxesPaid = disTr.totalTaxes;
             delete state._breakdownPrevAnnualGross;
             syncFinancialAliases();
             logEvent(
-                "Income adjusted for disability: take-home now reflects " + formatMoney(dis * 0.75) + " after taxes this year."
+                "Income adjusted for disability: take-home now reflects " + formatMoney(disTr.netIncome) + " after estimated taxes this year."
             );
             finishEndOfWorkYearAfterBreakdownTriggers();
             updateUI();
@@ -4005,19 +4038,25 @@
             } else {
                 gross = state.annualIncome || 0;
             }
-            var netIncome = gross * 0.75;
+            var taxResult = calculateTaxes(gross);
+            var netIncome = taxResult.netIncome;
+            state.lastTaxesPaid = taxResult.totalTaxes;
             state.cash += netIncome;
             state.salary = gross;
             syncFinancialAliases();
             if (gross > 0) {
                 if (state.isRetired) {
-                    logEvent("Age " + state.age + ": Pension income — took home " + formatMoney(netIncome) + " after taxes.");
+                    logEvent(
+                        "Age " + state.age + ": Pension — gross " + formatMoney(gross) + ", tax " + formatMoney(taxResult.totalTaxes) + ", took home " + formatMoney(netIncome) + "."
+                    );
                 } else if (state.medicalLeaveYearsRemaining > 0) {
                     logEvent(
-                        "Age " + state.age + ": Disability pay on medical leave — took home " + formatMoney(netIncome) + " after taxes."
+                        "Age " + state.age + ": Disability pay — gross " + formatMoney(gross) + ", tax " + formatMoney(taxResult.totalTaxes) + ", took home " + formatMoney(netIncome) + "."
                     );
                 } else {
-                    logEvent("Age " + state.age + ": You worked as " + state.jobTitle + " and took home " + formatMoney(netIncome) + " after taxes.");
+                    logEvent(
+                        "Age " + state.age + ": You worked as " + state.jobTitle + " — gross " + formatMoney(gross) + ", tax " + formatMoney(taxResult.totalTaxes) + ", took home " + formatMoney(netIncome) + "."
+                    );
                 }
             } else {
                 logEvent("Age " + state.age + ": You had no income this year.");
@@ -4735,9 +4774,12 @@
                 state.salary = state.annualIncome;
                 state.isEmployed = true;
                 state._savedJobBeforeSchoolYear = null;
-                const stipendNet = state.annualIncome * 0.75;
-                state.cash += stipendNet;
-                logEvent("Residency stipend (after tax): +" + formatMoney(stipendNet) + ".");
+                var stipendTr = calculateTaxes(state.annualIncome);
+                state.cash += stipendTr.netIncome;
+                state.lastTaxesPaid = stipendTr.totalTaxes;
+                logEvent(
+                    "Residency stipend — gross " + formatMoney(stipendTr.gross) + ", tax " + formatMoney(stipendTr.totalTaxes) + ", net +" + formatMoney(stipendTr.netIncome) + "."
+                );
             } else if (program.pipeline !== "undergrad" && savedJob && savedJob.isEmployed) {
                 state.jobTitle = savedJob.jobTitle;
                 state.annualIncome = savedJob.annualIncome;
@@ -4745,9 +4787,12 @@
                 state.isEmployed = true;
                 state.jobType = savedJob.jobType === "OddJob" ? "OddJob" : "Career";
                 state._savedJobBeforeSchoolYear = null;
-                const netIncome = state.annualIncome * 0.75;
-                state.cash += netIncome;
-                logEvent("Dual hustle: work income while studying: +" + formatMoney(netIncome) + " after taxes.");
+                var hustleTr = calculateTaxes(state.annualIncome);
+                state.cash += hustleTr.netIncome;
+                state.lastTaxesPaid = hustleTr.totalTaxes;
+                logEvent(
+                    "Dual hustle: work income while studying — gross " + formatMoney(hustleTr.gross) + ", tax " + formatMoney(hustleTr.totalTaxes) + ", net +" + formatMoney(hustleTr.netIncome) + "."
+                );
             } else {
                 state.annualIncome = 0;
                 state.salary = 0;
