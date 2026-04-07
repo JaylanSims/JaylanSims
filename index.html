@@ -563,7 +563,7 @@
             width: 100vw;
             height: 100vh;
             z-index: 9999;
-            background: rgba(0, 0, 0, 0.98);
+            background: rgba(0, 0, 0, 0.95);
             display: none;
             flex-direction: column;
             align-items: center;
@@ -789,7 +789,7 @@
             align-items: center;
             justify-content: center;
             padding: 20px;
-            background: rgba(0, 0, 0, 0.9);
+            background: rgba(0, 0, 0, 0.95);
             z-index: 10000;
         }
 
@@ -840,6 +840,99 @@
         .diagnosis-btn:disabled {
             opacity: 0.45;
             cursor: not-allowed;
+        }
+
+        #lifecycle-outcome-overlay {
+            position: fixed;
+            inset: 0;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.95);
+            z-index: 10002;
+        }
+
+        #lifecycle-outcome-overlay.open {
+            display: flex;
+        }
+
+        .lifecycle-outcome-card {
+            width: 100%;
+            max-width: 560px;
+            border-radius: 18px;
+            background: #151515;
+            padding: 24px 20px;
+            box-shadow: 0 22px 60px rgba(0, 0, 0, 0.68);
+            border: 1px solid #343434;
+        }
+
+        .lifecycle-outcome-card.graduation {
+            border-color: #4d8f5d;
+            box-shadow: 0 0 0 1px rgba(77, 143, 93, 0.22), 0 22px 60px rgba(0, 0, 0, 0.68);
+        }
+
+        .lifecycle-outcome-card.dismissal {
+            border-color: #a24949;
+            box-shadow: 0 0 0 1px rgba(162, 73, 73, 0.22), 0 22px 60px rgba(0, 0, 0, 0.72);
+        }
+
+        .lifecycle-outcome-kicker {
+            margin: 0 0 8px;
+            font-size: 0.8rem;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: #9e9e9e;
+        }
+
+        .lifecycle-outcome-card.graduation .lifecycle-outcome-kicker {
+            color: #9ad2a7;
+        }
+
+        .lifecycle-outcome-card.dismissal .lifecycle-outcome-kicker {
+            color: #ff9a9a;
+        }
+
+        .lifecycle-outcome-title {
+            margin: 0 0 10px;
+            font-size: 1.45rem;
+            line-height: 1.15;
+            color: #fff;
+        }
+
+        .lifecycle-outcome-body {
+            margin: 0 0 18px;
+            color: #d6d6d6;
+            line-height: 1.5;
+            font-size: 0.98rem;
+        }
+
+        .lifecycle-outcome-actions {
+            display: grid;
+            gap: 10px;
+        }
+
+        .lifecycle-outcome-btn {
+            width: 100%;
+            border: 1px solid #3a3a3a;
+            border-radius: 12px;
+            background: #232323;
+            color: #fff;
+            text-align: left;
+            padding: 14px 15px;
+            font-size: 0.98rem;
+            cursor: pointer;
+            min-height: 52px;
+        }
+
+        .lifecycle-outcome-card.graduation .lifecycle-outcome-btn-primary {
+            background: #23452f;
+            border-color: #4d8f5d;
+        }
+
+        .lifecycle-outcome-card.dismissal .lifecycle-outcome-btn-primary {
+            background: #432020;
+            border-color: #a24949;
         }
 
         #death-screen {
@@ -1003,6 +1096,7 @@
         </div>
 
         <div id="diagnosis-overlay-root"></div>
+        <div id="lifecycle-outcome-overlay-root"></div>
 
         <div id="death-screen">
             <p id="tombstone">🪦</p>
@@ -1029,6 +1123,7 @@
             examsTakenThisDegree: 0, examQuestionsThisYearTotal: 0, examQuestionsThisYearAnswered: 0,
             examYearQuestionQueue: [], examYearUsedQuestionIds: [], jobSearchBlocked: true, academicDismissed: false,
             isDiagnosisOverlayOpen: false, currentDiagnosisIllnessKey: null,
+            isLifecycleOutcomeOverlayOpen: false, lifecycleOutcome: null,
             canAccessDoctor: true, activeView: "MainGameplay",
             mentalIllnessState: {},
             happinessZeroStreakYears: 0,
@@ -1089,6 +1184,8 @@
         let evictionOverlayReactRoot = null;
         let higherEdCatalogRoot = null;
         const diagnosisOverlayRoot = document.getElementById("diagnosis-overlay-root");
+        const lifecycleOutcomeOverlayMount = document.getElementById("lifecycle-outcome-overlay-root");
+        let lifecycleOutcomeReactRoot = null;
         const deathScreen = document.getElementById("death-screen");
         const deathTitle = document.getElementById("death-title");
         const deathSummary = document.getElementById("death-summary");
@@ -1238,56 +1335,43 @@
 
         const JOB_MARKET = {
             STEM: [
-                { title: "Neurosurgeon", salary: 239200, requiredEducation: "Medical Degree" },
-                { title: "Physician (General)", salary: 208000, requiredEducation: "Medical Degree" },
-                { title: "Machine Learning Engineer", salary: 167000, requiredEducation: "Master's Degree" },
-                { title: "Software Architect", salary: 158000, requiredEducation: "Master's Degree" },
-                { title: "Aerospace Engineer", salary: 135800, requiredEducation: "Bachelor's Degree" },
-                { title: "Data Scientist", salary: 132000, requiredEducation: "Master's Degree" },
-                { title: "Petroleum Engineer", salary: 131800, requiredEducation: "Bachelor's Degree" },
-                { title: "Pharmacist", salary: 128710, requiredEducation: "Medical Degree/Doctorate" },
-                { title: "Nuclear Engineer", salary: 124300, requiredEducation: "Master's Degree" },
+                { title: "Neurosurgeon", salary: 239000, requiredEducation: "Bachelor's Degree" },
+                { title: "Software Architect", salary: 158000, requiredEducation: "Bachelor's Degree" },
+                { title: "Aerospace Engineer", salary: 136000, requiredEducation: "Bachelor's Degree" },
+                { title: "Data Scientist", salary: 132000, requiredEducation: "Bachelor's Degree" },
                 { title: "Actuary", salary: 120000, requiredEducation: "Bachelor's Degree" },
-                { title: "Chemical Engineer", salary: 114820, requiredEducation: "Bachelor's Degree" },
+                { title: "Chemical Engineer", salary: 115000, requiredEducation: "Bachelor's Degree" },
                 { title: "Cybersecurity Analyst", salary: 112000, requiredEducation: "Bachelor's Degree" },
-                { title: "Statistician", salary: 108700, requiredEducation: "Master's Degree" },
-                { title: "Environmental Engineer", salary: 103220, requiredEducation: "Bachelor's Degree" },
-                { title: "Biomedical Engineer", salary: 100730, requiredEducation: "Bachelor's Degree" }
+                { title: "Biomedical Engineer", salary: 101000, requiredEducation: "Bachelor's Degree" }
             ],
             Humanities: [
-                { title: "Entertainment Lawyer", salary: 135000, requiredEducation: "Law Degree" },
-                { title: "Public Relations Manager", salary: 125780, requiredEducation: "Bachelor's Degree" },
-                { title: "Art Director", salary: 106500, requiredEducation: "Bachelor's Degree" },
-                { title: "UX/UI Designer", salary: 99000, requiredEducation: "Bachelor's Degree" },
-                { title: "Technical Writer", salary: 79960, requiredEducation: "Bachelor's Degree" },
-                { title: "Film/TV Producer", salary: 76400, requiredEducation: "Bachelor's Degree" },
-                { title: "Editor (Books/Magazines)", salary: 72150, requiredEducation: "Bachelor's Degree" },
-                { title: "Social Media Manager", salary: 64000, requiredEducation: "Bachelor's Degree" },
-                { title: "Copywriter", salary: 63200, requiredEducation: "Bachelor's Degree" },
-                { title: "High School Teacher", salary: 62360, requiredEducation: "Bachelor's Degree" },
-                { title: "Librarian", salary: 61190, requiredEducation: "Master's Degree" },
-                { title: "Graphic Designer", salary: 58910, requiredEducation: "Bachelor's Degree" },
-                { title: "Museum Curator", salary: 58820, requiredEducation: "Master's Degree" },
-                { title: "Translator/Interpreter", salary: 57090, requiredEducation: "Bachelor's Degree" },
-                { title: "Journalist/Reporter", salary: 55960, requiredEducation: "Bachelor's Degree" }
+                { title: "Lawyer", salary: 135000, requiredEducation: "Bachelor's Degree" },
+                { title: "Public Relations Manager", salary: 126000, requiredEducation: "Bachelor's Degree" },
+                { title: "Art Director", salary: 107000, requiredEducation: "Bachelor's Degree" },
+                { title: "UX Designer", salary: 99000, requiredEducation: "Bachelor's Degree" },
+                { title: "Technical Writer", salary: 80000, requiredEducation: "Bachelor's Degree" },
+                { title: "Copywriter", salary: 63000, requiredEducation: "Bachelor's Degree" },
+                { title: "High School Teacher", salary: 62000, requiredEducation: "Bachelor's Degree" },
+                { title: "Graphic Designer", salary: 59000, requiredEducation: "Bachelor's Degree" },
+                { title: "Museum Curator", salary: 59000, requiredEducation: "Bachelor's Degree" },
+                { title: "Journalist", salary: 56000, requiredEducation: "Bachelor's Degree" }
             ],
             Trades: [
-                { title: "Elevator Installer & Repairer", salary: 97860, requiredEducation: "Trade Certificate" },
-                { title: "Electrical Power Line Installer", salary: 85420, requiredEducation: "Trade Certificate" },
-                { title: "Radiation Therapist", salary: 82790, requiredEducation: "Trade Certificate" },
-                { title: "Boilermaker", salary: 66920, requiredEducation: "Trade Certificate" },
-                { title: "Industrial Pipefitter", salary: 63100, requiredEducation: "Trade Certificate" },
-                { title: "Plumber", salary: 61550, requiredEducation: "Trade Certificate" },
-                { title: "Electrician", salary: 60240, requiredEducation: "Trade Certificate" },
-                { title: "Millwright", salary: 59800, requiredEducation: "Trade Certificate" },
-                { title: "Brickmason", salary: 58430, requiredEducation: "Trade Certificate" },
-                { title: "HVAC Technician", salary: 57300, requiredEducation: "Trade Certificate" },
-                { title: "Diesel Mechanic", salary: 54360, requiredEducation: "Trade Certificate" },
-                { title: "Heavy Equipment Operator", salary: 52230, requiredEducation: "Trade Certificate" },
-                { title: "Carpenter", salary: 51390, requiredEducation: "Trade Certificate" },
-                { title: "Welder", salary: 47540, requiredEducation: "Trade Certificate" },
-                { title: "Automotive Technician", salary: 46840, requiredEducation: "Trade Certificate" }
+                { title: "Elevator Technician", salary: 97000, requiredEducation: "Trade Certificate" },
+                { title: "Industrial Pipefitter", salary: 63000, requiredEducation: "Trade Certificate" },
+                { title: "Plumber", salary: 61000, requiredEducation: "Trade Certificate" },
+                { title: "Electrician", salary: 60000, requiredEducation: "Trade Certificate" },
+                { title: "HVAC Technician", salary: 57000, requiredEducation: "Trade Certificate" },
+                { title: "Carpenter", salary: 51000, requiredEducation: "Trade Certificate" },
+                { title: "Welder", salary: 48000, requiredEducation: "Trade Certificate" },
+                { title: "Automotive Technician", salary: 47000, requiredEducation: "Trade Certificate" }
             ]
+        };
+
+        const HIRE_CHANCE_BY_PATH = {
+            STEM: 0.60,
+            Humanities: 0.20,
+            Trades: 0.85
         };
 
         const ODD_JOBS_GENERAL = [
@@ -1413,6 +1497,30 @@
         const EXAM_QUESTION_BANKS = {};
         Object.keys(EXAM_QUESTION_BANKS_RAW).forEach(function (pathKey) {
             EXAM_QUESTION_BANKS[pathKey] = EXAM_QUESTION_BANKS_RAW[pathKey].map(normalizeExamQuestionEntry);
+        });
+        const CORE_UNDERGRAD_EXAM_QUESTION_BANKS_RAW = {
+            STEM: [
+                { question: "Thermodynamics: which law says entropy in an isolated system tends to increase?", options: ["First Law", "Second Law", "Third Law", "Zeroth Law"], correctAnswer: "Second Law" },
+                { question: "What is it called when a function calls itself to solve smaller versions of the same problem?", options: ["Encapsulation", "Recursion", "Memoization", "Compilation"], correctAnswer: "Recursion" },
+                { question: "What is the derivative of x^2?", options: ["x", "2x", "x^3", "2"], correctAnswer: "2x" },
+                { question: "Which element has the highest electronegativity?", options: ["Oxygen", "Fluorine", "Chlorine", "Nitrogen"], correctAnswer: "Fluorine" }
+            ],
+            Humanities: [
+                { question: "Which art movement associated with Salvador Dali explored dreams and the unconscious?", options: ["Realism", "Surrealism", "Cubism", "Futurism"], correctAnswer: "Surrealism" },
+                { question: "Joseph Campbell is most associated with which narrative framework?", options: ["Five-Act Structure", "Monomyth / Hero's Journey", "Three Unities", "Absurdism"], correctAnswer: "Monomyth / Hero's Journey" },
+                { question: "Which musical and artistic period is associated with Bach and heavy ornamentation?", options: ["Baroque", "Romantic", "Modernist", "Classical"], correctAnswer: "Baroque" },
+                { question: "A word's literal dictionary meaning is its what?", options: ["Connotation", "Denotation", "Subtext", "Metaphor"], correctAnswer: "Denotation" }
+            ],
+            Trades: [
+                { question: "What is the primary purpose of a level tool?", options: ["To cut lumber", "To test voltage", "To check whether a surface is straight and level", "To tighten bolts"], correctAnswer: "To check whether a surface is straight and level" },
+                { question: "What device interrupts electrical flow during an overload to prevent damage and fire?", options: ["Circuit breaker", "Ground rod", "Wire nut", "Outlet cover"], correctAnswer: "Circuit breaker" },
+                { question: "What material is commonly used to smooth wood before finishing?", options: ["Sandpaper", "Drywall mud", "Flux", "Pipe tape"], correctAnswer: "Sandpaper" },
+                { question: "In jobsite safety, what does PPE stand for?", options: ["Power Protection Equipment", "Personal Protective Equipment", "Primary Project Estimate", "Pressure Point Evaluation"], correctAnswer: "Personal Protective Equipment" }
+            ]
+        };
+        const CORE_UNDERGRAD_EXAM_QUESTION_BANKS = {};
+        Object.keys(CORE_UNDERGRAD_EXAM_QUESTION_BANKS_RAW).forEach(function (pathKey) {
+            CORE_UNDERGRAD_EXAM_QUESTION_BANKS[pathKey] = CORE_UNDERGRAD_EXAM_QUESTION_BANKS_RAW[pathKey].map(normalizeExamQuestionEntry);
         });
         const EXAM_FEEDBACK_DELAY_MS = 700;
 
@@ -1591,7 +1699,7 @@
         };
 
         const MENTAL_ILLNESS_DEFINITIONS = {
-            seasonalAffectiveDisorder: { name: "Seasonal Affective Disorder", tier: "mild", curable: true, minVisits: 3, maxVisits: 5 },
+            seasonalAffectiveDisorder: { name: "SAD", tier: "mild", curable: true, minVisits: 3, maxVisits: 5 },
             specificPhobia: { name: "Specific Phobia", tier: "mild", curable: true, minVisits: 4, maxVisits: 6 },
             adjustmentDisorder: { name: "Adjustment Disorder", tier: "mild", curable: true, minVisits: 3, maxVisits: 5 },
             mildAnxiety: { name: "Mild Anxiety", tier: "mild", curable: true, minVisits: 4, maxVisits: 8 },
@@ -1602,9 +1710,9 @@
 
             panicDisorder: { name: "Panic Disorder", tier: "medium", curable: true, minVisits: 10, maxVisits: 15 },
             ptsd: { name: "PTSD", tier: "medium", curable: true, minVisits: 12, maxVisits: 20 },
-            moderateOcd: { name: "Moderate OCD", tier: "medium", curable: true, minVisits: 15, maxVisits: 25 },
+            moderateOcd: { name: "OCD", tier: "medium", curable: true, minVisits: 15, maxVisits: 25 },
             bulimia: { name: "Bulimia", tier: "medium", curable: true, minVisits: 15, maxVisits: 25 },
-            depression: { name: "Moderate Depression", tier: "medium", curable: true, minVisits: 12, maxVisits: 20, annualHealthDrain: 5 },
+            depression: { name: "Depression", tier: "medium", curable: false, annualHealthDrain: 5 },
             anxiety: { name: "Moderate Anxiety", tier: "medium", curable: true, minVisits: 10, maxVisits: 18 },
             moderateAdhd: { name: "Moderate ADHD", tier: "medium", curable: false },
             bipolarII: { name: "Bipolar II", tier: "medium", curable: false },
@@ -1710,6 +1818,49 @@
                 mult *= STEM_DISMISSAL_MENTAL_MULTIPLIER;
             }
             return mult;
+        }
+
+        function getDisplayPathLabel(path) {
+            return path === "Humanities" ? "Arts" : path;
+        }
+
+        function getExamDifficultyLabel(path) {
+            if (path === "STEM") return "Hard";
+            if (path === "Trades") return "Easy";
+            return "Medium";
+        }
+
+        function getHireChanceForPath(path) {
+            return HIRE_CHANCE_BY_PATH[path] || 0;
+        }
+
+        function hasBasePathCredential(path) {
+            if (path === "Trades") {
+                return meetsEducationRequirement("Trade Certificate");
+            }
+            return meetsEducationRequirement("Bachelor's Degree");
+        }
+
+        function getIllnessAnnualImpactLine(illnessKey) {
+            const disease = DISEASES[illnessKey];
+            if (!disease) return "Annual Drain: none recorded";
+            const parts = [];
+            if (isMentalIllness(illnessKey)) {
+                const tier = disease.mentalTier || "mild";
+                const happinessDrain = MENTAL_TIER_HAPPINESS_DRAIN[tier] || disease.annualHappinessDrain || 0;
+                if (happinessDrain > 0) {
+                    parts.push("-" + happinessDrain + " Happiness");
+                }
+            } else if (typeof disease.annualHappinessDrain === "number" && disease.annualHappinessDrain > 0) {
+                parts.push("-" + disease.annualHappinessDrain + " Happiness");
+            }
+            if (typeof disease.annualHealthDrain === "number" && disease.annualHealthDrain > 0) {
+                parts.push("-" + disease.annualHealthDrain + " Health");
+            }
+            if (typeof disease.annualSmartsDrain === "number" && disease.annualSmartsDrain > 0) {
+                parts.push("-" + disease.annualSmartsDrain + " Smarts");
+            }
+            return "Annual Drain: " + (parts.length ? parts.join(" | ") : "none");
         }
 
         function getMentalTierIndex(tier) {
@@ -2232,13 +2383,13 @@
             const q = props.question;
             if (!q) return null;
             const part = props.questionPart || 1;
-            const totalParts = props.questionsPerYear || 2;
+            const totalParts = props.questionsPerYear || 1;
             return (
                 <div id="yearly-exam-overlay" className="open" role="dialog" aria-modal="true" aria-label="Yearly Exam">
                     <div id="exam-desk">
                         <h2 id="exam-title">FINAL EXAM: YEAR {props.currentSchoolYear}</h2>
                         <p id="exam-subtitle" style={{ margin: "0 0 10px", fontSize: "0.88rem", color: "#9e9e9e" }}>
-                            Question {part} of {totalParts} this year
+                            {props.pathLabel} Track | Difficulty: {props.difficultyLabel} | Question {part} of {totalParts}
                         </p>
                         <p id="exam-question">{q.question}</p>
                         <div id="exam-options">
@@ -2263,7 +2414,7 @@
                             })}
                         </div>
                         <p id="exam-penalty-warning">
-                            Warning: Incorrect answers will increase your total student debt for this track.
+                            This annual exam interceptor is unavoidable. Pass at least 3 of 4 yearly exams to graduate.
                         </p>
                     </div>
                 </div>
@@ -2275,8 +2426,10 @@
         }
 
         function startExamYearQuestionQueue(path) {
-            const bank = EXAM_QUESTION_BANKS[path] || [];
-            if (bank.length < 2) {
+            const currentProgram = state.currentlyPursuing ? EDUCATION_PROGRAMS[state.currentlyPursuing] : null;
+            const useCoreUndergradBank = !currentProgram || currentProgram.pipeline === "undergrad";
+            const bank = useCoreUndergradBank ? (CORE_UNDERGRAD_EXAM_QUESTION_BANKS[path] || []) : (EXAM_QUESTION_BANKS[path] || []);
+            if (bank.length < 1) {
                 state.examYearQuestionQueue = [];
                 return;
             }
@@ -2288,16 +2441,16 @@
                 indices[j] = t;
             }
             var pick = [];
-            for (var k = 0; k < indices.length && pick.length < 2; k++) {
+            for (var k = 0; k < indices.length && pick.length < 1; k++) {
                 var idx = indices[k];
                 var id = examQuestionId(path, idx);
                 if (state.examYearUsedQuestionIds.indexOf(id) === -1) {
                     pick.push(idx);
                 }
             }
-            if (pick.length < 2) {
+            if (pick.length < 1) {
                 state.examYearUsedQuestionIds = [];
-                pick = indices.slice(0, 2);
+                pick = indices.slice(0, 1);
             }
             pick.forEach(function (idx) {
                 state.examYearUsedQuestionIds.push(examQuestionId(path, idx));
@@ -2335,7 +2488,9 @@
                     currentSchoolYear={state.yearsInSchool + 1}
                     question={state.currentExamQuestion}
                     questionPart={state.examQuestionsThisYearAnswered + 1}
-                    questionsPerYear={state.examQuestionsThisYearTotal || 2}
+                    questionsPerYear={state.examQuestionsThisYearTotal || 1}
+                    pathLabel={getDisplayPathLabel(state.playerPath)}
+                    difficultyLabel={getExamDifficultyLabel(state.playerPath)}
                     selectedOptionIndex={selectedOptionIndex}
                     showFeedback={showFeedback}
                     onSelectOption={handleYearlyExamAnswer}
@@ -2352,6 +2507,111 @@
             }
         }
 
+        function LifecycleOutcomeOverlay(props) {
+            const outcome = props.outcome;
+            if (!outcome) return null;
+            const cardClass = "lifecycle-outcome-card " + outcome.kind;
+            return (
+                <div id="lifecycle-outcome-overlay" className="open" role="dialog" aria-modal="true" aria-label={outcome.title}>
+                    <div className={cardClass}>
+                        <p className="lifecycle-outcome-kicker">{outcome.kicker}</p>
+                        <h2 className="lifecycle-outcome-title">{outcome.title}</h2>
+                        <div className="lifecycle-outcome-body" dangerouslySetInnerHTML={{ __html: outcome.bodyHtml }} />
+                        <div className="lifecycle-outcome-actions">
+                            <button type="button" className="lifecycle-outcome-btn lifecycle-outcome-btn-primary" onClick={props.onPrimary}>
+                                {outcome.primaryLabel}
+                            </button>
+                            {outcome.secondaryLabel ? (
+                                <button type="button" className="lifecycle-outcome-btn" onClick={props.onSecondary}>
+                                    {outcome.secondaryLabel}
+                                </button>
+                            ) : null}
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        function renderLifecycleOutcomeOverlay() {
+            if (!lifecycleOutcomeOverlayMount) return;
+            if (!state.isLifecycleOutcomeOverlayOpen || !state.lifecycleOutcome) {
+                if (lifecycleOutcomeReactRoot) {
+                    lifecycleOutcomeReactRoot.render(null);
+                }
+                return;
+            }
+            if (!lifecycleOutcomeReactRoot) {
+                lifecycleOutcomeReactRoot = ReactDOM.createRoot(lifecycleOutcomeOverlayMount);
+            }
+            lifecycleOutcomeReactRoot.render(
+                <LifecycleOutcomeOverlay
+                    outcome={state.lifecycleOutcome}
+                    onPrimary={handleLifecycleOutcomePrimaryAction}
+                    onSecondary={handleLifecycleOutcomeSecondaryAction}
+                />
+            );
+        }
+
+        function closeLifecycleOutcomeOverlay() {
+            state.isLifecycleOutcomeOverlayOpen = false;
+            state.lifecycleOutcome = null;
+            if (lifecycleOutcomeReactRoot) {
+                lifecycleOutcomeReactRoot.render(null);
+            }
+        }
+
+        function openGraduationOutcomeOverlay(program, debtLine) {
+            state.isLifecycleOutcomeOverlayOpen = true;
+            state.lifecycleOutcome = {
+                kind: "graduation",
+                kicker: "Education-to-Career Milestone",
+                title: "Graduation Achieved",
+                bodyHtml:
+                    "You passed the education gauntlet and graduated with your <strong>" + escapeHtml(program.degreeName) + "</strong>." +
+                    "<br><br>" + escapeHtml(debtLine) +
+                    "<br><br>Your " + escapeHtml(getDisplayPathLabel(state.playerPath)) + " career market is now open.",
+                primaryLabel: "Find a Job",
+                secondaryLabel: "Keep Planning"
+            };
+            renderLifecycleOutcomeOverlay();
+        }
+
+        function openAcademicDismissalOutcomeOverlay(program, passedCount, requiredPasses, debtLine) {
+            state.isLifecycleOutcomeOverlayOpen = true;
+            state.lifecycleOutcome = {
+                kind: "dismissal",
+                kicker: "Academic Dismissal",
+                title: "You Were Dismissed",
+                bodyHtml:
+                    "You passed <strong>" + passedCount + "/" + program.yearsRequired + "</strong> yearly exams for " + escapeHtml(program.degreeName) + "." +
+                    "<br><br>You needed at least <strong>" + requiredPasses + "/" + program.yearsRequired + "</strong> to graduate." +
+                    "<br><br>Find a Job remains locked. You must repeat all 4 school years before you can try again." +
+                    "<br><br>" + escapeHtml(debtLine),
+                primaryLabel: "Re-enroll and Continue"
+            };
+            renderLifecycleOutcomeOverlay();
+        }
+
+        function handleLifecycleOutcomePrimaryAction() {
+            const outcome = state.lifecycleOutcome;
+            if (!outcome) return;
+            closeLifecycleOutcomeOverlay();
+            if (outcome.kind === "graduation") {
+                openCareersTab();
+                return;
+            }
+            if (outcome.kind === "dismissal") {
+                state.happiness = 0;
+                diagnoseIllness("depression", { setHappinessZero: true, skipHappinessPenalty: true, forceOverlay: true });
+                updateUI();
+            }
+        }
+
+        function handleLifecycleOutcomeSecondaryAction() {
+            closeLifecycleOutcomeOverlay();
+            updateUI();
+        }
+
         function escapeHtml(text) {
             return String(text)
                 .replace(/&/g, "&amp;")
@@ -2366,14 +2626,16 @@
             if (!disease) return "";
             const isMental = isMentalIllness(props.illnessKey);
             const doctorBtnAttrs = props.canAccessDoctor ? "" : "disabled";
+            const title = isMental ? "MENTAL HEALTH DIAGNOSIS" : "MEDICAL DIAGNOSIS";
             const doctorLabel = props.canAccessDoctor
-                ? (isMental ? "Visit Psychiatrist" : "Go to the Doctor")
-                : (isMental ? "Visit Psychiatrist (Unavailable)" : "Go to the Doctor (Unavailable)");
+                ? (isMental ? "Go to Psychiatrist" : "Go to Doctor")
+                : (isMental ? "Go to Psychiatrist (Unavailable)" : "Go to Doctor (Unavailable)");
             return "<div id=\"diagnosis-overlay\" class=\"open\" role=\"dialog\" aria-modal=\"true\" aria-label=\"Medical Diagnosis\">" +
                 "<div id=\"diagnosis-card\">" +
-                "<h2 id=\"diagnosis-title\">MEDICAL DIAGNOSIS 🩺</h2>" +
+                "<h2 id=\"diagnosis-title\">" + escapeHtml(title) + "</h2>" +
                 "<p id=\"diagnosis-text\">You have been diagnosed with " + escapeHtml(disease.name) + ".</p>" +
-                "<p id=\"diagnosis-cost\">Base treatment cost: " + formatMoney(disease.cureCost) + "</p>" +
+                "<p id=\"diagnosis-cost\">" + escapeHtml(getIllnessAnnualImpactLine(props.illnessKey)) + "</p>" +
+                "<p id=\"diagnosis-cost\">Treatment Access: " + (isMental ? "Psychiatrist visit " + formatMoney(PSYCHIATRIST_VISIT_COST) : "Doctor visit " + formatMoney(disease.cureCost)) + "</p>" +
                 "<div id=\"diagnosis-actions\">" +
                 "<button class=\"diagnosis-btn\" id=\"diagnosis-okay-btn\">Okay</button>" +
                 "<button class=\"diagnosis-btn\" id=\"diagnosis-doctor-btn\" " + doctorBtnAttrs + ">" + doctorLabel + "</button>" +
@@ -2445,13 +2707,13 @@
         }
 
         function openDoctorComponent() {
-            state.activeView = "DoctorComponent";
-            openDoctorMenu();
+            state.activeView = "DoctorAsset";
+            openAssetsMenu("doctor");
         }
 
         function openPsychiatristFromOverlay() {
             state.activeView = "PsychiatristService";
-            openAssetsMenu(true);
+            openAssetsMenu("psychiatrist");
         }
 
         function diagnoseIllness(illnessKey, options) {
@@ -2620,15 +2882,8 @@
         }
 
         function getRequiredExamPassesForProgram(program) {
-            var totalQuestions = program.yearsRequired * 2;
-            if (program && program.pipeline && program.pipeline !== "undergrad") {
-                return Math.ceil(totalQuestions * 0.5);
-            }
-            var byRatio = Math.ceil(totalQuestions * 0.75);
-            if (program.yearsRequired >= 4) {
-                return Math.max(6, byRatio);
-            }
-            return byRatio;
+            var totalQuestions = program.yearsRequired;
+            return Math.max(1, Math.ceil(totalQuestions * 0.75));
         }
 
         function clearEnrollmentAfterDismissalOrQuit() {
@@ -2685,6 +2940,11 @@
             state.examsTakenThisDegree = 0;
             state.isInSchool = true;
             state.isEnrolled = true;
+            state.annualIncome = 0;
+            state.salary = 0;
+            state.jobTitle = "Student";
+            state.isEmployed = false;
+            state.jobType = "None";
             syncCurrentEnrollment();
 
             logEvent("Academic dismissal: you did not pass enough yearly exams for " + program.degreeName + ".");
@@ -2693,24 +2953,51 @@
             state.examQuestionsThisYearTotal = 0;
             state.examQuestionsThisYearAnswered = 0;
 
-            openModal(
-                "Academic Dismissal — Failed Final Year",
-                "<strong>You did not meet the graduation exam requirement.</strong><br><br>You passed " + passedCount + "/" + (program.yearsRequired * 2) +
-                " exam questions (minimum required: " + requiredPasses + "). You must restart " +
-                program.degreeName + " from Year 1. Careers and Find a Job stay locked until you graduate successfully.<br><br>" + debtLine,
-                [
-                    {
-                        label: "Continue",
-                        handler: function () {
-                            closeModal();
-                            state.happiness = 0;
-                            diagnoseIllness("depression", { setHappinessZero: true, skipHappinessPenalty: true, forceOverlay: true });
-                            updateUI();
-                        }
-                    }
-                ]
-            );
+            openAcademicDismissalOutcomeOverlay(program, passedCount, requiredPasses, debtLine);
             updateUI();
+        }
+
+        function applySchoolYearFinancialAndHealthConsequences() {
+            const totalExpenses = state.annualExpenses;
+            state.cash -= totalExpenses;
+            state.salary = state.annualIncome;
+            syncFinancialAliases();
+            logEvent("School-year finances: paid " + formatMoney(totalExpenses) + " in living costs and asset upkeep. Annual income remained " + formatMoney(state.annualIncome) + ".");
+
+            state.investments *= (1 + (Math.random() * 0.25 - 0.10));
+            applyHousingMarketForYear();
+
+            if (processIllnessesForYear()) {
+                yearlyResetMentalSuppression();
+                return true;
+            }
+
+            applyAnnualMentalHealthLogic();
+            if (state.isDead) {
+                yearlyResetMentalSuppression();
+                return true;
+            }
+
+            if (state.happiness <= 0) {
+                state.happinessZeroStreakYears += 1;
+            } else {
+                state.happinessZeroStreakYears = 0;
+            }
+            if (state.happinessZeroStreakYears >= 2) {
+                handleSuicideDeath();
+                yearlyResetMentalSuppression();
+                return true;
+            }
+
+            if (state.health <= 0) {
+                onPlayerDeath(GENERIC_HEALTH_DEATH_MESSAGE);
+                yearlyResetMentalSuppression();
+                return true;
+            }
+
+            yearlyResetMentalSuppression();
+            syncFinancialAliases();
+            return false;
         }
 
         function finalizeSchoolYearAfterExams() {
@@ -2766,7 +3053,7 @@
             syncCurrentEnrollment();
 
             logEvent(
-                "Age " + state.age + ": Completed " + (state.examQuestionsThisYearTotal || 2) + " final exam questions. " +
+                "Age " + state.age + ": Completed " + (state.examQuestionsThisYearTotal || 1) + " annual exam question. " +
                 "School year " + state.yearsInSchool + "/" + program.yearsRequired + " in " + program.degreeName + "."
             );
 
@@ -2774,7 +3061,12 @@
             state.examQuestionsThisYearAnswered = 0;
 
             syncFinancialAliases();
-            if (state.health <= 0) {
+            if (program.pipeline === "undergrad") {
+                if (applySchoolYearFinancialAndHealthConsequences()) {
+                    updateUI();
+                    return;
+                }
+            } else if (state.health <= 0) {
                 onPlayerDeath(GENERIC_HEALTH_DEATH_MESSAGE);
                 return;
             }
@@ -2836,7 +3128,7 @@
             }
 
             closeModal();
-            state.examQuestionsThisYearTotal = 2;
+            state.examQuestionsThisYearTotal = 1;
             state.examQuestionsThisYearAnswered = 0;
             state.isExamModalOpen = true;
             state.currentExamQuestion = first;
@@ -2926,6 +3218,7 @@
         function applyForJob(job) {
             const isOddJob = job.jobKind === "OddJob";
             const chance = isOddJob ? 0.95 : getHireChance();
+            const hirePct = Math.round(chance * 100);
             if (Math.random() < chance) {
                 state.annualIncome = job.salary;
                 state.jobTitle = job.title;
@@ -2940,10 +3233,10 @@
                     promotionOverlayReactRoot.render(null);
                 }
                 alert("You were hired as a " + job.title + " earning " + formatMoney(job.salary) + " a year!");
-                logEvent("You were hired as a " + job.title + ".");
+                logEvent("You were hired as a " + job.title + " (" + hirePct + "% market chance).");
             } else {
                 alert("Your application for the " + job.title + " position was rejected. The job market is tough. Keep trying!");
-                logEvent("Your application was rejected for " + job.title + ".");
+                logEvent("Your application was rejected for " + job.title + " (" + hirePct + "% market chance).");
             }
             closeModal();
             updateUI();
@@ -2952,35 +3245,36 @@
         function openJobBoard() {
             const enrProg = state.currentlyPursuing ? EDUCATION_PROGRAMS[state.currentlyPursuing] : null;
             if (enrProg && enrProg.pipeline === "residency") {
-                openModal("Career Path Jobs", "You cannot take a standard job during Medical Residency.", [
+                openModal("Find a Job", "You cannot take a standard job during Medical Residency.", [
                     { label: "Close", handler: function () { closeModal(); } }
                 ]);
                 return;
             }
             if (state.isEmployed) {
-                openModal("Career Path Jobs", "You already have a job. Use Quit Job in Careers if you want to apply elsewhere.", [
+                openModal("Find a Job", "You already have a job. Use Quit Job in Careers if you want to apply elsewhere.", [
                     { label: "Close", handler: function () { closeModal(); } }
                 ]);
                 return;
             }
             if (state.currentlyPursuing) {
-                openModal("Career Path Jobs", "Degree-track careers unlock after you graduate. Use Odd Jobs & Part-Time while in school.", [
+                openModal("Find a Job", "Career access is blocked while you are in school. Graduate first.", [
                     { label: "Close", handler: function () { closeModal(); } }
                 ]);
                 return;
             }
             if (state.jobSearchBlocked) {
-                openModal("Career Path Jobs", "Career applications are locked until you resolve academic dismissal and graduate.", [
+                openModal("Find a Job", "Academic dismissal locked your career access. Re-enroll, survive another 4-year run, and graduate to unlock jobs.", [
                     { label: "Close", handler: function () { closeModal(); } }
                 ]);
                 return;
             }
             const jobs = JOB_MARKET[state.playerPath] || [];
+            const hireChance = getHireChance();
             const actions = jobs.map(function (job) {
                 const eligible = meetsEducationRequirement(job.requiredEducation);
                 return {
                     label: eligible
-                        ? "Apply: " + job.title + " — " + formatMoney(job.salary)
+                        ? "Apply: " + job.title + " — " + formatMoney(job.salary) + " (" + Math.round(hireChance * 100) + "% hire)"
                         : job.title + " — Requires " + job.requiredEducation,
                     disabled: !eligible,
                     handler: function () {
@@ -2990,36 +3284,12 @@
                 };
             });
             actions.push({ label: "Close", handler: function () { closeModal(); } });
-            openModal("Career Path (Requires Degree)", "Professional roles on your " + state.playerPath + " path. Hiring is competitive.", actions);
-        }
-
-        function openOddJobsBoard() {
-            const enrProg = state.currentlyPursuing ? EDUCATION_PROGRAMS[state.currentlyPursuing] : null;
-            if (enrProg && enrProg.pipeline === "residency") {
-                openModal("Odd Jobs & Part-Time", "No side jobs during Medical Residency.", [
-                    { label: "Close", handler: function () { closeModal(); } }
-                ]);
-                return;
-            }
-            if (state.isEmployed) {
-                openModal("Odd Jobs & Part-Time", "Quit your current job first to apply for a different one.", [
-                    { label: "Close", handler: function () { closeModal(); } }
-                ]);
-                return;
-            }
-            const jobs = getOddJobsListForPlayer();
-            const actions = jobs.map(function (job) {
-                return {
-                    label: "Apply: " + job.title + " — " + formatMoney(job.salary) + " (~95% hire)",
-                    handler: function () {
-                        applyForJob(job);
-                    }
-                };
-            });
-            actions.push({ label: "Close", handler: function () { closeModal(); } });
             openModal(
-                "Odd Jobs & Part-Time",
-                "No degree required. General listings plus " + state.playerPath + "-themed work. Easy to get hired; lighter stress if you study at the same time.",
+                "Find a Job",
+                "Career path: " + state.playerPath + "<br>" +
+                    "Credential gate: " + state.educationLevel + "<br>" +
+                    "Market odds this year: " + Math.round(hireChance * 100) + "%<br><br>" +
+                    "These roles are filtered to your education path and degree.",
                 actions
             );
         }
@@ -3028,9 +3298,8 @@
             const enrProg = state.currentlyPursuing ? EDUCATION_PROGRAMS[state.currentlyPursuing] : null;
             const residencyBlock = enrProg && enrProg.pipeline === "residency";
             const canCareerBoard = !state.isEmployed && !state.currentlyPursuing && !state.jobSearchBlocked && !residencyBlock;
-            const canOddJobsBoard = !state.isEmployed && state.playerPath && !residencyBlock;
             const lockReason = state.currentlyPursuing
-                ? "You are currently enrolled in school."
+                ? "You are currently enrolled in school and have no career income."
                 : state.jobSearchBlocked
                     ? "Career applications are locked due to academic dismissal."
                     : "Career applications are available.";
@@ -3041,7 +3310,7 @@
                     "Type: " + (state.jobType === "OddJob" ? "Part-time / Odd Job" : state.jobType === "Career" ? "Career" : "Other") + "<br>" +
                     "Current Position: " + state.jobTitle + "<br>" +
                     "Current Salary: " + formatMoney(state.annualIncome) + " / year<br><br>" +
-                    "<span style=\"color:#bdbdbd;font-size:0.9rem;\">Career jobs use your " + state.playerPath + " path and credentials. Odd jobs never require a degree.</span>";
+                    "<span style=\"color:#bdbdbd;font-size:0.9rem;\">Your career is permanently tied to your education path and completed credentials.</span>";
                 openModal(
                     "Careers",
                     panel,
@@ -3061,20 +3330,13 @@
             openModal(
                 "Careers",
                 "Status: " + state.jobTitle + " | Annual Income: " + formatMoney(state.annualIncome) + "<br>" + lockReason +
-                    "<br><br><strong>Choose a job board:</strong>",
+                    "<br><br><strong>Find work in your lane:</strong>",
                 [
                     {
-                        label: canCareerBoard ? "Career Path (Requires Degree)" : "Career Path (Locked)",
+                        label: canCareerBoard ? "Find a Job" : "Find a Job (Locked)",
                         disabled: !canCareerBoard,
                         handler: function () {
                             if (canCareerBoard) openJobBoard();
-                        }
-                    },
-                    {
-                        label: canOddJobsBoard ? "Odd Jobs & Part-Time" : "Odd Jobs (Unavailable)",
-                        disabled: !canOddJobsBoard,
-                        handler: function () {
-                            if (canOddJobsBoard) openOddJobsBoard();
                         }
                     },
                     { label: "Close", handler: function () { closeModal(); } }
@@ -3296,6 +3558,12 @@
             logEvent("Graduation: You earned " + program.degreeName + ".");
             syncCurrentEnrollment();
 
+            if (program.pipeline === "undergrad" || !program.pipeline) {
+                openGraduationOutcomeOverlay(program, debtLine);
+                updateUI();
+                return;
+            }
+
             const actions = [
                 {
                     label: "Find a Job",
@@ -3344,7 +3612,7 @@
                 : "You are not currently enrolled in school.";
             const examProgress = program
                 ? "Exam questions (this degree): " + state.examsPassedThisDegree + "/" + state.examsTakenThisDegree +
-                    " (2 per year; need " + getRequiredExamPassesForProgram(program) + "+ correct to graduate)."
+                    " (1 per year; need " + getRequiredExamPassesForProgram(program) + "+ correct to graduate)."
                 : "";
             const enrollLine = state.currentEnrollment
                 ? "<br><strong>Current enrollment:</strong> " + state.currentEnrollment.degreeName +
@@ -4020,13 +4288,15 @@
             ]);
         }
 
-        function openAssetsMenu(focusPsychiatrist) {
+        function openAssetsMenu(focusService) {
             if (state.realEstateListings.length === 0) {
                 generateRealEstateMarket();
             }
             syncFinancialAliases();
             const currentNetWorth = state.cash + state.investments - state.debt;
             const canInvest = state.bankBalance > 0 && currentNetWorth > 0;
+            const emphasizeDoctor = focusService === "doctor";
+            const emphasizePsychiatrist = focusService === "psychiatrist" || focusService === true;
             const marketLabel = state.currentHousingMarketEvent === "crash"
                 ? "<span style=\"color:#ff6b6b;\">Market Mood: Crash (-20%)</span>"
                 : state.currentHousingMarketEvent === "boom"
@@ -4041,10 +4311,11 @@
                     const color = up ? "#69f0ae" : down ? "#ff6b6b" : "#bdbdbd";
                     const marker = up ? "▲" : down ? "▼" : "■";
                     const mortgageText = property.isMortgaged ? "Mortgage: " + formatMoney(property.remainingBalance) : "No mortgage";
+                    const upkeepText = "Upkeep: " + formatMoney(property.annualUpkeep) + "/yr";
                     return "<div style=\"margin-bottom:8px;\">" +
                         "<strong>" + property.propertyType + "</strong><br>" +
                         "Original: " + formatMoney(property.originalPrice) + " | Current: " + formatMoney(property.currentValue) + "<br>" +
-                        "<span style=\"color:" + color + ";\">" + marker + " " + (up ? "+" : "") + delta.pct.toFixed(1) + "%</span> | " + mortgageText +
+                        "<span style=\"color:" + color + ";\">" + marker + " " + (up ? "+" : "") + delta.pct.toFixed(1) + "%</span> | " + mortgageText + " | " + upkeepText +
                         "</div>";
                 }).join("")
                 : "<div style=\"color:#bdbdbd; margin-bottom:8px;\">No properties owned.</div>";
@@ -4125,7 +4396,13 @@
                 }
             });
             actions.push({
-                label: (focusPsychiatrist ? "➡ " : "") + "Psychiatrist (" + formatMoney(PSYCHIATRIST_VISIT_COST) + ")",
+                label: (emphasizeDoctor ? "➡ " : "") + "Doctor",
+                handler: function () {
+                    openDoctorMenu();
+                }
+            });
+            actions.push({
+                label: (emphasizePsychiatrist ? "➡ " : "") + "Psychiatrist (" + formatMoney(PSYCHIATRIST_VISIT_COST) + ")",
                 handler: function () {
                     visitPsychiatrist();
                 }
@@ -4140,7 +4417,8 @@
             openModal(
                 "Assets",
                 marketLabel + "<br><br><strong>My Properties</strong><br>" + myPropertiesHtml +
-                "<br><strong>Broker Listings</strong><br>" + listingsHtml,
+                "<br><strong>Broker Listings</strong><br>" + listingsHtml +
+                "<br><br><strong>Financial pressure</strong><br>Every property's annual upkeep is added to your recurring expenses, permanently reducing net income until you sell.",
                 actions
             );
         }
