@@ -786,7 +786,8 @@
             playerPath: null, annualIncome: 0, educationLevel: "None", yearsInSchool: 0,
             currentlyPursuing: null, educationCredentials: [], jobTitle: "Unemployed",
             isExamModalOpen: false, currentExamQuestion: null, examsPassedThisDegree: 0,
-            examsTakenThisDegree: 0, jobSearchBlocked: true, academicDismissed: false,
+            examsTakenThisDegree: 0, examQuestionsThisYearTotal: 0, examQuestionsThisYearAnswered: 0,
+            examYearQuestionQueue: [], examYearUsedQuestionIds: [], jobSearchBlocked: true, academicDismissed: false,
             isDiagnosisOverlayOpen: false, currentDiagnosisIllnessKey: null,
             canAccessDoctor: true, activeView: "MainGameplay",
             mentalIllnessState: {},
@@ -1027,75 +1028,99 @@
             ]
         };
 
-        const EXAM_QUESTION_BANKS = {
+        function shuffleExamOptionsInPlace(arr) {
+            for (var i = arr.length - 1; i > 0; i--) {
+                var j = Math.floor(Math.random() * (i + 1));
+                var t = arr[i];
+                arr[i] = arr[j];
+                arr[j] = t;
+            }
+        }
+
+        function normalizeExamQuestionEntry(entry) {
+            var wrong = entry.options.filter(function (opt) { return opt !== entry.correctAnswer; });
+            var opts = [entry.correctAnswer].concat(wrong.slice(0, 3));
+            shuffleExamOptionsInPlace(opts);
+            return {
+                question: entry.question,
+                options: opts,
+                correctAnswerIndex: opts.indexOf(entry.correctAnswer)
+            };
+        }
+
+        const EXAM_QUESTION_BANKS_RAW = {
             STEM: [
-                {
-                    question: "In Thermodynamics, which law states that entropy tends to increase?",
-                    options: ["First Law", "Second Law", "Third Law", "Zeroth Law"],
-                    correctAnswerIndex: 1
-                },
-                {
-                    question: "Which concept refers to a function calling itself?",
-                    options: ["Iteration", "Recursion", "Inheritance", "Polymorphism"],
-                    correctAnswerIndex: 1
-                },
-                {
-                    question: "What is the derivative of sin(x)?",
-                    options: ["-sin(x)", "cos(x)", "tan(x)", "sec²(x)"],
-                    correctAnswerIndex: 1
-                },
-                {
-                    question: "Which element has the highest electronegativity?",
-                    options: ["Oxygen", "Chlorine", "Fluorine", "Nitrogen"],
-                    correctAnswerIndex: 2
-                }
+                { question: 'In Thermodynamics, which law states entropy tends to increase?', options: ['First Law', 'Second Law', 'Third Law', 'Zeroth Law'], correctAnswer: 'Second Law' },
+                { question: 'What programming concept refers to a function calling itself?', options: ['Iteration', 'Recursion', 'Inheritance', 'Polymorphism'], correctAnswer: 'Recursion' },
+                { question: 'What is the derivative of sin(x)?', options: ['-sin(x)', 'cos(x)', 'tan(x)', 'sec²(x)'], correctAnswer: 'cos(x)' },
+                { question: 'Which element has the highest electronegativity?', options: ['Oxygen', 'Chlorine', 'Fluorine', 'Nitrogen'], correctAnswer: 'Fluorine' },
+                { question: 'What is the average time complexity of searching a balanced binary search tree?', options: ['O(n)', 'O(log n)', 'O(n log n)', 'O(1)'], correctAnswer: 'O(log n)' },
+                { question: 'In organic chemistry, what rule states the most stable alkene has the most alkyl substituents?', options: ["Markovnikov's Rule", "Zaitsev's Rule", 'Hofmann Rule', 'Saytzeff Rule'], correctAnswer: "Zaitsev's Rule" },
+                { question: 'What is the indefinite integral of 1/x dx?', options: ['x + C', '1/x² + C', 'e^x + C', 'ln|x| + C'], correctAnswer: 'ln|x| + C' },
+                { question: 'Who formulated the Uncertainty Principle in quantum mechanics?', options: ['Niels Bohr', 'Werner Heisenberg', 'Max Planck', 'Erwin Schrödinger'], correctAnswer: 'Werner Heisenberg' },
+                { question: 'Which equations describe the motion of viscous fluid substances?', options: ['Bernoulli Equations', 'Navier-Stokes Equations', "Maxwell's Equations", 'Schrödinger Equation'], correctAnswer: 'Navier-Stokes Equations' },
+                { question: 'In linear algebra, what vector changes at most by a scalar factor under linear transformation?', options: ['Basis vector', 'Eigenvector', 'Unit vector', 'Zero vector'], correctAnswer: 'Eigenvector' },
+                { question: 'Which liver enzymes are responsible for the majority of drug metabolism?', options: ['Amylase', 'Lipase', 'Cytochrome P450', 'Trypsin'], correctAnswer: 'Cytochrome P450' },
+                { question: "In computational complexity, what does 'NP' stand for?", options: ['Non-Polynomial time', 'Nondeterministic Polynomial time', 'Normal Processing', 'Network Protocol'], correctAnswer: 'Nondeterministic Polynomial time' },
+                { question: 'What enzyme synthesizes ATP in the mitochondria?', options: ['DNA polymerase', 'RNA polymerase', 'ATP Synthase', 'Helicase'], correctAnswer: 'ATP Synthase' },
+                { question: "What is Avogadro's constant approximately?", options: ['3.14 x 10^23', '6.022 x 10^23', '9.81 x 10^23', '1.602 x 10^23'], correctAnswer: '6.022 x 10^23' },
+                { question: "What is the formula for Ohm's Law?", options: ['P = IV', 'V = IR', 'F = ma', 'E = mc²'], correctAnswer: 'V = IR' },
+                { question: 'In SQL, which join returns only rows with a match in both tables?', options: ['LEFT JOIN', 'RIGHT JOIN', 'INNER JOIN', 'FULL OUTER JOIN'], correctAnswer: 'INNER JOIN' },
+                { question: 'What cellular process results in four haploid cells?', options: ['Mitosis', 'Meiosis', 'Binary fission', 'Budding'], correctAnswer: 'Meiosis' },
+                { question: "In physics, what are the SI units of Planck's constant?", options: ['Newton-meters', 'Joule-seconds', 'Watts', 'Coulombs'], correctAnswer: 'Joule-seconds' },
+                { question: 'Which ions are primarily responsible for the resting membrane potential in neurons?', options: ['Calcium and Magnesium', 'Sodium and Potassium', 'Chloride only', 'Hydrogen only'], correctAnswer: 'Sodium and Potassium' },
+                { question: 'In Boolean algebra, what law states that NOT (A OR B) is equivalent to (NOT A) AND (NOT B)?', options: ['Commutative Law', 'Associative Law', "De Morgan's Law", 'Distributive Law'], correctAnswer: "De Morgan's Law" },
             ],
             Humanities: [
-                {
-                    question: "Which movement was led by Salvador Dalí?",
-                    options: ["Impressionism", "Cubism", "Surrealism", "Dada"],
-                    correctAnswerIndex: 2
-                },
-                {
-                    question: "Who popularized 'The Hero's Journey'?",
-                    options: ["Sigmund Freud", "Carl Jung", "Joseph Campbell", "James Joyce"],
-                    correctAnswerIndex: 2
-                },
-                {
-                    question: "Which period featured Bach and Vivaldi?",
-                    options: ["Classical", "Romantic", "Baroque", "Modern"],
-                    correctAnswerIndex: 2
-                },
-                {
-                    question: "What is a word's literal, dictionary definition?",
-                    options: ["Connotation", "Denotation", "Etymology", "Syntax"],
-                    correctAnswerIndex: 1
-                }
+                { question: 'Which art movement, led by Salvador Dalí, explored the unconscious mind?', options: ['Cubism', 'Surrealism', 'Dada', 'Futurism'], correctAnswer: 'Surrealism' },
+                { question: "Who popularized the literary concept of 'The Hero's Journey'?", options: ['Sigmund Freud', 'Carl Jung', 'Joseph Campbell', 'James Joyce'], correctAnswer: 'Joseph Campbell' },
+                { question: 'Which musical period featured heavy ornamentation and composers like Bach?', options: ['Classical', 'Romantic', 'Baroque', 'Modern'], correctAnswer: 'Baroque' },
+                { question: "What is a word's literal, dictionary definition called?", options: ['Connotation', 'Denotation', 'Etymology', 'Syntax'], correctAnswer: 'Denotation' },
+                { question: "Which philosopher used the 'Panopticon' to describe societal surveillance?", options: ['John Locke', 'Michel Foucault', 'Thomas Hobbes', 'John Stuart Mill'], correctAnswer: 'Michel Foucault' },
+                { question: "Immanuel Kant's universal moral law is known as what?", options: ['The Veil of Ignorance', 'The Categorical Imperative', 'The Social Contract', 'Utilitarianism'], correctAnswer: 'The Categorical Imperative' },
+                { question: 'In U.S. Law, what is the most rigorous form of judicial review?', options: ['Rational Basis', 'Intermediate Scrutiny', 'Strict Scrutiny', 'Arbitrary Review'], correctAnswer: 'Strict Scrutiny' },
+                { question: 'Which critical theory is most closely associated with Jacques Derrida?', options: ['Structuralism', 'Deconstruction', 'Formalism', 'Marxism'], correctAnswer: 'Deconstruction' },
+                { question: 'In which Italian city is the Renaissance generally considered to have begun?', options: ['Rome', 'Venice', 'Florence', 'Milan'], correctAnswer: 'Florence' },
+                { question: "Who wrote the foundational political treatise 'The Prince'?", options: ['Thomas More', 'Niccolò Machiavelli', 'John Locke', 'Jean-Jacques Rousseau'], correctAnswer: 'Niccolò Machiavelli' },
+                { question: 'Which 19th-century art movement focused on capturing light and everyday subjects?', options: ['Romanticism', 'Impressionism', 'Realism', 'Neoclassicism'], correctAnswer: 'Impressionism' },
+                { question: 'What poetic meter consists of five sets of unstressed-stressed syllables per line?', options: ['Trochaic Tetrameter', 'Iambic Pentameter', 'Anapestic Hexameter', 'Dactylic Pentameter'], correctAnswer: 'Iambic Pentameter' },
+                { question: "Which philosopher is a primary figure in Existentialism and authored 'Being and Nothingness'?", options: ['Martin Heidegger', 'Jean-Paul Sartre', 'Albert Camus', 'Simone de Beauvoir'], correctAnswer: 'Jean-Paul Sartre' },
+                { question: 'In psychology, what is the mental discomfort of holding conflicting beliefs called?', options: ['Confirmation Bias', 'Cognitive Dissonance', 'Anchoring', 'Hindsight Bias'], correctAnswer: 'Cognitive Dissonance' },
+                { question: 'What legal principle protects individuals from unlawful detention?', options: ['Res judicata', 'Habeas Corpus', 'Stare decisis', 'Mens rea'], correctAnswer: 'Habeas Corpus' },
+                { question: 'Which literary genre blends magical elements into a realistic setting, popularized by Gabriel García Márquez?', options: ['Science Fiction', 'Magical Realism', 'Gothic Fiction', 'Allegory'], correctAnswer: 'Magical Realism' },
+                { question: "In Plato's Republic, what allegory describes prisoners mistaking shadows for reality?", options: ['Myth of Er', 'Allegory of the Cave', 'Ring of Gyges', 'Ship of Fools'], correctAnswer: 'Allegory of the Cave' },
+                { question: 'In what year was the Magna Carta signed?', options: ['1066', '1215', '1492', '1776'], correctAnswer: '1215' },
+                { question: 'Which economic theory advocates for increased government expenditures to stimulate demand?', options: ['Monetarism', 'Keynesian Economics', 'Supply-side Economics', 'Mercantilism'], correctAnswer: 'Keynesian Economics' },
+                { question: 'What influential German art school combined crafts and the fine arts in the early 20th century?', options: ['The Academy', 'Bauhaus', 'The Salon', 'Vkhutemas'], correctAnswer: 'Bauhaus' },
             ],
             Trades: [
-                {
-                    question: "What is the purpose of a level in construction?",
-                    options: ["Measure angles only", "Check horizontal/vertical alignment", "Mark cuts only", "Test for live voltage"],
-                    correctAnswerIndex: 1
-                },
-                {
-                    question: "Which device shuts off a circuit during overload?",
-                    options: ["A fuse only (never resets)", "Circuit breaker", "Ground wire", "Resistor"],
-                    correctAnswerIndex: 1
-                },
-                {
-                    question: "Which tool is used to smooth wood before painting?",
-                    options: ["Chisel", "Hand plane", "Sandpaper", "Soldering iron"],
-                    correctAnswerIndex: 2
-                },
-                {
-                    question: "What does 'PPE' stand for?",
-                    options: ["Project Planning Estimate", "Personal Protective Equipment", "Power Press Exam", "Public Permit Entry"],
-                    correctAnswerIndex: 1
-                }
-            ]
+                { question: 'What is the primary purpose of a level in construction?', options: ['To measure distance', 'To check if a surface is perfectly horizontal/vertical', 'To cut straight lines', 'To test voltage'], correctAnswer: 'To check if a surface is perfectly horizontal/vertical' },
+                { question: 'Which safety device shuts off an electrical circuit during an overload?', options: ['Fuse only', 'Circuit Breaker', 'Ground wire', 'Lightning rod'], correctAnswer: 'Circuit Breaker' },
+                { question: 'What is used to smooth a wooden surface before finishing?', options: ['Chisel', 'Sandpaper', 'Solder', 'Putty knife only'], correctAnswer: 'Sandpaper' },
+                { question: "What does 'PPE' stand for?", options: ['Project Planning Estimate', 'Personal Protective Equipment', 'Power Press Exam', 'Public Permit Entry'], correctAnswer: 'Personal Protective Equipment' },
+                { question: 'When framing a standard residential wall, what is the typical spacing between studs?', options: ['12 inches on center', '16 inches on center', '24 inches on center', '32 inches on center'], correctAnswer: '16 inches on center' },
+                { question: 'In plumbing, what prevents sewer gases from entering the home?', options: ['Shutoff valve', 'P-trap', 'Pressure tank', 'Expansion tank'], correctAnswer: 'P-trap' },
+                { question: 'What tool safely tests if an electrical wire is live?', options: ['Pipe wrench', 'Multimeter / Voltage Tester', 'Hacksaw', 'Level'], correctAnswer: 'Multimeter / Voltage Tester' },
+                { question: 'In MIG welding, what is the purpose of Argon gas?', options: ['To cool the torch', 'To protect the weld pool from contamination', 'To increase amperage', 'To remove rust'], correctAnswer: 'To protect the weld pool from contamination' },
+                { question: 'What type of outlet is required near water sources to prevent electrocution?', options: ['AFCI', 'GFCI', 'USB-only', '240V only'], correctAnswer: 'GFCI' },
+                { question: 'What tool establishes a perfectly vertical reference line?', options: ['Chalk line', 'Plumb bob', 'Speed square', 'Torpedo level'], correctAnswer: 'Plumb bob' },
+                { question: 'In the American Wire Gauge (AWG) system, how does wire thickness relate to gauge number?', options: ['Higher numbers mean thicker wire', 'Higher gauge numbers mean thinner wire', 'Gauge is unrelated to thickness', 'All gauges are the same thickness'], correctAnswer: 'Higher gauge numbers mean thinner wire' },
+                { question: "What does an 'R-value' measure in construction?", options: ['Electrical resistance only', 'Thermal resistance of insulation', 'Water pressure', 'Roof slope'], correctAnswer: 'Thermal resistance of insulation' },
+                { question: 'What is the process of joining copper pipes using heat and a filler metal called?', options: ['Threading', 'Sweating / Soldering', 'Crimping', 'Gluing'], correctAnswer: 'Sweating / Soldering' },
+                { question: 'What is the term for the width of the cut made by a saw blade?', options: ['Bevel', 'Kerf', 'Rip', 'Dado'], correctAnswer: 'Kerf' },
+                { question: 'What tool is used to snap perfectly straight lines across flat surfaces?', options: ['Plumb bob', 'Chalk line', 'Contour gauge', 'Stud finder'], correctAnswer: 'Chalk line' },
+                { question: 'Which plastic pipe is commonly used for hot water supply lines?', options: ['PVC only', 'PEX', 'ABS only', 'Cardboard'], correctAnswer: 'PEX' },
+                { question: 'What device is designed to protect against dangerous electrical arcs in branch circuits?', options: ['GFCI', 'AFCI', 'Surge protector', 'Transformer'], correctAnswer: 'AFCI' },
+                { question: 'Which tool is used to apply a specific torque to a fastener?', options: ['Hammer', 'Torque wrench', 'Speed square', 'Crowbar'], correctAnswer: 'Torque wrench' },
+                { question: 'What is the main purpose of a bay window?', options: ['Fire escape only', 'To project outward and add space/light', 'To block sunlight', 'To hide wiring'], correctAnswer: 'To project outward and add space/light' },
+                { question: 'What type of PPE is most important when operating loud power tools?', options: ['Steel-toe shoes only', 'Hearing protection', 'Sunscreen', 'Leather apron only'], correctAnswer: 'Hearing protection' },
+            ],
         };
 
+        const EXAM_QUESTION_BANKS = {};
+        Object.keys(EXAM_QUESTION_BANKS_RAW).forEach(function (pathKey) {
+            EXAM_QUESTION_BANKS[pathKey] = EXAM_QUESTION_BANKS_RAW[pathKey].map(normalizeExamQuestionEntry);
+        });
         const EXAM_FEEDBACK_DELAY_MS = 700;
 
         const DISEASES = {
@@ -1631,10 +1656,15 @@
         function YearlyExamOverlay(props) {
             const q = props.question;
             if (!q) return null;
+            const part = props.questionPart || 1;
+            const totalParts = props.questionsPerYear || 2;
             return (
                 <div id="yearly-exam-overlay" className="open" role="dialog" aria-modal="true" aria-label="Yearly Exam">
                     <div id="exam-desk">
                         <h2 id="exam-title">FINAL EXAM: YEAR {props.currentSchoolYear}</h2>
+                        <p id="exam-subtitle" style={{ margin: "0 0 10px", fontSize: "0.88rem", color: "#9e9e9e" }}>
+                            Question {part} of {totalParts} this year
+                        </p>
                         <p id="exam-question">{q.question}</p>
                         <div id="exam-options">
                             {q.options.map(function (optionText, optionIndex) {
@@ -1665,15 +1695,51 @@
             );
         }
 
-        function getRandomExamQuestionForPath(path) {
+        function examQuestionId(path, bankIndex) {
+            return path + ":" + bankIndex;
+        }
+
+        function startExamYearQuestionQueue(path) {
             const bank = EXAM_QUESTION_BANKS[path] || [];
-            if (!bank.length) return null;
-            const picked = bank[Math.floor(Math.random() * bank.length)];
-            return {
-                question: picked.question,
-                options: picked.options.slice(),
-                correctAnswerIndex: picked.correctAnswerIndex
-            };
+            if (bank.length < 2) {
+                state.examYearQuestionQueue = [];
+                return;
+            }
+            var indices = bank.map(function (_, i) { return i; });
+            for (var i = indices.length - 1; i > 0; i--) {
+                var j = Math.floor(Math.random() * (i + 1));
+                var t = indices[i];
+                indices[i] = indices[j];
+                indices[j] = t;
+            }
+            var pick = [];
+            for (var k = 0; k < indices.length && pick.length < 2; k++) {
+                var idx = indices[k];
+                var id = examQuestionId(path, idx);
+                if (state.examYearUsedQuestionIds.indexOf(id) === -1) {
+                    pick.push(idx);
+                }
+            }
+            if (pick.length < 2) {
+                state.examYearUsedQuestionIds = [];
+                pick = indices.slice(0, 2);
+            }
+            pick.forEach(function (idx) {
+                state.examYearUsedQuestionIds.push(examQuestionId(path, idx));
+            });
+            state.examYearQuestionQueue = pick.map(function (idx) {
+                var q = bank[idx];
+                return {
+                    question: q.question,
+                    options: q.options.slice(),
+                    correctAnswerIndex: q.correctAnswerIndex
+                };
+            });
+        }
+
+        function popNextExamQuestionForYear() {
+            if (!state.examYearQuestionQueue || !state.examYearQuestionQueue.length) return null;
+            return state.examYearQuestionQueue.shift();
         }
 
         function renderYearlyExamOverlay(selectedOptionIndex, showFeedback) {
@@ -1693,6 +1759,8 @@
                 <YearlyExamOverlay
                     currentSchoolYear={state.yearsInSchool + 1}
                     question={state.currentExamQuestion}
+                    questionPart={state.examQuestionsThisYearAnswered + 1}
+                    questionsPerYear={state.examQuestionsThisYearTotal || 2}
                     selectedOptionIndex={selectedOptionIndex}
                     showFeedback={showFeedback}
                     onSelectOption={handleYearlyExamAnswer}
@@ -1977,12 +2045,13 @@
         }
 
         function getRequiredExamPassesForProgram(program) {
+            var totalQuestions = program.yearsRequired * 2;
             if (program && program.pipeline && program.pipeline !== "undergrad") {
-                return Math.ceil(program.yearsRequired * 0.5);
+                return Math.ceil(totalQuestions * 0.5);
             }
-            const byRatio = Math.ceil(program.yearsRequired * 0.75);
+            var byRatio = Math.ceil(totalQuestions * 0.75);
             if (program.yearsRequired >= 4) {
-                return Math.max(3, byRatio);
+                return Math.max(6, byRatio);
             }
             return byRatio;
         }
@@ -1992,6 +2061,10 @@
             state.yearsInSchool = 0;
             state.examsPassedThisDegree = 0;
             state.examsTakenThisDegree = 0;
+            state.examYearQuestionQueue = [];
+            state.examYearUsedQuestionIds = [];
+            state.examQuestionsThisYearTotal = 0;
+            state.examQuestionsThisYearAnswered = 0;
             state.isInSchool = false;
             state.isEnrolled = false;
             state.isExamModalOpen = false;
@@ -2009,8 +2082,8 @@
             state.jobSearchBlocked = false;
             openModal(
                 "Academic Dismissal",
-                "<strong>You did not pass at least 50% of the required exams for " + program.degreeName + ".</strong><br><br>" +
-                "You passed " + passedCount + "/" + program.yearsRequired + " exams (minimum required: " + requiredPasses + "). " +
+                "<strong>You did not pass at least 50% of the required exam questions for " + program.degreeName + ".</strong><br><br>" +
+                "You passed " + passedCount + "/" + (program.yearsRequired * 2) + " exam questions (minimum required: " + requiredPasses + "). " +
                 "You are not awarded this degree. Accumulated program debt remains on your record.<br><br>" + debtLine,
                 [{ label: "Continue", handler: function () { closeModal(); updateUI(); } }]
             );
@@ -2039,10 +2112,15 @@
             syncCurrentEnrollment();
 
             logEvent("Academic dismissal: you did not pass enough yearly exams for " + program.degreeName + ".");
+            state.examYearQuestionQueue = [];
+            state.examYearUsedQuestionIds = [];
+            state.examQuestionsThisYearTotal = 0;
+            state.examQuestionsThisYearAnswered = 0;
+
             openModal(
                 "Academic Dismissal — Failed Final Year",
-                "<strong>You did not meet the graduation exam requirement.</strong><br><br>You passed " + passedCount + "/" + program.yearsRequired +
-                " exams (minimum required: " + requiredPasses + "). You must restart " +
+                "<strong>You did not meet the graduation exam requirement.</strong><br><br>You passed " + passedCount + "/" + (program.yearsRequired * 2) +
+                " exam questions (minimum required: " + requiredPasses + "). You must restart " +
                 program.degreeName + " from Year 1. Careers and Find a Job stay locked until you graduate successfully.<br><br>" + debtLine,
                 [
                     {
@@ -2059,7 +2137,7 @@
             updateUI();
         }
 
-        function advanceSchoolYearAfterExam(answerWasCorrect) {
+        function finalizeSchoolYearAfterExams() {
             const program = state.currentlyPursuing ? EDUCATION_PROGRAMS[state.currentlyPursuing] : null;
             if (!program) return;
 
@@ -2116,9 +2194,12 @@
             syncCurrentEnrollment();
 
             logEvent(
-                "Age " + state.age + ": Final exam " + (answerWasCorrect ? "passed" : "failed") +
-                ". School year " + state.yearsInSchool + "/" + program.yearsRequired + " in " + program.degreeName + "."
+                "Age " + state.age + ": Completed " + (state.examQuestionsThisYearTotal || 2) + " final exam questions. " +
+                "School year " + state.yearsInSchool + "/" + program.yearsRequired + " in " + program.degreeName + "."
             );
+
+            state.examQuestionsThisYearTotal = 0;
+            state.examQuestionsThisYearAnswered = 0;
 
             syncFinancialAliases();
             if (state.health <= 0) {
@@ -2158,23 +2239,35 @@
             renderYearlyExamOverlay(selectedOptionIndex, true);
 
             window.setTimeout(function () {
-                closeYearlyExamOverlay();
-                advanceSchoolYearAfterExam(answerWasCorrect);
+                state.examQuestionsThisYearAnswered += 1;
+                var nextQ = popNextExamQuestionForYear();
+                if (nextQ) {
+                    state.currentExamQuestion = nextQ;
+                    state.isExamModalOpen = true;
+                    state.isExamActive = true;
+                    renderYearlyExamOverlay(null, false);
+                } else {
+                    closeYearlyExamOverlay();
+                    finalizeSchoolYearAfterExams();
+                }
             }, EXAM_FEEDBACK_DELAY_MS);
         }
 
         function openYearlyExamOverlay() {
             if (state.isDead || !state.currentlyPursuing || state.isExamModalOpen) return;
 
-            const question = getRandomExamQuestionForPath(state.playerPath);
-            if (!question) {
-                advanceSchoolYearAfterExam(false);
+            startExamYearQuestionQueue(state.playerPath);
+            var first = popNextExamQuestionForYear();
+            if (!first) {
+                finalizeSchoolYearAfterExams();
                 return;
             }
 
             closeModal();
+            state.examQuestionsThisYearTotal = 2;
+            state.examQuestionsThisYearAnswered = 0;
             state.isExamModalOpen = true;
-            state.currentExamQuestion = question;
+            state.currentExamQuestion = first;
             renderYearlyExamOverlay(null, false);
         }
 
@@ -2360,6 +2453,10 @@
             state.currentExamQuestion = null;
             state.isExamModalOpen = false;
             state.isExamActive = false;
+            state.examYearQuestionQueue = [];
+            state.examYearUsedQuestionIds = [];
+            state.examQuestionsThisYearTotal = 0;
+            state.examQuestionsThisYearAnswered = 0;
             state.isInSchool = true;
             state.isEnrolled = true;
             state.jobSearchBlocked = program.pipeline === "undergrad" || program.pipeline === "residency";
@@ -2584,7 +2681,8 @@
                 ? "Currently pursuing: " + program.degreeName + " (" + state.yearsInSchool + "/" + program.yearsRequired + " years)"
                 : "You are not currently enrolled in school.";
             const examProgress = program
-                ? "Exam passes: " + state.examsPassedThisDegree + "/" + state.examsTakenThisDegree + "."
+                ? "Exam questions (this degree): " + state.examsPassedThisDegree + "/" + state.examsTakenThisDegree +
+                    " (2 per year; need " + getRequiredExamPassesForProgram(program) + "+ correct to graduate)."
                 : "";
             const enrollLine = state.currentEnrollment
                 ? "<br><strong>Current enrollment:</strong> " + state.currentEnrollment.degreeName +
