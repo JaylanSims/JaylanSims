@@ -896,12 +896,179 @@
             font-weight: 700;
             cursor: pointer;
         }
+
+        #academic-dismissal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 10100;
+            background: rgba(0, 0, 0, 0.97);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            box-sizing: border-box;
+        }
+
+        #academic-dismissal-overlay.open {
+            display: flex;
+        }
+
+        #academic-dismissal-card {
+            width: 100%;
+            max-width: 480px;
+            background: #1a0a0a;
+            border: 2px solid #c62828;
+            border-radius: 16px;
+            padding: 24px 22px;
+            box-shadow: 0 20px 60px rgba(198, 40, 40, 0.4);
+        }
+
+        #academic-dismissal-card h2 {
+            margin: 0 0 12px;
+            font-size: 1.4rem;
+            color: #ef5350;
+            text-align: center;
+            font-weight: 800;
+            letter-spacing: 0.04em;
+        }
+
+        #academic-dismissal-card p {
+            margin: 0 0 14px;
+            line-height: 1.5;
+            color: #f5c6c6;
+            font-size: 0.98rem;
+        }
+
+        #academic-dismissal-card .dismissal-score {
+            font-size: 1.05rem;
+            font-weight: 700;
+            color: #ff8a80;
+        }
+
+        #academic-dismissal-card .dismissal-consequence {
+            background: rgba(198, 40, 40, 0.18);
+            border: 1px solid rgba(239, 83, 80, 0.4);
+            border-radius: 10px;
+            padding: 10px 14px;
+            font-size: 0.95rem;
+            color: #ffcdd2;
+        }
+
+        #academic-dismissal-ack-btn {
+            width: 100%;
+            margin-top: 18px;
+            padding: 14px;
+            border-radius: 12px;
+            border: 1px solid #ef5350;
+            background: linear-gradient(180deg, #c62828, #b71c1c);
+            color: #fff;
+            font-size: 1rem;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        #graduation-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 10100;
+            background: rgba(0, 0, 0, 0.96);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            box-sizing: border-box;
+        }
+
+        #graduation-overlay.open {
+            display: flex;
+        }
+
+        #graduation-card {
+            width: 100%;
+            max-width: 480px;
+            background: #0a1a0a;
+            border: 2px solid #43a047;
+            border-radius: 16px;
+            padding: 24px 22px;
+            box-shadow: 0 20px 60px rgba(67, 160, 71, 0.4);
+        }
+
+        #graduation-card h2 {
+            margin: 0 0 12px;
+            font-size: 1.5rem;
+            color: #69f0ae;
+            text-align: center;
+            font-weight: 800;
+        }
+
+        #graduation-card p {
+            margin: 0 0 12px;
+            line-height: 1.5;
+            color: #c8f5c8;
+            font-size: 0.98rem;
+        }
+
+        #graduation-card .grad-degree {
+            font-size: 1.15rem;
+            font-weight: 700;
+            color: #a5d6a7;
+            text-align: center;
+        }
+
+        #graduation-card .grad-debt {
+            color: #ff8a80;
+            font-size: 0.9rem;
+        }
+
+        .graduation-btn {
+            width: 100%;
+            margin-top: 10px;
+            padding: 13px;
+            border-radius: 12px;
+            border: 1px solid #444;
+            font-size: 0.98rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .graduation-btn-primary {
+            background: linear-gradient(180deg, #2e7d32, #1b5e20);
+            color: #fff;
+            border-color: #4caf50;
+        }
+
+        .graduation-btn-secondary {
+            background: #1e2a1e;
+            color: #a5d6a7;
+        }
     </style>
 </head>
 <body>
     <div id="yearly-exam-react-root"></div>
     <div id="promotion-overlay-root"></div>
     <div id="eviction-overlay-root"></div>
+    <div id="academic-dismissal-overlay" aria-hidden="true">
+        <div id="academic-dismissal-card">
+            <h2>ACADEMIC DISMISSAL</h2>
+            <p id="academic-dismissal-body"></p>
+            <button type="button" id="academic-dismissal-ack-btn">I understand. Re-enroll from Year 1.</button>
+        </div>
+    </div>
+    <div id="graduation-overlay" aria-hidden="true">
+        <div id="graduation-card">
+            <h2 id="graduation-title">CONGRATULATIONS!</h2>
+            <p id="graduation-body"></p>
+            <div id="graduation-actions"></div>
+        </div>
+    </div>
     <div id="app-container">
         <div id="intro-screen">
             <img src="js-games-logo.png" alt="JS Games" id="intro-logo" onerror="this.onerror=null;this.src='./js-games-logo.png';">
@@ -1047,6 +1214,8 @@
             pendingPromotion: null,
             isPromotionOverlayOpen: false,
             isEvictionOverlayOpen: false,
+            isGraduationOverlayOpen: false,
+            isAcademicDismissalOverlayOpen: false,
             currentHousing: null,
             roommate: null,
             rentExpenseInBudget: 0
@@ -1966,7 +2135,7 @@
         }
 
         function openModal(title, description, actions) {
-            if (state.isExamModalOpen || state.isExamActive || state.isDiagnosisOverlayOpen || state.isPromotionOverlayOpen || state.isEvictionOverlayOpen) return;
+            if (state.isExamModalOpen || state.isExamActive || state.isDiagnosisOverlayOpen || state.isPromotionOverlayOpen || state.isEvictionOverlayOpen || state.isGraduationOverlayOpen || state.isAcademicDismissalOverlayOpen) return;
             if (higherEdCatalogRoot) {
                 higherEdCatalogRoot.render(null);
             }
@@ -2149,6 +2318,94 @@
             continueAgeUpAfterRoommateEviction();
         }
 
+        const academicDismissalOverlay = document.getElementById("academic-dismissal-overlay");
+        const academicDismissalBody = document.getElementById("academic-dismissal-body");
+        const academicDismissalAckBtn = document.getElementById("academic-dismissal-ack-btn");
+        const graduationOverlay = document.getElementById("graduation-overlay");
+        const graduationTitle = document.getElementById("graduation-title");
+        const graduationBody = document.getElementById("graduation-body");
+        const graduationActionsEl = document.getElementById("graduation-actions");
+
+        function triggerAcademicDismissalOverlay(passedCount, totalYears, requiredPasses, degreeName, debtLine) {
+            academicDismissalBody.innerHTML =
+                "<p class=\"dismissal-score\">You passed " + passedCount + " out of " + totalYears +
+                " exams (required: " + requiredPasses + " to graduate).</p>" +
+                "<p>You did not meet the graduation requirement for <strong>" + degreeName + "</strong>. " +
+                "You must restart from Year 1. All career applications remain locked until you graduate.</p>" +
+                "<div class=\"dismissal-consequence\">Happiness set to 0. <strong>Depression</strong> diagnosed — Annual drain: -25 Happiness until treated.</div>" +
+                "<p style=\"color:#bdbdbd; font-size:0.88rem; margin-top:10px;\">" + debtLine + "</p>";
+            setAcademicDismissalAckForUndergrad();
+            state.isAcademicDismissalOverlayOpen = true;
+            academicDismissalOverlay.classList.add("open");
+            academicDismissalOverlay.setAttribute("aria-hidden", "false");
+        }
+
+        function closeAcademicDismissalOverlay() {
+            academicDismissalOverlay.classList.remove("open");
+            academicDismissalOverlay.setAttribute("aria-hidden", "true");
+        }
+
+        function setAcademicDismissalAckForUndergrad() {
+            if (academicDismissalAckBtn) {
+                academicDismissalAckBtn.textContent = "I understand. Re-enroll from Year 1.";
+                academicDismissalAckBtn.onclick = function () {
+                    state.isAcademicDismissalOverlayOpen = false;
+                    closeAcademicDismissalOverlay();
+                    state.happiness = 0;
+                    diagnoseIllness("depression", { setHappinessZero: true, skipHappinessPenalty: true, forceOverlay: true });
+                    updateUI();
+                };
+            }
+        }
+
+        function triggerGraduationOverlay(program, debtLine, onFindJob, onGapYear, onHigherEd) {
+            const pathDiff = PATH_DIFFICULTY_LABEL[state.playerPath] || { label: "", color: "#fff" };
+            graduationTitle.textContent = "CONGRATULATIONS! \uD83C\uDF93";
+            graduationBody.innerHTML =
+                "<p class=\"grad-degree\">" + program.degreeName + " — " + state.playerPath + " Path</p>" +
+                "<p>After years of hard work, you have officially graduated! Your exam performance unlocked your career path.</p>" +
+                "<p class=\"grad-debt\">" + debtLine + "</p>";
+            graduationActionsEl.innerHTML = "";
+
+            function addBtn(label, cls, handler) {
+                var btn = document.createElement("button");
+                btn.className = "graduation-btn " + cls;
+                btn.textContent = label;
+                btn.addEventListener("click", handler);
+                graduationActionsEl.appendChild(btn);
+            }
+
+            addBtn("Find a Job", "graduation-btn-primary", function () {
+                closeGraduationOverlay();
+                onFindJob();
+            });
+            addBtn("Take a Gap Year", "graduation-btn-secondary", function () {
+                closeGraduationOverlay();
+                onGapYear();
+            });
+            if (onHigherEd) {
+                addBtn("Higher Education Catalog", "graduation-btn-secondary", function () {
+                    closeGraduationOverlay();
+                    onHigherEd();
+                });
+            }
+
+            state.isGraduationOverlayOpen = true;
+            graduationOverlay.classList.add("open");
+            graduationOverlay.setAttribute("aria-hidden", "false");
+        }
+
+        function closeGraduationOverlay() {
+            graduationOverlay.classList.remove("open");
+            graduationOverlay.setAttribute("aria-hidden", "true");
+            state.isGraduationOverlayOpen = false;
+        }
+
+        function closeAcademicDismissalOverlayAndClearFlag() {
+            closeAcademicDismissalOverlay();
+            state.isAcademicDismissalOverlayOpen = false;
+        }
+
         function continueAgeUpAfterRoommateEviction() {
             state.roommate = null;
             state.happiness -= 20;
@@ -2228,24 +2485,33 @@
             );
         }
 
+        const PATH_DIFFICULTY_LABEL = {
+            STEM: { label: "HARD", color: "#ff5252" },
+            Humanities: { label: "MEDIUM", color: "#FFD700" },
+            Trades: { label: "EASY", color: "#69f0ae" }
+        };
+
         function YearlyExamOverlay(props) {
             const q = props.question;
             if (!q) return null;
-            const part = props.questionPart || 1;
-            const totalParts = props.questionsPerYear || 2;
+            const diff = PATH_DIFFICULTY_LABEL[props.path] || { label: "MEDIUM", color: "#FFD700" };
             return (
                 <div id="yearly-exam-overlay" className="open" role="dialog" aria-modal="true" aria-label="Yearly Exam">
                     <div id="exam-desk">
-                        <h2 id="exam-title">FINAL EXAM: YEAR {props.currentSchoolYear}</h2>
-                        <p id="exam-subtitle" style={{ margin: "0 0 10px", fontSize: "0.88rem", color: "#9e9e9e" }}>
-                            Question {part} of {totalParts} this year
+                        <h2 id="exam-title">FINAL EXAM — YEAR {props.currentSchoolYear}</h2>
+                        <p id="exam-subtitle" style={{ margin: "0 0 4px", fontSize: "0.85rem", color: "#9e9e9e" }}>
+                            {props.path} Path &nbsp;|&nbsp;
+                            <span style={{ color: diff.color, fontWeight: 700 }}>{diff.label}</span>
+                            &nbsp;|&nbsp; Exam {props.currentSchoolYear} of {props.totalYears}
+                            &nbsp;|&nbsp; Passed {props.passedSoFar}/{props.currentSchoolYear - 1 < 0 ? 0 : props.currentSchoolYear - 1} — need 3/4 to graduate
                         </p>
                         <p id="exam-question">{q.question}</p>
                         <div id="exam-options">
                             {q.options.map(function (optionText, optionIndex) {
                                 let feedbackClass = "";
-                                if (props.showFeedback && props.selectedOptionIndex === optionIndex) {
-                                    feedbackClass = optionIndex === q.correctAnswerIndex ? "correct" : "wrong";
+                                if (props.showFeedback) {
+                                    if (optionIndex === q.correctAnswerIndex) feedbackClass = "correct";
+                                    else if (props.selectedOptionIndex === optionIndex) feedbackClass = "wrong";
                                 }
                                 return (
                                     <button
@@ -2263,7 +2529,7 @@
                             })}
                         </div>
                         <p id="exam-penalty-warning">
-                            Warning: Incorrect answers will increase your total student debt for this track.
+                            Wrong answer = extra student debt. You need 3 out of 4 years correct to graduate.
                         </p>
                     </div>
                 </div>
@@ -2276,7 +2542,7 @@
 
         function startExamYearQuestionQueue(path) {
             const bank = EXAM_QUESTION_BANKS[path] || [];
-            if (bank.length < 2) {
+            if (bank.length < 1) {
                 state.examYearQuestionQueue = [];
                 return;
             }
@@ -2288,16 +2554,16 @@
                 indices[j] = t;
             }
             var pick = [];
-            for (var k = 0; k < indices.length && pick.length < 2; k++) {
+            for (var k = 0; k < indices.length && pick.length < 1; k++) {
                 var idx = indices[k];
                 var id = examQuestionId(path, idx);
                 if (state.examYearUsedQuestionIds.indexOf(id) === -1) {
                     pick.push(idx);
                 }
             }
-            if (pick.length < 2) {
+            if (pick.length < 1) {
                 state.examYearUsedQuestionIds = [];
-                pick = indices.slice(0, 2);
+                pick = indices.slice(0, 1);
             }
             pick.forEach(function (idx) {
                 state.examYearUsedQuestionIds.push(examQuestionId(path, idx));
@@ -2330,12 +2596,15 @@
             if (!yearlyExamReactRoot) {
                 yearlyExamReactRoot = ReactDOM.createRoot(yearlyExamReactMount);
             }
+            const prog = state.currentlyPursuing ? EDUCATION_PROGRAMS[state.currentlyPursuing] : null;
+            const totalYears = prog ? prog.yearsRequired : 4;
             yearlyExamReactRoot.render(
                 <YearlyExamOverlay
                     currentSchoolYear={state.yearsInSchool + 1}
+                    totalYears={totalYears}
+                    passedSoFar={state.examsPassedThisDegree}
                     question={state.currentExamQuestion}
-                    questionPart={state.examQuestionsThisYearAnswered + 1}
-                    questionsPerYear={state.examQuestionsThisYearTotal || 2}
+                    path={state.playerPath}
                     selectedOptionIndex={selectedOptionIndex}
                     showFeedback={showFeedback}
                     onSelectOption={handleYearlyExamAnswer}
@@ -2365,15 +2634,21 @@
             const disease = DISEASES[props.illnessKey];
             if (!disease) return "";
             const isMental = isMentalIllness(props.illnessKey);
+            const tier = disease.mentalTier || null;
+            const tierColor = tier === "severe" ? "#ff5252" : tier === "medium" ? "#FFD700" : "#69f0ae";
+            const tierLabel = tier ? (" <span style=\"color:" + tierColor + ";font-weight:700\">(" + tier.toUpperCase() + ")</span>") : "";
+            const drainDesc = isMental
+                ? "Annual drain: -" + (disease.annualHappinessDrain || 0) + " Happiness/yr" + (disease.mentalCurable === false ? " | Incurable" : " | Treatable with Psychiatrist")
+                : "Annual drain: -" + (disease.annualHealthDrain || 0) + " Health/yr" + (disease.curable ? " | Curable" : " | Incurable");
             const doctorBtnAttrs = props.canAccessDoctor ? "" : "disabled";
             const doctorLabel = props.canAccessDoctor
-                ? (isMental ? "Visit Psychiatrist" : "Go to the Doctor")
-                : (isMental ? "Visit Psychiatrist (Unavailable)" : "Go to the Doctor (Unavailable)");
+                ? (isMental ? "Go to Psychiatrist →" : "Go to the Doctor →")
+                : (isMental ? "Psychiatrist (Unavailable)" : "Doctor (Unavailable)");
             return "<div id=\"diagnosis-overlay\" class=\"open\" role=\"dialog\" aria-modal=\"true\" aria-label=\"Medical Diagnosis\">" +
                 "<div id=\"diagnosis-card\">" +
-                "<h2 id=\"diagnosis-title\">MEDICAL DIAGNOSIS 🩺</h2>" +
-                "<p id=\"diagnosis-text\">You have been diagnosed with " + escapeHtml(disease.name) + ".</p>" +
-                "<p id=\"diagnosis-cost\">Base treatment cost: " + formatMoney(disease.cureCost) + "</p>" +
+                "<h2 id=\"diagnosis-title\">NEW DIAGNOSIS" + (isMental ? " — MENTAL HEALTH" : "") + "</h2>" +
+                "<p id=\"diagnosis-text\">You have been diagnosed with <strong>" + escapeHtml(disease.name) + "</strong>" + tierLabel + ".</p>" +
+                "<p id=\"diagnosis-cost\" style=\"color:#bdbdbd;font-size:0.88rem;\">" + drainDesc + "<br>Base treatment cost: " + formatMoney(disease.cureCost) + (isMental ? " per psychiatrist visit" : "") + "</p>" +
                 "<div id=\"diagnosis-actions\">" +
                 "<button class=\"diagnosis-btn\" id=\"diagnosis-okay-btn\">Okay</button>" +
                 "<button class=\"diagnosis-btn\" id=\"diagnosis-doctor-btn\" " + doctorBtnAttrs + ">" + doctorLabel + "</button>" +
@@ -2620,15 +2895,14 @@
         }
 
         function getRequiredExamPassesForProgram(program) {
-            var totalQuestions = program.yearsRequired * 2;
+            var totalQuestions = program.yearsRequired * 1;
             if (program && program.pipeline && program.pipeline !== "undergrad") {
                 return Math.ceil(totalQuestions * 0.5);
             }
-            var byRatio = Math.ceil(totalQuestions * 0.75);
             if (program.yearsRequired >= 4) {
-                return Math.max(6, byRatio);
+                return 3;
             }
-            return byRatio;
+            return Math.ceil(totalQuestions * 0.75);
         }
 
         function clearEnrollmentAfterDismissalOrQuit() {
@@ -2656,13 +2930,21 @@
             clearEnrollmentAfterDismissalOrQuit();
             state._savedJobBeforeSchoolYear = null;
             state.jobSearchBlocked = false;
-            openModal(
-                "Academic Dismissal",
-                "<strong>You did not pass at least 50% of the required exam questions for " + program.degreeName + ".</strong><br><br>" +
-                "You passed " + passedCount + "/" + (program.yearsRequired * 2) + " exam questions (minimum required: " + requiredPasses + "). " +
-                "You are not awarded this degree. Accumulated program debt remains on your record.<br><br>" + debtLine,
-                [{ label: "Continue", handler: function () { closeModal(); updateUI(); } }]
-            );
+            academicDismissalBody.innerHTML =
+                "<p class=\"dismissal-score\">You passed " + passedCount + " out of " + program.yearsRequired + " exams (required: " + requiredPasses + ").</p>" +
+                "<p>You did not pass the required threshold for <strong>" + program.degreeName + "</strong>. No degree awarded. You may attempt other programs.</p>" +
+                "<p style=\"color:#bdbdbd; font-size:0.88rem;\">" + debtLine + "</p>";
+            academicDismissalAckBtn.textContent = "Understood. Continue.";
+            academicDismissalAckBtn.onclick = function () {
+                state.isAcademicDismissalOverlayOpen = false;
+                closeAcademicDismissalOverlay();
+                academicDismissalAckBtn.textContent = "I understand. Re-enroll from Year 1.";
+                academicDismissalAckBtn.onclick = null;
+                updateUI();
+            };
+            state.isAcademicDismissalOverlayOpen = true;
+            academicDismissalOverlay.classList.add("open");
+            academicDismissalOverlay.setAttribute("aria-hidden", "false");
             updateUI();
         }
 
@@ -2676,7 +2958,7 @@
 
             applyDegreeEndDebt();
             state.degreeWrongAnswersThisEnrollment = 0;
-            const debtLine = "You have finished your studies with " + formatMoney(state.existingDebt) + " in student debt.";
+            const debtLine = "Total student debt: " + formatMoney(state.existingDebt) + ".";
 
             state.academicDismissed = true;
             state.jobSearchBlocked = true;
@@ -2687,29 +2969,13 @@
             state.isEnrolled = true;
             syncCurrentEnrollment();
 
-            logEvent("Academic dismissal: you did not pass enough yearly exams for " + program.degreeName + ".");
+            logEvent("Academic dismissal: failed graduation exam requirement for " + program.degreeName + ". Must restart from Year 1.");
             state.examYearQuestionQueue = [];
             state.examYearUsedQuestionIds = [];
             state.examQuestionsThisYearTotal = 0;
             state.examQuestionsThisYearAnswered = 0;
 
-            openModal(
-                "Academic Dismissal — Failed Final Year",
-                "<strong>You did not meet the graduation exam requirement.</strong><br><br>You passed " + passedCount + "/" + (program.yearsRequired * 2) +
-                " exam questions (minimum required: " + requiredPasses + "). You must restart " +
-                program.degreeName + " from Year 1. Careers and Find a Job stay locked until you graduate successfully.<br><br>" + debtLine,
-                [
-                    {
-                        label: "Continue",
-                        handler: function () {
-                            closeModal();
-                            state.happiness = 0;
-                            diagnoseIllness("depression", { setHappinessZero: true, skipHappinessPenalty: true, forceOverlay: true });
-                            updateUI();
-                        }
-                    }
-                ]
-            );
+            triggerAcademicDismissalOverlay(passedCount, program.yearsRequired, requiredPasses, program.degreeName, debtLine);
             updateUI();
         }
 
@@ -2766,8 +3032,8 @@
             syncCurrentEnrollment();
 
             logEvent(
-                "Age " + state.age + ": Completed " + (state.examQuestionsThisYearTotal || 2) + " final exam questions. " +
-                "School year " + state.yearsInSchool + "/" + program.yearsRequired + " in " + program.degreeName + "."
+                "Age " + state.age + ": Completed final exam for Year " + state.yearsInSchool + "/" + program.yearsRequired +
+                " in " + program.degreeName + ". Total passed: " + state.examsPassedThisDegree + "/" + state.yearsInSchool + "."
             );
 
             state.examQuestionsThisYearTotal = 0;
@@ -2836,7 +3102,7 @@
             }
 
             closeModal();
-            state.examQuestionsThisYearTotal = 2;
+            state.examQuestionsThisYearTotal = 1;
             state.examQuestionsThisYearAnswered = 0;
             state.isExamModalOpen = true;
             state.currentExamQuestion = first;
@@ -2877,12 +3143,12 @@
 
         function getHireChance() {
             if (state.playerPath === "Trades") {
-                return 0.75 + Math.random() * 0.15;
+                return 0.85;
             }
             if (state.playerPath === "STEM") {
-                return 0.50 + Math.random() * 0.20;
+                return 0.60;
             }
-            return 0.15 + Math.random() * 0.15;
+            return 0.20;
         }
 
         function quitJob() {
@@ -2939,11 +3205,12 @@
                 if (promotionOverlayReactRoot) {
                     promotionOverlayReactRoot.render(null);
                 }
-                alert("You were hired as a " + job.title + " earning " + formatMoney(job.salary) + " a year!");
-                logEvent("You were hired as a " + job.title + ".");
+                state.hudDebtSalaryUnlocked = true;
+                logEvent("Hired! You are now a " + job.title + " earning " + formatMoney(job.salary) + "/yr.");
+                showPurchaseToastMessage("Hired as " + job.title + " — " + formatMoney(job.salary) + "/yr!");
             } else {
-                alert("Your application for the " + job.title + " position was rejected. The job market is tough. Keep trying!");
-                logEvent("Your application was rejected for " + job.title + ".");
+                logEvent("Application rejected for " + job.title + ". The " + (state.playerPath === "Humanities" ? "Arts job market is tough (20% chance)" : "job market is competitive") + ". Try again.");
+                showPurchaseToastMessage("Application rejected for " + job.title + ". Keep trying!");
             }
             closeModal();
             updateUI();
@@ -2975,12 +3242,18 @@
                 ]);
                 return;
             }
+            const hireChancePct = state.playerPath === "Trades" ? "85%" : state.playerPath === "STEM" ? "60%" : "20%";
+            const pathNote = state.playerPath === "Humanities"
+                ? "<span style=\"color:#ff8a80\">Arts path: Hard Mode — only 20% hire rate per application.</span>"
+                : state.playerPath === "STEM"
+                    ? "<span style=\"color:#FFD700\">STEM path: 60% hire rate per application.</span>"
+                    : "<span style=\"color:#69f0ae\">Trades path: 85% hire rate per application.</span>";
             const jobs = JOB_MARKET[state.playerPath] || [];
             const actions = jobs.map(function (job) {
                 const eligible = meetsEducationRequirement(job.requiredEducation);
                 return {
                     label: eligible
-                        ? "Apply: " + job.title + " — " + formatMoney(job.salary)
+                        ? "Apply (" + hireChancePct + "): " + job.title + " — " + formatMoney(job.salary) + "/yr"
                         : job.title + " — Requires " + job.requiredEducation,
                     disabled: !eligible,
                     handler: function () {
@@ -2990,7 +3263,7 @@
                 };
             });
             actions.push({ label: "Close", handler: function () { closeModal(); } });
-            openModal("Career Path (Requires Degree)", "Professional roles on your " + state.playerPath + " path. Hiring is competitive.", actions);
+            openModal("Find a Job — " + state.playerPath + " Careers", pathNote + "<br>Professional roles filtered to your " + state.playerPath + " credential.", actions);
         }
 
         function openOddJobsBoard() {
@@ -3029,49 +3302,58 @@
             const residencyBlock = enrProg && enrProg.pipeline === "residency";
             const canCareerBoard = !state.isEmployed && !state.currentlyPursuing && !state.jobSearchBlocked && !residencyBlock;
             const canOddJobsBoard = !state.isEmployed && state.playerPath && !residencyBlock;
-            const lockReason = state.currentlyPursuing
-                ? "You are currently enrolled in school."
-                : state.jobSearchBlocked
-                    ? "Career applications are locked due to academic dismissal."
-                    : "Career applications are available.";
+
+            var hireRateInfo = state.playerPath === "Trades"
+                ? "<span style=\"color:#69f0ae\">Hire Rate: 85% — Trades are in demand</span>"
+                : state.playerPath === "STEM"
+                    ? "<span style=\"color:#FFD700\">Hire Rate: 60% — Competitive market</span>"
+                    : "<span style=\"color:#ff8a80\">Hire Rate: 20% — Arts: Hard Mode</span>";
+
+            var lockReason = "";
+            if (state.jobSearchBlocked) {
+                lockReason = "<br><span style=\"color:#ff8a80;\">Career locked: resolve academic dismissal first.</span>";
+            } else if (state.currentlyPursuing) {
+                lockReason = "<br><span style=\"color:#bdbdbd;\">Career locked while enrolled in school.</span>";
+            } else if (residencyBlock) {
+                lockReason = "<br><span style=\"color:#bdbdbd;\">Career locked during Medical Residency.</span>";
+            }
 
             if (state.isEmployed) {
+                const typeLabel = state.jobType === "OddJob" ? "Part-time / Odd Job" : state.jobType === "Career" ? "Career" : "Other";
                 const panel =
                     "<strong>Active Employment</strong><br><br>" +
-                    "Type: " + (state.jobType === "OddJob" ? "Part-time / Odd Job" : state.jobType === "Career" ? "Career" : "Other") + "<br>" +
-                    "Current Position: " + state.jobTitle + "<br>" +
-                    "Current Salary: " + formatMoney(state.annualIncome) + " / year<br><br>" +
-                    "<span style=\"color:#bdbdbd;font-size:0.9rem;\">Career jobs use your " + state.playerPath + " path and credentials. Odd jobs never require a degree.</span>";
+                    "Type: " + typeLabel + "<br>" +
+                    "Position: " + state.jobTitle + "<br>" +
+                    "Annual Salary: " + formatMoney(state.annualIncome) + "<br>" +
+                    "Years at Job: " + state.yearsAtCurrentJob + "<br><br>" +
+                    "<span style=\"color:#bdbdbd;font-size:0.9rem;\">Promotions available after 3 years. Use Quit Job if you want to look elsewhere.</span>";
                 openModal(
                     "Careers",
                     panel,
                     [
                         { label: "Close", handler: function () { closeModal(); } },
-                        {
-                            label: "Quit Job",
-                            handler: function () {
-                                openResignationConfirm();
-                            }
-                        }
+                        { label: "Quit Job", handler: function () { openResignationConfirm(); } }
                     ]
                 );
                 return;
             }
 
+            const credLabel = state.educationLevel !== "None" ? state.educationLevel : "No degree yet";
             openModal(
                 "Careers",
-                "Status: " + state.jobTitle + " | Annual Income: " + formatMoney(state.annualIncome) + "<br>" + lockReason +
-                    "<br><br><strong>Choose a job board:</strong>",
+                "Status: <strong>" + state.jobTitle + "</strong> | Credential: " + credLabel + "<br>" +
+                hireRateInfo + lockReason +
+                "<br><br><strong>Choose a job board:</strong>",
                 [
                     {
-                        label: canCareerBoard ? "Career Path (Requires Degree)" : "Career Path (Locked)",
+                        label: canCareerBoard ? "Find a Job (Career — Requires Degree)" : "Find a Job (Locked — Need Degree)",
                         disabled: !canCareerBoard,
                         handler: function () {
                             if (canCareerBoard) openJobBoard();
                         }
                     },
                     {
-                        label: canOddJobsBoard ? "Odd Jobs & Part-Time" : "Odd Jobs (Unavailable)",
+                        label: canOddJobsBoard ? "Odd Jobs & Part-Time (No Degree Required)" : "Odd Jobs (Unavailable)",
                         disabled: !canOddJobsBoard,
                         handler: function () {
                             if (canOddJobsBoard) openOddJobsBoard();
@@ -3164,7 +3446,7 @@
             state.happiness += 10;
             state.health -= 1;
             logEvent("You spent a year traveling and discovering yourself.");
-            alert("You spent a year traveling and discovering yourself.");
+            showPurchaseToastMessage("Gap year taken — Happiness +10!");
             updateUI();
         }
 
@@ -3230,7 +3512,7 @@
         }
 
         function openHigherEducationCatalogModal() {
-            if (state.isExamModalOpen || state.isExamActive || state.isDiagnosisOverlayOpen) return;
+            if (state.isExamModalOpen || state.isExamActive || state.isDiagnosisOverlayOpen || state.isGraduationOverlayOpen || state.isAcademicDismissalOverlayOpen) return;
             if (state.playerPath === "Trades") return;
             if (state.jobSearchBlocked) {
                 openModal("Higher Education", "Career applications and new enrollments are locked until you resolve academic dismissal.", [
@@ -3296,42 +3578,18 @@
             logEvent("Graduation: You earned " + program.degreeName + ".");
             syncCurrentEnrollment();
 
-            const actions = [
-                {
-                    label: "Find a Job",
-                    handler: function () {
-                        closeModal();
-                        openCareersTab();
-                    }
-                },
-                {
-                    label: "Take a Gap Year",
-                    handler: function () {
-                        closeModal();
-                        takeGapYear();
-                    }
-                }
-            ];
-            if (state.playerPath !== "Trades") {
-                actions.push({
-                    label: "Higher Education Catalog",
-                    handler: function () {
-                        closeModal();
-                        openHigherEducationCatalogModal();
-                    }
-                });
-            }
-
-            let gradBody = "After years of hard work, you have officially graduated with your " + program.degreeName + "!<br><br>" + debtLine;
             if (programKey === "STEM_MEDICAL") {
-                gradBody += "<br><br><strong>Medical Residency</strong> now begins automatically (4 years, resident stipend, no outside employment).";
+                logEvent("Medical Residency now begins automatically.");
                 enrollInProgram("STEM_RESIDENCY");
             }
 
-            openModal(
-                "Congratulations! 🎉",
-                gradBody,
-                actions
+            const higherEdFn = state.playerPath !== "Trades" ? function () { openHigherEducationCatalogModal(); } : null;
+            triggerGraduationOverlay(
+                program,
+                debtLine,
+                function () { openCareersTab(); },
+                function () { takeGapYear(); },
+                higherEdFn
             );
             updateUI();
         }
@@ -3343,8 +3601,8 @@
                 ? "Currently pursuing: " + program.degreeName + " (" + state.yearsInSchool + "/" + program.yearsRequired + " years)"
                 : "You are not currently enrolled in school.";
             const examProgress = program
-                ? "Exam questions (this degree): " + state.examsPassedThisDegree + "/" + state.examsTakenThisDegree +
-                    " (2 per year; need " + getRequiredExamPassesForProgram(program) + "+ correct to graduate)."
+                ? "Exam progress: " + state.examsPassedThisDegree + " passed / " + state.examsTakenThisDegree +
+                    " taken (1 per year; need " + getRequiredExamPassesForProgram(program) + "/4 correct to graduate)."
                 : "";
             const enrollLine = state.currentEnrollment
                 ? "<br><strong>Current enrollment:</strong> " + state.currentEnrollment.degreeName +
@@ -3597,10 +3855,15 @@
             getGlobalHousingMarketShiftForYear();
 
             state.ownedAssets.forEach(function (property) {
-                const marketFluctuation = Math.random() * 0.12 - 0.05;
+                const marketFluctuation = (Math.random() < 0.5 ? -1 : 1) * (0.02 + Math.random() * 0.03);
                 const totalShift = marketFluctuation + state.currentHousingMarketShift;
+                const prevValue = property.currentValue;
                 property.currentValue = Math.max(10000, Math.round(property.currentValue * (1 + totalShift)));
                 property.lastMarketFluctuation = totalShift;
+                if (Math.abs(marketFluctuation) >= 0.04) {
+                    const changeAmt = property.currentValue - prevValue;
+                    logEvent(property.propertyType + " value " + (changeAmt >= 0 ? "rose" : "fell") + " by " + formatMoney(Math.abs(changeAmt)) + " (" + (totalShift * 100).toFixed(1) + "%).");
+                }
 
                 if (property.isMortgaged && property.remainingBalance > 0) {
                     const principalPaydown = Math.min(property.remainingBalance, Math.max(0, Math.round(property.mortgagePayment * 0.55)));
@@ -4028,10 +4291,10 @@
             const currentNetWorth = state.cash + state.investments - state.debt;
             const canInvest = state.bankBalance > 0 && currentNetWorth > 0;
             const marketLabel = state.currentHousingMarketEvent === "crash"
-                ? "<span style=\"color:#ff6b6b;\">Market Mood: Crash (-20%)</span>"
+                ? "<span style=\"color:#ff6b6b;\">Market: Crash (-20%)</span>"
                 : state.currentHousingMarketEvent === "boom"
-                    ? "<span style=\"color:#69f0ae;\">Market Mood: Boom (+20%)</span>"
-                    : "<span style=\"color:#bdbdbd;\">Market Mood: Stable</span>";
+                    ? "<span style=\"color:#69f0ae;\">Market: Boom (+20%)</span>"
+                    : "<span style=\"color:#bdbdbd;\">Market: Stable (±5%/yr volatility)</span>";
 
             const myPropertiesHtml = state.ownedAssets.length
                 ? state.ownedAssets.map(function (property) {
@@ -4040,24 +4303,40 @@
                     const down = delta.delta < 0;
                     const color = up ? "#69f0ae" : down ? "#ff6b6b" : "#bdbdbd";
                     const marker = up ? "▲" : down ? "▼" : "■";
-                    const mortgageText = property.isMortgaged ? "Mortgage: " + formatMoney(property.remainingBalance) : "No mortgage";
+                    const mortgageText = property.isMortgaged ? "Mortgage left: " + formatMoney(property.remainingBalance) : "No mortgage";
                     return "<div style=\"margin-bottom:8px;\">" +
                         "<strong>" + property.propertyType + "</strong><br>" +
-                        "Original: " + formatMoney(property.originalPrice) + " | Current: " + formatMoney(property.currentValue) + "<br>" +
-                        "<span style=\"color:" + color + ";\">" + marker + " " + (up ? "+" : "") + delta.pct.toFixed(1) + "%</span> | " + mortgageText +
+                        "Bought: " + formatMoney(property.originalPrice) + " | Now: " + formatMoney(property.currentValue) +
+                        " <span style=\"color:" + color + ";\">" + marker + " " + (delta.delta >= 0 ? "+" : "") + delta.pct.toFixed(1) + "%</span><br>" +
+                        "Upkeep: " + formatMoney(property.annualUpkeep) + "/yr | " + mortgageText +
                         "</div>";
                 }).join("")
                 : "<div style=\"color:#bdbdbd; margin-bottom:8px;\">No properties owned.</div>";
 
             const listingsHtml = state.realEstateListings.map(function (listing) {
-                return "<div style=\"margin-bottom:6px;\"><strong>" + listing.propertyType + "</strong> - " +
-                    formatMoney(listing.price) + " (Upkeep " + formatMoney(listing.annualUpkeep) + "/yr)</div>";
+                return "<div style=\"margin-bottom:6px;\"><strong>" + listing.propertyType + "</strong> — " +
+                    formatMoney(listing.price) + " | Upkeep: <span style=\"color:#ff8a80\">" + formatMoney(listing.annualUpkeep) + "/yr</span></div>";
             }).join("");
 
+            var housingStatusHtml = "";
+            if (state.currentHousing) {
+                if (state.currentHousing.type === "Rent") {
+                    var effectiveRent = getEffectiveAnnualRentCost();
+                    housingStatusHtml = "<div style=\"margin-bottom:8px; color:#81c784;\">Current Rental: <strong>" +
+                        state.currentHousing.name + "</strong> — " + formatMoney(effectiveRent) + "/yr" +
+                        (state.roommate ? " (split with roommate)" : "") + "</div>";
+                } else {
+                    housingStatusHtml = "<div style=\"margin-bottom:8px; color:#81c784;\">You own your home.</div>";
+                }
+            } else {
+                housingStatusHtml = "<div style=\"margin-bottom:8px; color:#bdbdbd;\">No current housing.</div>";
+            }
+
             const actions = [];
+
             state.ownedAssets.forEach(function (property) {
                 actions.push({
-                    label: "Sell " + property.propertyType,
+                    label: "Sell " + property.propertyType + " (" + formatMoney(property.currentValue) + ")",
                     handler: function () {
                         openSellPropertyConfirmation(property.id);
                     }
@@ -4069,18 +4348,20 @@
                 const downPayment = Math.round(listing.price * 0.20);
                 const canPayFull = bankBal >= listing.price;
                 const required = canPayFull ? listing.price : downPayment;
-                const canBuy = bankBal >= required;
+                const canBuy = bankBal >= required && !(state.currentHousing && state.currentHousing.type === "Rent");
                 const priceLabel = formatMoney(listing.price);
                 const reqLabel = formatMoney(required);
                 actions.push({
                     label: canBuy
-                        ? "Buy for " + priceLabel + (canPayFull ? " (cash)" : " (20% down " + reqLabel + ")")
-                        : "Insufficient Funds (Requires " + reqLabel + ")",
+                        ? "Buy " + listing.propertyType + " — " + priceLabel + (canPayFull ? " (cash)" : " (20% down: " + reqLabel + ") | Upkeep: " + formatMoney(listing.annualUpkeep) + "/yr")
+                        : listing.propertyType + " — Need " + reqLabel + (state.currentHousing && state.currentHousing.type === "Rent" ? " (end lease first)" : ""),
                     disabled: !canBuy,
                     buttonVariant: canBuy ? "buyAfford" : "buyDeny",
                     handler: function () {
                         if (!canBuy) {
-                            showPurchaseToastMessage("Insufficient funds. Need " + reqLabel + " (have " + formatMoney(bankBal) + ").");
+                            showPurchaseToastMessage(state.currentHousing && state.currentHousing.type === "Rent"
+                                ? "End your rental lease before buying property."
+                                : "Insufficient funds. Need " + reqLabel + ".");
                             return;
                         }
                         buyProperty(listing.id);
@@ -4088,15 +4369,55 @@
                 });
             });
 
+            if (!state.ownedAssets.length) {
+                var rentActions = RENTAL_LISTINGS.filter(function (r) {
+                    return !r.requiresEnrollment || state.isEnrolled;
+                });
+                rentActions.forEach(function (listing) {
+                    var isActive = state.currentHousing && state.currentHousing.rentalId === listing.id;
+                    var canRent = !isActive && !state.ownedAssets.length && bankBal >= listing.annualCost;
+                    actions.push({
+                        label: isActive
+                            ? "✓ Renting: " + listing.name + " (" + formatMoney(listing.annualCost) + "/yr)"
+                            : canRent
+                                ? "Rent: " + listing.name + " — " + formatMoney(listing.annualCost) + "/yr"
+                                : "Rent: " + listing.name + " — " + formatMoney(listing.annualCost) + "/yr (insufficient funds)",
+                        disabled: isActive || !canRent,
+                        handler: function () {
+                            if (!isActive && canRent) {
+                                selectRental(listing.id);
+                                closeModal();
+                                updateUI();
+                            }
+                        }
+                    });
+                });
+
+                if (state.currentHousing && state.currentHousing.type === "Rent") {
+                    var meta = currentRentalListingMeta();
+                    if (meta && meta.roommateEligible && !state.roommate) {
+                        actions.push({
+                            label: "Find Roommate (Split Rent)",
+                            handler: function () { findRoommate(); closeModal(); }
+                        });
+                    } else if (state.roommate) {
+                        actions.push({
+                            label: "Remove Roommate (Pay Full Rent)",
+                            handler: function () { removeRoommate(); closeModal(); }
+                        });
+                    }
+                }
+            }
+
             actions.push({
-                label: canInvest ? "Invest 50% Cash" : "Insufficient Funds (Invest Unavailable)",
+                label: canInvest ? "Invest 50% Cash" : "Invest 50% Cash (Unavailable)",
                 disabled: !canInvest,
                 handler: function () {
                     if (!canInvest) {
-                        showPurchaseToastMessage("Insufficient funds in your bank balance to invest.");
+                        showPurchaseToastMessage("Insufficient funds to invest.");
                         return;
                     }
-                    applyActionWithRefresh("You invested 50% cash, and your net worth dropped by 50%.", function () {
+                    applyActionWithRefresh("You invested 50% of your cash.", function () {
                         const amt = state.cash * 0.5;
                         state.cash -= amt;
                         state.investments += amt;
@@ -4107,14 +4428,14 @@
                 }
             });
             actions.push({
-                label: canInvest ? "Contribute 10% Cash" : "Insufficient Funds (Contribute Unavailable)",
+                label: canInvest ? "Contribute 10% Cash" : "Contribute 10% Cash (Unavailable)",
                 disabled: !canInvest,
                 handler: function () {
                     if (!canInvest) {
-                        showPurchaseToastMessage("Insufficient funds in your bank balance to contribute.");
+                        showPurchaseToastMessage("Insufficient funds to contribute.");
                         return;
                     }
-                    applyActionWithRefresh("You contributed 10% cash, and your net worth dropped by 10%.", function () {
+                    applyActionWithRefresh("You contributed 10% cash to investments.", function () {
                         const amt = state.cash * 0.10;
                         state.cash -= amt;
                         state.investments += amt;
@@ -4125,7 +4446,7 @@
                 }
             });
             actions.push({
-                label: (focusPsychiatrist ? "➡ " : "") + "Psychiatrist (" + formatMoney(PSYCHIATRIST_VISIT_COST) + ")",
+                label: (focusPsychiatrist ? "→ " : "") + "Psychiatrist — " + formatMoney(PSYCHIATRIST_VISIT_COST) + "/visit (suppresses illness)",
                 handler: function () {
                     visitPsychiatrist();
                 }
@@ -4138,9 +4459,11 @@
             });
 
             openModal(
-                "Assets",
-                marketLabel + "<br><br><strong>My Properties</strong><br>" + myPropertiesHtml +
-                "<br><strong>Broker Listings</strong><br>" + listingsHtml,
+                "Assets & Housing",
+                marketLabel + "<br><br>" +
+                "<strong>Housing Status</strong><br>" + housingStatusHtml +
+                "<strong>My Properties</strong><br>" + myPropertiesHtml +
+                "<strong>Broker Listings</strong><br>" + listingsHtml,
                 actions
             );
         }
@@ -4335,7 +4658,7 @@
         }
 
         function ageUp() {
-            if (state.isDead || !state.playerPath || state.isExamModalOpen || state.isExamActive || state.isDiagnosisOverlayOpen || state.isPromotionOverlayOpen || state.isEvictionOverlayOpen) return;
+            if (state.isDead || !state.playerPath || state.isExamModalOpen || state.isExamActive || state.isDiagnosisOverlayOpen || state.isPromotionOverlayOpen || state.isEvictionOverlayOpen || state.isGraduationOverlayOpen || state.isAcademicDismissalOverlayOpen) return;
 
             if (state.isInSchool && state.currentlyPursuing) {
                 openYearlyExamOverlay();
@@ -4430,17 +4753,23 @@
         });
 
         document.getElementById("age-up-btn").addEventListener("click", ageUp);
+        function isAnyOverlayOpen() {
+            return state.isExamModalOpen || state.isExamActive || state.isDiagnosisOverlayOpen ||
+                state.isPromotionOverlayOpen || state.isEvictionOverlayOpen ||
+                state.isGraduationOverlayOpen || state.isAcademicDismissalOverlayOpen;
+        }
+
         document.getElementById("education-nav-btn").addEventListener("click", function () {
-            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isEvictionOverlayOpen) openEducationTab();
+            if (!state.isDead && state.playerPath && !isAnyOverlayOpen()) openEducationTab();
         });
         document.getElementById("careers-nav-btn").addEventListener("click", function () {
-            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isEvictionOverlayOpen) openCareersTab();
+            if (!state.isDead && state.playerPath && !isAnyOverlayOpen()) openCareersTab();
         });
         document.getElementById("activities-nav-btn").addEventListener("click", function () {
-            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isEvictionOverlayOpen) openActivitiesMenu();
+            if (!state.isDead && state.playerPath && !isAnyOverlayOpen()) openActivitiesMenu();
         });
         document.getElementById("assets-nav-btn").addEventListener("click", function () {
-            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isEvictionOverlayOpen) openAssetsMenu();
+            if (!state.isDead && state.playerPath && !isAnyOverlayOpen()) openAssetsMenu();
         });
         document.getElementById("play-again-btn").addEventListener("click", function () {
             location.reload();
