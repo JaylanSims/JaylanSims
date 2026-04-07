@@ -563,7 +563,7 @@
             width: 100vw;
             height: 100vh;
             z-index: 9999;
-            background: rgba(0, 0, 0, 0.98);
+            background: rgba(0, 0, 0, 0.95);
             display: none;
             flex-direction: column;
             align-items: center;
@@ -789,7 +789,7 @@
             align-items: center;
             justify-content: center;
             padding: 20px;
-            background: rgba(0, 0, 0, 0.9);
+            background: rgba(0, 0, 0, 0.95);
             z-index: 10000;
         }
 
@@ -813,7 +813,8 @@
         }
 
         #diagnosis-text,
-        #diagnosis-cost {
+        #diagnosis-cost,
+        #diagnosis-impact {
             margin: 0 0 12px;
             line-height: 1.35;
             color: #d8d8d8;
@@ -840,6 +841,60 @@
         .diagnosis-btn:disabled {
             opacity: 0.45;
             cursor: not-allowed;
+        }
+
+        #dismissal-overlay {
+            position: fixed;
+            inset: 0;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            background: rgba(0, 0, 0, 0.96);
+            z-index: 10010;
+        }
+
+        #dismissal-overlay.open {
+            display: flex;
+        }
+
+        #dismissal-card {
+            width: 100%;
+            max-width: 560px;
+            border-radius: 16px;
+            border: 1px solid #6d1b1b;
+            background: linear-gradient(180deg, #1b1111 0%, #120909 100%);
+            box-shadow: 0 24px 64px rgba(0, 0, 0, 0.78);
+            padding: 22px;
+        }
+
+        #dismissal-card h2 {
+            margin: 0 0 12px;
+            font-size: 1.35rem;
+            color: #ffb3b3;
+        }
+
+        #dismissal-card p {
+            margin: 0 0 14px;
+            line-height: 1.45;
+            color: #f0d6d6;
+        }
+
+        #dismissal-actions {
+            display: grid;
+            gap: 10px;
+        }
+
+        .dismissal-btn {
+            width: 100%;
+            border: 1px solid #934040;
+            border-radius: 12px;
+            background: linear-gradient(180deg, #7f1d1d 0%, #5f1010 100%);
+            color: #fff;
+            padding: 14px;
+            font-size: 1rem;
+            font-weight: 700;
+            cursor: pointer;
         }
 
         #death-screen {
@@ -1003,6 +1058,7 @@
         </div>
 
         <div id="diagnosis-overlay-root"></div>
+        <div id="dismissal-overlay-root"></div>
 
         <div id="death-screen">
             <p id="tombstone">🪦</p>
@@ -1029,6 +1085,7 @@
             examsTakenThisDegree: 0, examQuestionsThisYearTotal: 0, examQuestionsThisYearAnswered: 0,
             examYearQuestionQueue: [], examYearUsedQuestionIds: [], jobSearchBlocked: true, academicDismissed: false,
             isDiagnosisOverlayOpen: false, currentDiagnosisIllnessKey: null,
+            isDismissalOverlayOpen: false, dismissalOverlayData: null,
             canAccessDoctor: true, activeView: "MainGameplay",
             mentalIllnessState: {},
             happinessZeroStreakYears: 0,
@@ -1089,6 +1146,7 @@
         let evictionOverlayReactRoot = null;
         let higherEdCatalogRoot = null;
         const diagnosisOverlayRoot = document.getElementById("diagnosis-overlay-root");
+        const dismissalOverlayRoot = document.getElementById("dismissal-overlay-root");
         const deathScreen = document.getElementById("death-screen");
         const deathTitle = document.getElementById("death-title");
         const deathSummary = document.getElementById("death-summary");
@@ -1255,10 +1313,10 @@
                 { title: "Biomedical Engineer", salary: 100730, requiredEducation: "Bachelor's Degree" }
             ],
             Humanities: [
-                { title: "Entertainment Lawyer", salary: 135000, requiredEducation: "Law Degree" },
+                { title: "Lawyer", salary: 135000, requiredEducation: "Law Degree" },
                 { title: "Public Relations Manager", salary: 125780, requiredEducation: "Bachelor's Degree" },
                 { title: "Art Director", salary: 106500, requiredEducation: "Bachelor's Degree" },
-                { title: "UX/UI Designer", salary: 99000, requiredEducation: "Bachelor's Degree" },
+                { title: "UX Designer", salary: 99000, requiredEducation: "Bachelor's Degree" },
                 { title: "Technical Writer", salary: 79960, requiredEducation: "Bachelor's Degree" },
                 { title: "Film/TV Producer", salary: 76400, requiredEducation: "Bachelor's Degree" },
                 { title: "Editor (Books/Magazines)", salary: 72150, requiredEducation: "Bachelor's Degree" },
@@ -1272,13 +1330,13 @@
                 { title: "Journalist/Reporter", salary: 55960, requiredEducation: "Bachelor's Degree" }
             ],
             Trades: [
-                { title: "Elevator Installer & Repairer", salary: 97860, requiredEducation: "Trade Certificate" },
+                { title: "Elevator Tech", salary: 97000, requiredEducation: "Trade Certificate" },
                 { title: "Electrical Power Line Installer", salary: 85420, requiredEducation: "Trade Certificate" },
                 { title: "Radiation Therapist", salary: 82790, requiredEducation: "Trade Certificate" },
                 { title: "Boilermaker", salary: 66920, requiredEducation: "Trade Certificate" },
                 { title: "Industrial Pipefitter", salary: 63100, requiredEducation: "Trade Certificate" },
-                { title: "Plumber", salary: 61550, requiredEducation: "Trade Certificate" },
-                { title: "Electrician", salary: 60240, requiredEducation: "Trade Certificate" },
+                { title: "Plumber", salary: 61000, requiredEducation: "Trade Certificate" },
+                { title: "Electrician", salary: 60000, requiredEducation: "Trade Certificate" },
                 { title: "Millwright", salary: 59800, requiredEducation: "Trade Certificate" },
                 { title: "Brickmason", salary: 58430, requiredEducation: "Trade Certificate" },
                 { title: "HVAC Technician", salary: 57300, requiredEducation: "Trade Certificate" },
@@ -1343,71 +1401,23 @@
 
         const EXAM_QUESTION_BANKS_RAW = {
             STEM: [
-                { question: 'In Thermodynamics, which law states entropy tends to increase?', options: ['First Law', 'Second Law', 'Third Law', 'Zeroth Law'], correctAnswer: 'Second Law' },
-                { question: 'What programming concept refers to a function calling itself?', options: ['Iteration', 'Recursion', 'Inheritance', 'Polymorphism'], correctAnswer: 'Recursion' },
-                { question: 'What is the derivative of sin(x)?', options: ['-sin(x)', 'cos(x)', 'tan(x)', 'sec²(x)'], correctAnswer: 'cos(x)' },
-                { question: 'Which element has the highest electronegativity?', options: ['Oxygen', 'Chlorine', 'Fluorine', 'Nitrogen'], correctAnswer: 'Fluorine' },
-                { question: 'What is the average time complexity of searching a balanced binary search tree?', options: ['O(n)', 'O(log n)', 'O(n log n)', 'O(1)'], correctAnswer: 'O(log n)' },
-                { question: 'In organic chemistry, what rule states the most stable alkene has the most alkyl substituents?', options: ["Markovnikov's Rule", "Zaitsev's Rule", 'Hofmann Rule', 'Saytzeff Rule'], correctAnswer: "Zaitsev's Rule" },
-                { question: 'What is the indefinite integral of 1/x dx?', options: ['x + C', '1/x² + C', 'e^x + C', 'ln|x| + C'], correctAnswer: 'ln|x| + C' },
-                { question: 'Who formulated the Uncertainty Principle in quantum mechanics?', options: ['Niels Bohr', 'Werner Heisenberg', 'Max Planck', 'Erwin Schrödinger'], correctAnswer: 'Werner Heisenberg' },
-                { question: 'Which equations describe the motion of viscous fluid substances?', options: ['Bernoulli Equations', 'Navier-Stokes Equations', "Maxwell's Equations", 'Schrödinger Equation'], correctAnswer: 'Navier-Stokes Equations' },
-                { question: 'In linear algebra, what vector changes at most by a scalar factor under linear transformation?', options: ['Basis vector', 'Eigenvector', 'Unit vector', 'Zero vector'], correctAnswer: 'Eigenvector' },
-                { question: 'Which liver enzymes are responsible for the majority of drug metabolism?', options: ['Amylase', 'Lipase', 'Cytochrome P450', 'Trypsin'], correctAnswer: 'Cytochrome P450' },
-                { question: "In computational complexity, what does 'NP' stand for?", options: ['Non-Polynomial time', 'Nondeterministic Polynomial time', 'Normal Processing', 'Network Protocol'], correctAnswer: 'Nondeterministic Polynomial time' },
-                { question: 'What enzyme synthesizes ATP in the mitochondria?', options: ['DNA polymerase', 'RNA polymerase', 'ATP Synthase', 'Helicase'], correctAnswer: 'ATP Synthase' },
-                { question: "What is Avogadro's constant approximately?", options: ['3.14 x 10^23', '6.022 x 10^23', '9.81 x 10^23', '1.602 x 10^23'], correctAnswer: '6.022 x 10^23' },
-                { question: "What is the formula for Ohm's Law?", options: ['P = IV', 'V = IR', 'F = ma', 'E = mc²'], correctAnswer: 'V = IR' },
-                { question: 'In SQL, which join returns only rows with a match in both tables?', options: ['LEFT JOIN', 'RIGHT JOIN', 'INNER JOIN', 'FULL OUTER JOIN'], correctAnswer: 'INNER JOIN' },
-                { question: 'What cellular process results in four haploid cells?', options: ['Mitosis', 'Meiosis', 'Binary fission', 'Budding'], correctAnswer: 'Meiosis' },
-                { question: "In physics, what are the SI units of Planck's constant?", options: ['Newton-meters', 'Joule-seconds', 'Watts', 'Coulombs'], correctAnswer: 'Joule-seconds' },
-                { question: 'Which ions are primarily responsible for the resting membrane potential in neurons?', options: ['Calcium and Magnesium', 'Sodium and Potassium', 'Chloride only', 'Hydrogen only'], correctAnswer: 'Sodium and Potassium' },
-                { question: 'In Boolean algebra, what law states that NOT (A OR B) is equivalent to (NOT A) AND (NOT B)?', options: ['Commutative Law', 'Associative Law', "De Morgan's Law", 'Distributive Law'], correctAnswer: "De Morgan's Law" },
+                { question: 'In thermodynamics, which law says entropy in an isolated system tends to increase?', options: ['First Law', 'Second Law', 'Third Law', 'Zeroth Law'], correctAnswer: 'Second Law' },
+                { question: 'What programming concept describes a function calling itself?', options: ['Iteration', 'Recursion', 'Inheritance', 'Compilation'], correctAnswer: 'Recursion' },
+                { question: 'What is the derivative of x^2 with respect to x?', options: ['x', '2x', 'x^2', '2'], correctAnswer: '2x' },
+                { question: 'Which element has the highest electronegativity?', options: ['Oxygen', 'Fluorine', 'Chlorine', 'Nitrogen'], correctAnswer: 'Fluorine' }
             ],
             Humanities: [
-                { question: 'Which art movement, led by Salvador Dalí, explored the unconscious mind?', options: ['Cubism', 'Surrealism', 'Dada', 'Futurism'], correctAnswer: 'Surrealism' },
-                { question: "Who popularized the literary concept of 'The Hero's Journey'?", options: ['Sigmund Freud', 'Carl Jung', 'Joseph Campbell', 'James Joyce'], correctAnswer: 'Joseph Campbell' },
-                { question: 'Which musical period featured heavy ornamentation and composers like Bach?', options: ['Classical', 'Romantic', 'Baroque', 'Modern'], correctAnswer: 'Baroque' },
-                { question: "What is a word's literal, dictionary definition called?", options: ['Connotation', 'Denotation', 'Etymology', 'Syntax'], correctAnswer: 'Denotation' },
-                { question: "Which philosopher used the 'Panopticon' to describe societal surveillance?", options: ['John Locke', 'Michel Foucault', 'Thomas Hobbes', 'John Stuart Mill'], correctAnswer: 'Michel Foucault' },
-                { question: "Immanuel Kant's universal moral law is known as what?", options: ['The Veil of Ignorance', 'The Categorical Imperative', 'The Social Contract', 'Utilitarianism'], correctAnswer: 'The Categorical Imperative' },
-                { question: 'In U.S. Law, what is the most rigorous form of judicial review?', options: ['Rational Basis', 'Intermediate Scrutiny', 'Strict Scrutiny', 'Arbitrary Review'], correctAnswer: 'Strict Scrutiny' },
-                { question: 'Which critical theory is most closely associated with Jacques Derrida?', options: ['Structuralism', 'Deconstruction', 'Formalism', 'Marxism'], correctAnswer: 'Deconstruction' },
-                { question: 'In which Italian city is the Renaissance generally considered to have begun?', options: ['Rome', 'Venice', 'Florence', 'Milan'], correctAnswer: 'Florence' },
-                { question: "Who wrote the foundational political treatise 'The Prince'?", options: ['Thomas More', 'Niccolò Machiavelli', 'John Locke', 'Jean-Jacques Rousseau'], correctAnswer: 'Niccolò Machiavelli' },
-                { question: 'Which 19th-century art movement focused on capturing light and everyday subjects?', options: ['Romanticism', 'Impressionism', 'Realism', 'Neoclassicism'], correctAnswer: 'Impressionism' },
-                { question: 'What poetic meter consists of five sets of unstressed-stressed syllables per line?', options: ['Trochaic Tetrameter', 'Iambic Pentameter', 'Anapestic Hexameter', 'Dactylic Pentameter'], correctAnswer: 'Iambic Pentameter' },
-                { question: "Which philosopher is a primary figure in Existentialism and authored 'Being and Nothingness'?", options: ['Martin Heidegger', 'Jean-Paul Sartre', 'Albert Camus', 'Simone de Beauvoir'], correctAnswer: 'Jean-Paul Sartre' },
-                { question: 'In psychology, what is the mental discomfort of holding conflicting beliefs called?', options: ['Confirmation Bias', 'Cognitive Dissonance', 'Anchoring', 'Hindsight Bias'], correctAnswer: 'Cognitive Dissonance' },
-                { question: 'What legal principle protects individuals from unlawful detention?', options: ['Res judicata', 'Habeas Corpus', 'Stare decisis', 'Mens rea'], correctAnswer: 'Habeas Corpus' },
-                { question: 'Which literary genre blends magical elements into a realistic setting, popularized by Gabriel García Márquez?', options: ['Science Fiction', 'Magical Realism', 'Gothic Fiction', 'Allegory'], correctAnswer: 'Magical Realism' },
-                { question: "In Plato's Republic, what allegory describes prisoners mistaking shadows for reality?", options: ['Myth of Er', 'Allegory of the Cave', 'Ring of Gyges', 'Ship of Fools'], correctAnswer: 'Allegory of the Cave' },
-                { question: 'In what year was the Magna Carta signed?', options: ['1066', '1215', '1492', '1776'], correctAnswer: '1215' },
-                { question: 'Which economic theory advocates for increased government expenditures to stimulate demand?', options: ['Monetarism', 'Keynesian Economics', 'Supply-side Economics', 'Mercantilism'], correctAnswer: 'Keynesian Economics' },
-                { question: 'What influential German art school combined crafts and the fine arts in the early 20th century?', options: ['The Academy', 'Bauhaus', 'The Salon', 'Vkhutemas'], correctAnswer: 'Bauhaus' },
+                { question: 'Salvador Dali is most strongly associated with which art movement?', options: ['Cubism', 'Surrealism', 'Baroque', 'Realism'], correctAnswer: 'Surrealism' },
+                { question: 'Joseph Campbell is best known for popularizing which narrative framework?', options: ['Three-act structure', 'Monomyth', 'Tragic flaw', 'Blank verse'], correctAnswer: 'Monomyth' },
+                { question: 'Which period is known for ornamentation and composers like Bach and Handel?', options: ['Romantic', 'Modern', 'Baroque', 'Classical'], correctAnswer: 'Baroque' },
+                { question: "A word's literal dictionary meaning is its what?", options: ['Connotation', 'Allusion', 'Denotation', 'Metaphor'], correctAnswer: 'Denotation' }
             ],
             Trades: [
-                { question: 'What is the primary purpose of a level in construction?', options: ['To measure distance', 'To check if a surface is perfectly horizontal/vertical', 'To cut straight lines', 'To test voltage'], correctAnswer: 'To check if a surface is perfectly horizontal/vertical' },
-                { question: 'Which safety device shuts off an electrical circuit during an overload?', options: ['Fuse only', 'Circuit Breaker', 'Ground wire', 'Lightning rod'], correctAnswer: 'Circuit Breaker' },
-                { question: 'What is used to smooth a wooden surface before finishing?', options: ['Chisel', 'Sandpaper', 'Solder', 'Putty knife only'], correctAnswer: 'Sandpaper' },
-                { question: "What does 'PPE' stand for?", options: ['Project Planning Estimate', 'Personal Protective Equipment', 'Power Press Exam', 'Public Permit Entry'], correctAnswer: 'Personal Protective Equipment' },
-                { question: 'When framing a standard residential wall, what is the typical spacing between studs?', options: ['12 inches on center', '16 inches on center', '24 inches on center', '32 inches on center'], correctAnswer: '16 inches on center' },
-                { question: 'In plumbing, what prevents sewer gases from entering the home?', options: ['Shutoff valve', 'P-trap', 'Pressure tank', 'Expansion tank'], correctAnswer: 'P-trap' },
-                { question: 'What tool safely tests if an electrical wire is live?', options: ['Pipe wrench', 'Multimeter / Voltage Tester', 'Hacksaw', 'Level'], correctAnswer: 'Multimeter / Voltage Tester' },
-                { question: 'In MIG welding, what is the purpose of Argon gas?', options: ['To cool the torch', 'To protect the weld pool from contamination', 'To increase amperage', 'To remove rust'], correctAnswer: 'To protect the weld pool from contamination' },
-                { question: 'What type of outlet is required near water sources to prevent electrocution?', options: ['AFCI', 'GFCI', 'USB-only', '240V only'], correctAnswer: 'GFCI' },
-                { question: 'What tool establishes a perfectly vertical reference line?', options: ['Chalk line', 'Plumb bob', 'Speed square', 'Torpedo level'], correctAnswer: 'Plumb bob' },
-                { question: 'In the American Wire Gauge (AWG) system, how does wire thickness relate to gauge number?', options: ['Higher numbers mean thicker wire', 'Higher gauge numbers mean thinner wire', 'Gauge is unrelated to thickness', 'All gauges are the same thickness'], correctAnswer: 'Higher gauge numbers mean thinner wire' },
-                { question: "What does an 'R-value' measure in construction?", options: ['Electrical resistance only', 'Thermal resistance of insulation', 'Water pressure', 'Roof slope'], correctAnswer: 'Thermal resistance of insulation' },
-                { question: 'What is the process of joining copper pipes using heat and a filler metal called?', options: ['Threading', 'Sweating / Soldering', 'Crimping', 'Gluing'], correctAnswer: 'Sweating / Soldering' },
-                { question: 'What is the term for the width of the cut made by a saw blade?', options: ['Bevel', 'Kerf', 'Rip', 'Dado'], correctAnswer: 'Kerf' },
-                { question: 'What tool is used to snap perfectly straight lines across flat surfaces?', options: ['Plumb bob', 'Chalk line', 'Contour gauge', 'Stud finder'], correctAnswer: 'Chalk line' },
-                { question: 'Which plastic pipe is commonly used for hot water supply lines?', options: ['PVC only', 'PEX', 'ABS only', 'Cardboard'], correctAnswer: 'PEX' },
-                { question: 'What device is designed to protect against dangerous electrical arcs in branch circuits?', options: ['GFCI', 'AFCI', 'Surge protector', 'Transformer'], correctAnswer: 'AFCI' },
-                { question: 'Which tool is used to apply a specific torque to a fastener?', options: ['Hammer', 'Torque wrench', 'Speed square', 'Crowbar'], correctAnswer: 'Torque wrench' },
-                { question: 'What is the main purpose of a bay window?', options: ['Fire escape only', 'To project outward and add space/light', 'To block sunlight', 'To hide wiring'], correctAnswer: 'To project outward and add space/light' },
-                { question: 'What type of PPE is most important when operating loud power tools?', options: ['Steel-toe shoes only', 'Hearing protection', 'Sunscreen', 'Leather apron only'], correctAnswer: 'Hearing protection' },
-            ],
+                { question: 'What is the primary purpose of a level tool?', options: ['Measure depth', 'Check whether a surface is level or plumb', 'Cut trim', 'Test voltage'], correctAnswer: 'Check whether a surface is level or plumb' },
+                { question: 'What device trips to stop current during an electrical overload?', options: ['Transformer', 'Circuit breaker', 'Extension cord', 'Ground rod'], correctAnswer: 'Circuit breaker' },
+                { question: 'What material is commonly used to smooth wood before finishing?', options: ['Sandpaper', 'Caulk', 'Flux', 'Rebar'], correctAnswer: 'Sandpaper' },
+                { question: 'In workplace safety, what does PPE stand for?', options: ['Power Protection Equipment', 'Personal Protective Equipment', 'Primary Power Entry', 'Personal Project Estimate'], correctAnswer: 'Personal Protective Equipment' }
+            ]
         };
 
         const EXAM_QUESTION_BANKS = {};
@@ -1591,40 +1601,15 @@
         };
 
         const MENTAL_ILLNESS_DEFINITIONS = {
-            seasonalAffectiveDisorder: { name: "Seasonal Affective Disorder", tier: "mild", curable: true, minVisits: 3, maxVisits: 5 },
-            specificPhobia: { name: "Specific Phobia", tier: "mild", curable: true, minVisits: 4, maxVisits: 6 },
-            adjustmentDisorder: { name: "Adjustment Disorder", tier: "mild", curable: true, minVisits: 3, maxVisits: 5 },
-            mildAnxiety: { name: "Mild Anxiety", tier: "mild", curable: true, minVisits: 4, maxVisits: 8 },
-            insomnia: { name: "Insomnia", tier: "mild", curable: true, minVisits: 3, maxVisits: 6 },
-            mildDepression: { name: "Mild Depression", tier: "mild", curable: true, minVisits: 5, maxVisits: 8 },
-            socialAnxiety: { name: "Social Anxiety", tier: "mild", curable: true, minVisits: 6, maxVisits: 10 },
-            hypochondria: { name: "Hypochondria", tier: "mild", curable: true, minVisits: 6, maxVisits: 10 },
-
-            panicDisorder: { name: "Panic Disorder", tier: "medium", curable: true, minVisits: 10, maxVisits: 15 },
-            ptsd: { name: "PTSD", tier: "medium", curable: true, minVisits: 12, maxVisits: 20 },
-            moderateOcd: { name: "Moderate OCD", tier: "medium", curable: true, minVisits: 15, maxVisits: 25 },
-            bulimia: { name: "Bulimia", tier: "medium", curable: true, minVisits: 15, maxVisits: 25 },
-            depression: { name: "Moderate Depression", tier: "medium", curable: true, minVisits: 12, maxVisits: 20, annualHealthDrain: 5 },
-            anxiety: { name: "Moderate Anxiety", tier: "medium", curable: true, minVisits: 10, maxVisits: 18 },
-            moderateAdhd: { name: "Moderate ADHD", tier: "medium", curable: false },
+            seasonalAffectiveDisorder: { name: "Seasonal Affective Disorder (SAD)", tier: "mild", curable: true, minVisits: 2, maxVisits: 4 },
+            insomnia: { name: "Insomnia", tier: "mild", curable: true, minVisits: 2, maxVisits: 5 },
+            anxiety: { name: "Mild Anxiety", tier: "mild", curable: true, minVisits: 3, maxVisits: 6 },
+            depression: { name: "Depression", tier: "medium", curable: false, annualHealthDrain: 5, annualHappinessDrainOverride: 25 },
+            ptsd: { name: "PTSD", tier: "medium", curable: true, minVisits: 6, maxVisits: 10 },
+            ocd: { name: "OCD", tier: "medium", curable: true, minVisits: 5, maxVisits: 9 },
             bipolarII: { name: "Bipolar II", tier: "medium", curable: false },
-            severeAcademicBurnout: {
-                name: "Severe Academic Burnout",
-                tier: "medium",
-                curable: true,
-                minVisits: 8,
-                maxVisits: 14,
-                annualHappinessDrainOverride: 25
-            },
-
             schizophrenia: { name: "Schizophrenia", tier: "severe", curable: false },
-            bipolarI: { name: "Bipolar I", tier: "severe", curable: false },
-            severeOcd: { name: "Severe OCD", tier: "severe", curable: false },
-            anorexiaNervosa: { name: "Anorexia Nervosa", tier: "severe", curable: true, minVisits: 30, maxVisits: 45 },
-            borderlinePersonalityDisorder: { name: "Borderline Personality Disorder (BPD)", tier: "severe", curable: false },
-            dissociativeIdentityDisorder: { name: "Dissociative Identity Disorder (DID)", tier: "severe", curable: false },
-            schizoaffectiveDisorder: { name: "Schizoaffective Disorder", tier: "severe", curable: false },
-            severeDepressionPsychosis: { name: "Severe Depression with Psychosis", tier: "severe", curable: false }
+            severeDepressionPsychosis: { name: "Severe Depression with Psychosis", tier: "severe", curable: false, annualHealthDrain: 8 }
         };
 
         function randomIntBetween(min, max) {
@@ -1651,27 +1636,12 @@
             });
 
             const extraMentalRolls = [
-                { key: "seasonalAffectiveDisorder", weight: 3.2 },
-                { key: "specificPhobia", weight: 2.8 },
-                { key: "adjustmentDisorder", weight: 2.5 },
-                { key: "mildAnxiety", weight: 3.6 },
-                { key: "insomnia", weight: 3.3 },
-                { key: "mildDepression", weight: 2.9 },
-                { key: "socialAnxiety", weight: 2.5 },
-                { key: "hypochondria", weight: 2.4 },
-                { key: "panicDisorder", weight: 1.8 },
-                { key: "moderateOcd", weight: 1.1 },
-                { key: "bulimia", weight: 0.9 },
-                { key: "moderateAdhd", weight: 1.0 },
+                { key: "seasonalAffectiveDisorder", weight: 3.0 },
+                { key: "insomnia", weight: 3.2 },
+                { key: "anxiety", weight: 3.6 },
+                { key: "ocd", weight: 1.2 },
                 { key: "bipolarII", weight: 0.6 },
-                { key: "bipolarI", weight: 0.25 },
-                { key: "severeOcd", weight: 0.3 },
-                { key: "anorexiaNervosa", weight: 0.25 },
-                { key: "borderlinePersonalityDisorder", weight: 0.35 },
-                { key: "dissociativeIdentityDisorder", weight: 0.12 },
-                { key: "schizoaffectiveDisorder", weight: 0.2 },
-                { key: "severeDepressionPsychosis", weight: 0.18 },
-                { key: "severeAcademicBurnout", weight: 0.15 }
+                { key: "severeDepressionPsychosis", weight: 0.18 }
             ];
 
             extraMentalRolls.forEach(function (entry) {
@@ -1864,10 +1834,10 @@
             if (!state.isEmployed || !state.isEnrolled) return;
             if (state.jobType !== "Career") return;
             if (state.happiness >= 25) return;
-            if (state.currentIllnesses.includes("severeAcademicBurnout")) return;
+            if (state.currentIllnesses.includes("depression")) return;
             if (Math.random() >= 0.5) return;
-            diagnoseIllness("severeAcademicBurnout", { skipHappinessPenalty: true, forceOverlay: true });
-            logEvent("Dual hustle overload: Severe Academic Burnout diagnosed.");
+            diagnoseIllness("depression", { setHappinessZero: true, skipHappinessPenalty: true, forceOverlay: true });
+            logEvent("Dual hustle overload pushed you into depression.");
         }
 
         function applyDualHustleStressForYear() {
@@ -2232,13 +2202,13 @@
             const q = props.question;
             if (!q) return null;
             const part = props.questionPart || 1;
-            const totalParts = props.questionsPerYear || 2;
+            const totalParts = props.questionsPerYear || 1;
             return (
                 <div id="yearly-exam-overlay" className="open" role="dialog" aria-modal="true" aria-label="Yearly Exam">
                     <div id="exam-desk">
-                        <h2 id="exam-title">FINAL EXAM: YEAR {props.currentSchoolYear}</h2>
+                        <h2 id="exam-title">YEARLY EXAM - YEAR {props.currentSchoolYear}</h2>
                         <p id="exam-subtitle" style={{ margin: "0 0 10px", fontSize: "0.88rem", color: "#9e9e9e" }}>
-                            Question {part} of {totalParts} this year
+                            Mandatory checkpoint {part} of {totalParts}
                         </p>
                         <p id="exam-question">{q.question}</p>
                         <div id="exam-options">
@@ -2263,7 +2233,7 @@
                             })}
                         </div>
                         <p id="exam-penalty-warning">
-                            Warning: Incorrect answers will increase your total student debt for this track.
+                            Permanent consequence: you need at least 3 correct answers across 4 school years to graduate.
                         </p>
                     </div>
                 </div>
@@ -2276,40 +2246,26 @@
 
         function startExamYearQuestionQueue(path) {
             const bank = EXAM_QUESTION_BANKS[path] || [];
-            if (bank.length < 2) {
+            if (!bank.length) {
                 state.examYearQuestionQueue = [];
                 return;
             }
             var indices = bank.map(function (_, i) { return i; });
-            for (var i = indices.length - 1; i > 0; i--) {
-                var j = Math.floor(Math.random() * (i + 1));
-                var t = indices[i];
-                indices[i] = indices[j];
-                indices[j] = t;
-            }
-            var pick = [];
-            for (var k = 0; k < indices.length && pick.length < 2; k++) {
-                var idx = indices[k];
-                var id = examQuestionId(path, idx);
-                if (state.examYearUsedQuestionIds.indexOf(id) === -1) {
-                    pick.push(idx);
-                }
-            }
-            if (pick.length < 2) {
+            var pick = indices.filter(function (idx) {
+                return state.examYearUsedQuestionIds.indexOf(examQuestionId(path, idx)) === -1;
+            });
+            if (!pick.length) {
                 state.examYearUsedQuestionIds = [];
-                pick = indices.slice(0, 2);
+                pick = indices.slice();
             }
-            pick.forEach(function (idx) {
-                state.examYearUsedQuestionIds.push(examQuestionId(path, idx));
-            });
-            state.examYearQuestionQueue = pick.map(function (idx) {
-                var q = bank[idx];
-                return {
-                    question: q.question,
-                    options: q.options.slice(),
-                    correctAnswerIndex: q.correctAnswerIndex
-                };
-            });
+            var selectedIdx = pick[Math.floor(Math.random() * pick.length)];
+            state.examYearUsedQuestionIds.push(examQuestionId(path, selectedIdx));
+            var q = bank[selectedIdx];
+            state.examYearQuestionQueue = [{
+                question: q.question,
+                options: q.options.slice(),
+                correctAnswerIndex: q.correctAnswerIndex
+            }];
         }
 
         function popNextExamQuestionForYear() {
@@ -2335,7 +2291,7 @@
                     currentSchoolYear={state.yearsInSchool + 1}
                     question={state.currentExamQuestion}
                     questionPart={state.examQuestionsThisYearAnswered + 1}
-                    questionsPerYear={state.examQuestionsThisYearTotal || 2}
+                    questionsPerYear={state.examQuestionsThisYearTotal || 1}
                     selectedOptionIndex={selectedOptionIndex}
                     showFeedback={showFeedback}
                     onSelectOption={handleYearlyExamAnswer}
@@ -2361,19 +2317,49 @@
                 .replace(/'/g, "&#39;");
         }
 
+        function capitalizeWord(word) {
+            if (!word) return "";
+            return word.charAt(0).toUpperCase() + word.slice(1);
+        }
+
+        function getIllnessAnnualImpactDescription(illnessKey) {
+            const disease = DISEASES[illnessKey];
+            if (!disease) return "";
+
+            if (isMentalIllness(illnessKey)) {
+                const tier = disease.mentalTier || "mild";
+                const drain = MENTAL_TIER_HAPPINESS_DRAIN[tier] || 10;
+                const careLine = disease.mentalCurable
+                    ? "Curable with repeated psychiatrist visits."
+                    : "Incurable; psychiatry can only suppress the yearly drain.";
+                return "Tier: " + capitalizeWord(tier) + " | Annual Happiness Drain: -" + drain + " | " + careLine;
+            }
+
+            const impactParts = [];
+            if (disease.annualHealthDrain) {
+                impactParts.push("Annual Health Drain: -" + disease.annualHealthDrain);
+            }
+            if (disease.annualHappinessDrain) {
+                impactParts.push("Annual Happiness Drain: -" + disease.annualHappinessDrain);
+            }
+            impactParts.push(disease.curable ? "Treatable by a doctor." : "Currently incurable.");
+            return impactParts.join(" | ");
+        }
+
         function DiagnosisOverlay(props) {
             const disease = DISEASES[props.illnessKey];
             if (!disease) return "";
             const isMental = isMentalIllness(props.illnessKey);
             const doctorBtnAttrs = props.canAccessDoctor ? "" : "disabled";
             const doctorLabel = props.canAccessDoctor
-                ? (isMental ? "Visit Psychiatrist" : "Go to the Doctor")
-                : (isMental ? "Visit Psychiatrist (Unavailable)" : "Go to the Doctor (Unavailable)");
-            return "<div id=\"diagnosis-overlay\" class=\"open\" role=\"dialog\" aria-modal=\"true\" aria-label=\"Medical Diagnosis\">" +
+                ? (isMental ? "Go to Psychiatrist" : "Go to Doctor")
+                : (isMental ? "Go to Psychiatrist (Unavailable)" : "Go to Doctor (Unavailable)");
+            return "<div id=\"diagnosis-overlay\" class=\"open\" role=\"dialog\" aria-modal=\"true\" aria-label=\"Diagnosis Alert\">" +
                 "<div id=\"diagnosis-card\">" +
-                "<h2 id=\"diagnosis-title\">MEDICAL DIAGNOSIS 🩺</h2>" +
+                "<h2 id=\"diagnosis-title\">DIAGNOSIS ALERT</h2>" +
                 "<p id=\"diagnosis-text\">You have been diagnosed with " + escapeHtml(disease.name) + ".</p>" +
                 "<p id=\"diagnosis-cost\">Base treatment cost: " + formatMoney(disease.cureCost) + "</p>" +
+                "<p id=\"diagnosis-impact\">" + escapeHtml(getIllnessAnnualImpactDescription(props.illnessKey)) + "</p>" +
                 "<div id=\"diagnosis-actions\">" +
                 "<button class=\"diagnosis-btn\" id=\"diagnosis-okay-btn\">Okay</button>" +
                 "<button class=\"diagnosis-btn\" id=\"diagnosis-doctor-btn\" " + doctorBtnAttrs + ">" + doctorLabel + "</button>" +
@@ -2434,6 +2420,56 @@
             state.isDiagnosisOverlayOpen = false;
             state.currentDiagnosisIllnessKey = null;
             diagnosisOverlayRoot.innerHTML = "";
+        }
+
+        function AcademicDismissalOverlay(props) {
+            if (!props) return "";
+            return "<div id=\"dismissal-overlay\" class=\"open\" role=\"dialog\" aria-modal=\"true\" aria-label=\"Academic Dismissal\">" +
+                "<div id=\"dismissal-card\">" +
+                "<h2>Academic Dismissal</h2>" +
+                "<p>You failed the four-year education gauntlet for " + escapeHtml(props.degreeName) + ".</p>" +
+                "<p>You answered " + props.passedCount + "/" + props.totalQuestions + " yearly exams correctly. You needed at least " + props.requiredPasses + ".</p>" +
+                "<p>Your happiness has collapsed to zero, career-track hiring remains locked, and you must repeat the full four-year program before you can enter the job market.</p>" +
+                "<div id=\"dismissal-actions\">" +
+                "<button class=\"dismissal-btn\" id=\"dismissal-ack-btn\">Accept Consequences</button>" +
+                "</div>" +
+                "</div>" +
+                "</div>";
+        }
+
+        function closeAcademicDismissalOverlay() {
+            state.isDismissalOverlayOpen = false;
+            state.dismissalOverlayData = null;
+            dismissalOverlayRoot.innerHTML = "";
+        }
+
+        function renderAcademicDismissalOverlay() {
+            if (!state.isDismissalOverlayOpen || !state.dismissalOverlayData) {
+                dismissalOverlayRoot.innerHTML = "";
+                return;
+            }
+
+            dismissalOverlayRoot.innerHTML = AcademicDismissalOverlay(state.dismissalOverlayData);
+            const acknowledgeBtn = document.getElementById("dismissal-ack-btn");
+            if (acknowledgeBtn) {
+                acknowledgeBtn.addEventListener("click", function () {
+                    closeAcademicDismissalOverlay();
+                    diagnoseIllness("depression", { setHappinessZero: true, skipHappinessPenalty: true, forceOverlay: true });
+                    updateUI();
+                });
+            }
+        }
+
+        function openAcademicDismissalOverlay(program, passedCount, requiredPasses) {
+            closeModal();
+            state.isDismissalOverlayOpen = true;
+            state.dismissalOverlayData = {
+                degreeName: program.degreeName,
+                passedCount: passedCount,
+                totalQuestions: program.yearsRequired,
+                requiredPasses: requiredPasses
+            };
+            renderAcademicDismissalOverlay();
         }
 
         function openDiagnosisOverlayForIllness(illnessKey) {
@@ -2620,15 +2656,8 @@
         }
 
         function getRequiredExamPassesForProgram(program) {
-            var totalQuestions = program.yearsRequired * 2;
-            if (program && program.pipeline && program.pipeline !== "undergrad") {
-                return Math.ceil(totalQuestions * 0.5);
-            }
-            var byRatio = Math.ceil(totalQuestions * 0.75);
-            if (program.yearsRequired >= 4) {
-                return Math.max(6, byRatio);
-            }
-            return byRatio;
+            if (!program) return 0;
+            return Math.max(1, Math.ceil(program.yearsRequired * 0.75));
         }
 
         function clearEnrollmentAfterDismissalOrQuit() {
@@ -2658,8 +2687,8 @@
             state.jobSearchBlocked = false;
             openModal(
                 "Academic Dismissal",
-                "<strong>You did not pass at least 50% of the required exam questions for " + program.degreeName + ".</strong><br><br>" +
-                "You passed " + passedCount + "/" + (program.yearsRequired * 2) + " exam questions (minimum required: " + requiredPasses + "). " +
+                "<strong>You failed the annual exam threshold for " + program.degreeName + ".</strong><br><br>" +
+                "You passed " + passedCount + "/" + program.yearsRequired + " yearly exams (minimum required: " + requiredPasses + "). " +
                 "You are not awarded this degree. Accumulated program debt remains on your record.<br><br>" + debtLine,
                 [{ label: "Continue", handler: function () { closeModal(); updateUI(); } }]
             );
@@ -2676,40 +2705,27 @@
 
             applyDegreeEndDebt();
             state.degreeWrongAnswersThisEnrollment = 0;
-            const debtLine = "You have finished your studies with " + formatMoney(state.existingDebt) + " in student debt.";
-
             state.academicDismissed = true;
             state.jobSearchBlocked = true;
+            state.happiness = 0;
             state.yearsInSchool = 0;
             state.examsPassedThisDegree = 0;
             state.examsTakenThisDegree = 0;
             state.isInSchool = true;
             state.isEnrolled = true;
+            state.annualIncome = 0;
+            state.salary = 0;
+            state.jobTitle = "Student";
+            state.isEmployed = false;
+            state.jobType = "None";
             syncCurrentEnrollment();
 
-            logEvent("Academic dismissal: you did not pass enough yearly exams for " + program.degreeName + ".");
+            logEvent("Academic dismissal: you failed to clear the four-year exam threshold for " + program.degreeName + ".");
             state.examYearQuestionQueue = [];
             state.examYearUsedQuestionIds = [];
             state.examQuestionsThisYearTotal = 0;
             state.examQuestionsThisYearAnswered = 0;
-
-            openModal(
-                "Academic Dismissal — Failed Final Year",
-                "<strong>You did not meet the graduation exam requirement.</strong><br><br>You passed " + passedCount + "/" + (program.yearsRequired * 2) +
-                " exam questions (minimum required: " + requiredPasses + "). You must restart " +
-                program.degreeName + " from Year 1. Careers and Find a Job stay locked until you graduate successfully.<br><br>" + debtLine,
-                [
-                    {
-                        label: "Continue",
-                        handler: function () {
-                            closeModal();
-                            state.happiness = 0;
-                            diagnoseIllness("depression", { setHappinessZero: true, skipHappinessPenalty: true, forceOverlay: true });
-                            updateUI();
-                        }
-                    }
-                ]
-            );
+            openAcademicDismissalOverlay(program, passedCount, requiredPasses);
             updateUI();
         }
 
@@ -2766,7 +2782,7 @@
             syncCurrentEnrollment();
 
             logEvent(
-                "Age " + state.age + ": Completed " + (state.examQuestionsThisYearTotal || 2) + " final exam questions. " +
+                "Age " + state.age + ": Completed " + (state.examQuestionsThisYearTotal || 1) + " mandatory yearly exam. " +
                 "School year " + state.yearsInSchool + "/" + program.yearsRequired + " in " + program.degreeName + "."
             );
 
@@ -2836,7 +2852,7 @@
             }
 
             closeModal();
-            state.examQuestionsThisYearTotal = 2;
+            state.examQuestionsThisYearTotal = 1;
             state.examQuestionsThisYearAnswered = 0;
             state.isExamModalOpen = true;
             state.currentExamQuestion = first;
@@ -2877,12 +2893,12 @@
 
         function getHireChance() {
             if (state.playerPath === "Trades") {
-                return 0.75 + Math.random() * 0.15;
+                return 0.85;
             }
             if (state.playerPath === "STEM") {
-                return 0.50 + Math.random() * 0.20;
+                return 0.60;
             }
-            return 0.15 + Math.random() * 0.15;
+            return 0.20;
         }
 
         function quitJob() {
@@ -2952,45 +2968,53 @@
         function openJobBoard() {
             const enrProg = state.currentlyPursuing ? EDUCATION_PROGRAMS[state.currentlyPursuing] : null;
             if (enrProg && enrProg.pipeline === "residency") {
-                openModal("Career Path Jobs", "You cannot take a standard job during Medical Residency.", [
+                openModal("Find a Job", "You cannot take a standard job during Medical Residency.", [
                     { label: "Close", handler: function () { closeModal(); } }
                 ]);
                 return;
             }
             if (state.isEmployed) {
-                openModal("Career Path Jobs", "You already have a job. Use Quit Job in Careers if you want to apply elsewhere.", [
+                openModal("Find a Job", "You already have a job. Use Quit Job in Careers if you want to apply elsewhere.", [
                     { label: "Close", handler: function () { closeModal(); } }
                 ]);
                 return;
             }
             if (state.currentlyPursuing) {
-                openModal("Career Path Jobs", "Degree-track careers unlock after you graduate. Use Odd Jobs & Part-Time while in school.", [
+                openModal("Find a Job", "Career-track hiring unlocks only after graduation. Keep aging up through school first.", [
                     { label: "Close", handler: function () { closeModal(); } }
                 ]);
                 return;
             }
             if (state.jobSearchBlocked) {
-                openModal("Career Path Jobs", "Career applications are locked until you resolve academic dismissal and graduate.", [
+                openModal("Find a Job", "Career applications are locked until you recover from academic dismissal and finish the degree path.", [
                     { label: "Close", handler: function () { closeModal(); } }
                 ]);
                 return;
             }
-            const jobs = JOB_MARKET[state.playerPath] || [];
+            const jobs = (JOB_MARKET[state.playerPath] || []).filter(function (job) {
+                return meetsEducationRequirement(job.requiredEducation);
+            });
+            if (!jobs.length) {
+                openModal("Find a Job", "No jobs match your current path and credentials yet. Graduate or earn a stronger credential to unlock more roles.", [
+                    { label: "Close", handler: function () { closeModal(); } }
+                ]);
+                return;
+            }
+            const hireRatePct = Math.round(getHireChance() * 100);
             const actions = jobs.map(function (job) {
-                const eligible = meetsEducationRequirement(job.requiredEducation);
                 return {
-                    label: eligible
-                        ? "Apply: " + job.title + " — " + formatMoney(job.salary)
-                        : job.title + " — Requires " + job.requiredEducation,
-                    disabled: !eligible,
+                    label: "Apply: " + job.title + " — " + formatMoney(job.salary),
                     handler: function () {
-                        if (!eligible) return;
                         applyForJob(job);
                     }
                 };
             });
             actions.push({ label: "Close", handler: function () { closeModal(); } });
-            openModal("Career Path (Requires Degree)", "Professional roles on your " + state.playerPath + " path. Hiring is competitive.", actions);
+            openModal(
+                "Find a Job",
+                "Filtered to your " + state.playerPath + " path and current degree. Hiring rate for this board: ~" + hireRatePct + "%.",
+                actions
+            );
         }
 
         function openOddJobsBoard() {
@@ -3030,10 +3054,10 @@
             const canCareerBoard = !state.isEmployed && !state.currentlyPursuing && !state.jobSearchBlocked && !residencyBlock;
             const canOddJobsBoard = !state.isEmployed && state.playerPath && !residencyBlock;
             const lockReason = state.currentlyPursuing
-                ? "You are currently enrolled in school."
+                ? "You are still in school, so Find a Job is locked."
                 : state.jobSearchBlocked
-                    ? "Career applications are locked due to academic dismissal."
-                    : "Career applications are available.";
+                    ? "Find a Job is locked because you were academically dismissed and must repeat the program."
+                    : "Find a Job is open for your degree path.";
 
             if (state.isEmployed) {
                 const panel =
@@ -3041,7 +3065,7 @@
                     "Type: " + (state.jobType === "OddJob" ? "Part-time / Odd Job" : state.jobType === "Career" ? "Career" : "Other") + "<br>" +
                     "Current Position: " + state.jobTitle + "<br>" +
                     "Current Salary: " + formatMoney(state.annualIncome) + " / year<br><br>" +
-                    "<span style=\"color:#bdbdbd;font-size:0.9rem;\">Career jobs use your " + state.playerPath + " path and credentials. Odd jobs never require a degree.</span>";
+                    "<span style=\"color:#bdbdbd;font-size:0.9rem;\">Career jobs are filtered by your path and credentials. Odd jobs ignore degree requirements.</span>";
                 openModal(
                     "Careers",
                     panel,
@@ -3061,10 +3085,10 @@
             openModal(
                 "Careers",
                 "Status: " + state.jobTitle + " | Annual Income: " + formatMoney(state.annualIncome) + "<br>" + lockReason +
-                    "<br><br><strong>Choose a job board:</strong>",
+                    "<br><br><strong>Choose your lane:</strong>",
                 [
                     {
-                        label: canCareerBoard ? "Career Path (Requires Degree)" : "Career Path (Locked)",
+                        label: canCareerBoard ? "Find a Job" : "Find a Job (Locked)",
                         disabled: !canCareerBoard,
                         handler: function () {
                             if (canCareerBoard) openJobBoard();
@@ -3329,7 +3353,7 @@
             }
 
             openModal(
-                "Congratulations! 🎉",
+                "Graduation Celebration",
                 gradBody,
                 actions
             );
@@ -3343,8 +3367,8 @@
                 ? "Currently pursuing: " + program.degreeName + " (" + state.yearsInSchool + "/" + program.yearsRequired + " years)"
                 : "You are not currently enrolled in school.";
             const examProgress = program
-                ? "Exam questions (this degree): " + state.examsPassedThisDegree + "/" + state.examsTakenThisDegree +
-                    " (2 per year; need " + getRequiredExamPassesForProgram(program) + "+ correct to graduate)."
+                ? "Yearly exams passed: " + state.examsPassedThisDegree + "/" + state.examsTakenThisDegree +
+                    " (1 forced exam per year; need " + getRequiredExamPassesForProgram(program) + "+ correct to graduate)."
                 : "";
             const enrollLine = state.currentEnrollment
                 ? "<br><strong>Current enrollment:</strong> " + state.currentEnrollment.degreeName +
@@ -3576,29 +3600,15 @@
         }
 
         function getGlobalHousingMarketShiftForYear() {
-            let shift = 0;
-            let eventType = "stable";
-            if (Math.random() < 0.05) {
-                if (Math.random() < 0.5) {
-                    shift = -0.20;
-                    eventType = "crash";
-                    logEvent("Housing Market Crash: real estate values dropped by 20% this year.");
-                } else {
-                    shift = 0.20;
-                    eventType = "boom";
-                    logEvent("Housing Boom: real estate values jumped by 20% this year.");
-                }
-            }
-            state.currentHousingMarketShift = shift;
-            state.currentHousingMarketEvent = eventType;
+            state.currentHousingMarketShift = 0;
+            state.currentHousingMarketEvent = "volatile";
         }
 
         function applyHousingMarketForYear() {
             getGlobalHousingMarketShiftForYear();
 
             state.ownedAssets.forEach(function (property) {
-                const marketFluctuation = Math.random() * 0.12 - 0.05;
-                const totalShift = marketFluctuation + state.currentHousingMarketShift;
+                const totalShift = Math.random() * 0.10 - 0.05;
                 property.currentValue = Math.max(10000, Math.round(property.currentValue * (1 + totalShift)));
                 property.lastMarketFluctuation = totalShift;
 
@@ -3630,7 +3640,7 @@
 
             state.realEstateListings = templates.map(function (tpl) {
                 const basePrice = tpl.minPrice + Math.random() * (tpl.maxPrice - tpl.minPrice);
-                const adjustedPrice = Math.max(50000, Math.round(basePrice * (1 + state.currentHousingMarketShift)));
+                const adjustedPrice = Math.max(50000, Math.round(basePrice));
                 const annualUpkeep = Math.max(1000, Math.round(adjustedPrice * tpl.upkeepRate));
                 const suggestedMortgagePayment = Math.max(1200, Math.round(adjustedPrice * 0.06));
                 return {
@@ -4027,11 +4037,7 @@
             syncFinancialAliases();
             const currentNetWorth = state.cash + state.investments - state.debt;
             const canInvest = state.bankBalance > 0 && currentNetWorth > 0;
-            const marketLabel = state.currentHousingMarketEvent === "crash"
-                ? "<span style=\"color:#ff6b6b;\">Market Mood: Crash (-20%)</span>"
-                : state.currentHousingMarketEvent === "boom"
-                    ? "<span style=\"color:#69f0ae;\">Market Mood: Boom (+20%)</span>"
-                    : "<span style=\"color:#bdbdbd;\">Market Mood: Stable</span>";
+            const marketLabel = "<span style=\"color:#bdbdbd;\">Annual Housing Volatility: +/-5%</span>";
 
             const myPropertiesHtml = state.ownedAssets.length
                 ? state.ownedAssets.map(function (property) {
@@ -4044,6 +4050,7 @@
                     return "<div style=\"margin-bottom:8px;\">" +
                         "<strong>" + property.propertyType + "</strong><br>" +
                         "Original: " + formatMoney(property.originalPrice) + " | Current: " + formatMoney(property.currentValue) + "<br>" +
+                        "Annual Upkeep: " + formatMoney(property.annualUpkeep) + (property.mortgagePayment ? " | Mortgage Pmt: " + formatMoney(property.mortgagePayment) : "") + "<br>" +
                         "<span style=\"color:" + color + ";\">" + marker + " " + (up ? "+" : "") + delta.pct.toFixed(1) + "%</span> | " + mortgageText +
                         "</div>";
                 }).join("")
@@ -4248,6 +4255,7 @@
             closePromotionOverlay();
             closeEvictionOverlay();
             closeDiagnosisOverlay();
+            closeAcademicDismissalOverlay();
             gameUI.style.display = "none";
             deathScreen.style.display = "flex";
 
@@ -4312,7 +4320,8 @@
                 return;
             }
 
-            if (state.happiness <= 0) {
+            state.happiness = clampStat(state.happiness);
+            if (state.happiness === 0) {
                 state.happinessZeroStreakYears += 1;
             } else {
                 state.happinessZeroStreakYears = 0;
@@ -4335,7 +4344,7 @@
         }
 
         function ageUp() {
-            if (state.isDead || !state.playerPath || state.isExamModalOpen || state.isExamActive || state.isDiagnosisOverlayOpen || state.isPromotionOverlayOpen || state.isEvictionOverlayOpen) return;
+            if (state.isDead || !state.playerPath || state.isExamModalOpen || state.isExamActive || state.isDiagnosisOverlayOpen || state.isDismissalOverlayOpen || state.isPromotionOverlayOpen || state.isEvictionOverlayOpen) return;
 
             if (state.isInSchool && state.currentlyPursuing) {
                 openYearlyExamOverlay();
@@ -4419,7 +4428,7 @@
             syncFinancialAliases();
             generateRealEstateMarket();
 
-            logEvent("You chose the " + path + " path. Your education journey begins.");
+            logEvent("You chose the " + path + " path. The four-year education gauntlet begins.");
             updateUI();
         }
 
@@ -4431,16 +4440,16 @@
 
         document.getElementById("age-up-btn").addEventListener("click", ageUp);
         document.getElementById("education-nav-btn").addEventListener("click", function () {
-            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isEvictionOverlayOpen) openEducationTab();
+            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isDismissalOverlayOpen && !state.isPromotionOverlayOpen && !state.isEvictionOverlayOpen) openEducationTab();
         });
         document.getElementById("careers-nav-btn").addEventListener("click", function () {
-            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isEvictionOverlayOpen) openCareersTab();
+            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isDismissalOverlayOpen && !state.isPromotionOverlayOpen && !state.isEvictionOverlayOpen) openCareersTab();
         });
         document.getElementById("activities-nav-btn").addEventListener("click", function () {
-            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isEvictionOverlayOpen) openActivitiesMenu();
+            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isDismissalOverlayOpen && !state.isPromotionOverlayOpen && !state.isEvictionOverlayOpen) openActivitiesMenu();
         });
         document.getElementById("assets-nav-btn").addEventListener("click", function () {
-            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isEvictionOverlayOpen) openAssetsMenu();
+            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isDismissalOverlayOpen && !state.isPromotionOverlayOpen && !state.isEvictionOverlayOpen) openAssetsMenu();
         });
         document.getElementById("play-again-btn").addEventListener("click", function () {
             location.reload();
