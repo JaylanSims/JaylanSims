@@ -457,8 +457,10 @@
     <script>
         let state = {
             age: 18, health: 100, happiness: 100, smarts: 50,
-            cash: 0, investments: 0, debt: 0, salary: 0, expenses: 25000,
-            major: null, isDead: false, currentIllnesses: [], illnessYears: {}
+            cash: 0, investments: 0, debt: 0, salary: 0, expenses: 25000, annualExpenses: 25000, bankBalance: 0,
+            major: null, isDead: false, currentIllnesses: [], illnessYears: {},
+            ownedAssets: [], realEstateListings: [], nextPropertyId: 1, nextListingId: 1,
+            currentHousingMarketShift: 0, currentHousingMarketEvent: "stable"
         };
 
         const setupScreen = document.getElementById("setup-screen");
@@ -768,6 +770,7 @@
         }
 
         function updateUI() {
+            syncFinancialAliases();
             state.health = clampStat(state.health);
             state.happiness = clampStat(state.happiness);
             state.smarts = clampStat(state.smarts);
@@ -814,7 +817,7 @@
 
         function openModal(title, description, actions) {
             modalTitle.textContent = title;
-            modalDescription.textContent = description;
+            modalDescription.innerHTML = description;
             modalActions.innerHTML = "";
 
             actions.forEach(function (action) {
@@ -837,6 +840,11 @@
 
         function closeModal() {
             modalOverlay.style.display = "none";
+        }
+
+        function syncFinancialAliases() {
+            state.bankBalance = state.cash;
+            state.expenses = state.annualExpenses;
         }
 
         function applyProceduralEffects(effects) {
@@ -922,6 +930,189 @@
 
             logEvent("This year brought " + yearlyProceduralEventTotal + " surprise event" + (yearlyProceduralEventTotal > 1 ? "s." : "."));
             showNextProceduralEvent();
+        }
+
+        function getPropertyMarketDelta(property) {
+            const delta = property.currentValue - property.originalPrice;
+            const pct = property.originalPrice > 0 ? (delta / property.originalPrice) * 100 : 0;
+            return { delta: delta, pct: pct };
+        }
+
+        function getGlobalHousingMarketShiftForYear() {
+            let shift = 0;
+            let eventType = "stable";
+            if (Math.random() < 0.05) {
+                if (Math.random() < 0.5) {
+                    shift = -0.20;
+                    eventType = "crash";
+                    logEvent("Housing Market Crash: real estate values dropped by 20% this year.");
+                } else {
+                    shift = 0.20;
+                    eventType = "boom";
+                    logEvent("Housing Boom: real estate values jumped by 20% this year.");
+                }
+            }
+            state.currentHousingMarketShift = shift;
+            state.currentHousingMarketEvent = eventType;
+        }
+
+        function applyHousingMarketForYear() {
+            getGlobalHousingMarketShiftForYear();
+
+            state.ownedAssets.forEach(function (property) {
+                const marketFluctuation = Math.random() * 0.12 - 0.05;
+                const totalShift = marketFluctuation + state.currentHousingMarketShift;
+                property.currentValue = Math.max(10000, Math.round(property.currentValue * (1 + totalShift)));
+                property.lastMarketFluctuation = totalShift;
+
+                if (property.isMortgaged && property.remainingBalance > 0) {
+                    const principalPaydown = Math.min(property.remainingBalance, Math.max(0, Math.round(property.mortgagePayment * 0.55)));
+                    property.remainingBalance -= principalPaydown;
+                    if (property.remainingBalance <= 0) {
+                        property.remainingBalance = 0;
+                        property.isMortgaged = false;
+                        if (property.mortgagePayment > 0) {
+                            state.annualExpenses = Math.max(0, state.annualExpenses - property.mortgagePayment);
+                        }
+                        property.mortgagePayment = 0;
+                        logEvent(property.propertyType + " mortgage has been fully paid off.");
+                    }
+                }
+            });
+
+            syncFinancialAliases();
+            generateRealEstateMarket();
+        }
+
+        function generateRealEstateMarket() {
+            const templates = [
+                { propertyType: "Starter Condo", minPrice: 120000, maxPrice: 220000, upkeepRate: 0.010 },
+                { propertyType: "Suburban House", minPrice: 240000, maxPrice: 420000, upkeepRate: 0.012 },
+                { propertyType: "Urban Duplex", minPrice: 300000, maxPrice: 550000, upkeepRate: 0.013 }
+            ];
+
+            state.realEstateListings = templates.map(function (tpl) {
+                const basePrice = tpl.minPrice + Math.random() * (tpl.maxPrice - tpl.minPrice);
+                const adjustedPrice = Math.max(50000, Math.round(basePrice * (1 + state.currentHousingMarketShift)));
+                const annualUpkeep = Math.max(1000, Math.round(adjustedPrice * tpl.upkeepRate));
+                const suggestedMortgagePayment = Math.max(1200, Math.round(adjustedPrice * 0.06));
+                return {
+                    id: state.nextListingId++,
+                    propertyType: tpl.propertyType,
+                    price: adjustedPrice,
+                    annualUpkeep: annualUpkeep,
+                    suggestedMortgagePayment: suggestedMortgagePayment
+                };
+            });
+        }
+
+        function buyProperty(listingId) {
+            const listing = state.realEstateListings.find(function (item) { return item.id === listingId; });
+            if (!listing) return;
+
+            const canPayInFull = state.cash >= listing.price;
+            const downPayment = Math.round(listing.price * 0.20);
+            if (!canPayInFull && state.cash < downPayment) {
+                logEvent("You don't have enough cash to buy " + listing.propertyType + ".");
+                closeModal();
+                updateUI();
+                return;
+            }
+
+            let paidNow = 0;
+            let isMortgaged = false;
+            let remainingBalance = 0;
+            let mortgagePayment = 0;
+
+            if (canPayInFull) {
+                paidNow = listing.price;
+            } else {
+                paidNow = downPayment;
+                isMortgaged = true;
+                remainingBalance = listing.price - downPayment;
+                mortgagePayment = listing.suggestedMortgagePayment;
+            }
+
+            state.cash -= paidNow;
+            state.annualExpenses += listing.annualUpkeep + mortgagePayment;
+            syncFinancialAliases();
+
+            state.ownedAssets.push({
+                id: state.nextPropertyId++,
+                propertyType: listing.propertyType,
+                originalPrice: listing.price,
+                currentValue: listing.price,
+                annualUpkeep: listing.annualUpkeep,
+                isMortgaged: isMortgaged,
+                remainingBalance: remainingBalance,
+                mortgagePayment: mortgagePayment,
+                lastMarketFluctuation: 0
+            });
+
+            state.realEstateListings = state.realEstateListings.filter(function (item) {
+                return item.id !== listingId;
+            });
+
+            if (isMortgaged) {
+                logEvent("You bought " + listing.propertyType + " with a mortgage. Down payment: " + formatMoney(downPayment) + ".");
+            } else {
+                logEvent("You bought " + listing.propertyType + " outright for " + formatMoney(listing.price) + ".");
+            }
+
+            closeModal();
+            updateUI();
+        }
+
+        function sellProperty(propertyId) {
+            const index = state.ownedAssets.findIndex(function (asset) { return asset.id === propertyId; });
+            if (index === -1) return;
+
+            const property = state.ownedAssets[index];
+            const salePrice = Math.round(property.currentValue);
+            const mortgageBalance = property.isMortgaged ? Math.round(property.remainingBalance) : 0;
+            const proceeds = salePrice - mortgageBalance;
+
+            state.cash += proceeds;
+            state.annualExpenses = Math.max(0, state.annualExpenses - property.annualUpkeep - (property.isMortgaged ? property.mortgagePayment : 0));
+            syncFinancialAliases();
+
+            state.ownedAssets.splice(index, 1);
+
+            const profitLoss = salePrice - property.originalPrice;
+            const profitLossLabel = profitLoss >= 0 ? "profit" : "loss";
+            logEvent("You sold your " + property.propertyType + " for " + formatMoney(salePrice) + " and pocketed " + formatMoney(proceeds) + ". " + profitLossLabel + ": " + formatMoney(Math.abs(profitLoss)) + ".");
+
+            closeModal();
+            updateUI();
+        }
+
+        function openSellPropertyConfirmation(propertyId) {
+            const property = state.ownedAssets.find(function (asset) { return asset.id === propertyId; });
+            if (!property) return;
+
+            const currentValue = Math.round(property.currentValue);
+            const mortgageBalance = property.isMortgaged ? Math.round(property.remainingBalance) : 0;
+            const netProceeds = currentValue - mortgageBalance;
+            const netLabel = netProceeds >= 0 ? formatMoney(netProceeds) : "-" + formatMoney(Math.abs(netProceeds));
+
+            openModal(
+                "Sell Property",
+                "You have an offer of " + formatMoney(currentValue) + " for your " + property.propertyType + ". After paying off your mortgage of " + formatMoney(mortgageBalance) + ", you will pocket " + netLabel + ". Do you want to sell?",
+                [
+                    {
+                        label: "Yes, Sell",
+                        handler: function () {
+                            sellProperty(propertyId);
+                        }
+                    },
+                    {
+                        label: "Cancel",
+                        handler: function () {
+                            closeModal();
+                        }
+                    }
+                ]
+            );
         }
 
         function applyActionWithRefresh(actionText, fn) {
@@ -1185,65 +1376,104 @@
         }
 
         function openAssetsMenu() {
-            if (state.cash <= 0) {
-                openModal("Assets", "You cannot cash in assets when your cash balance is zero or negative.", [
-                    {
-                        label: "Close",
-                        handler: function () {
-                            closeModal();
-                        }
-                    }
-                ]);
-                return;
+            if (state.realEstateListings.length === 0) {
+                generateRealEstateMarket();
             }
-
             const currentNetWorth = state.cash + state.investments - state.debt;
-            if (currentNetWorth <= 0) {
-                openModal("Assets", "You cannot invest assets when your net worth is zero or negative.", [
-                    {
-                        label: "Close",
-                        handler: function () {
-                            closeModal();
-                        }
-                    }
-                ]);
-                return;
-            }
+            const canInvest = state.cash > 0 && currentNetWorth > 0;
+            const marketLabel = state.currentHousingMarketEvent === "crash"
+                ? "<span style=\"color:#ff6b6b;\">Market Mood: Crash (-20%)</span>"
+                : state.currentHousingMarketEvent === "boom"
+                    ? "<span style=\"color:#69f0ae;\">Market Mood: Boom (+20%)</span>"
+                    : "<span style=\"color:#bdbdbd;\">Market Mood: Stable</span>";
 
-            openModal("Assets", "Move money into investments and ride market volatility.", [
-                {
-                    label: "Invest 50% Cash",
+            const myPropertiesHtml = state.ownedAssets.length
+                ? state.ownedAssets.map(function (property) {
+                    const delta = getPropertyMarketDelta(property);
+                    const up = delta.delta > 0;
+                    const down = delta.delta < 0;
+                    const color = up ? "#69f0ae" : down ? "#ff6b6b" : "#bdbdbd";
+                    const marker = up ? "▲" : down ? "▼" : "■";
+                    const mortgageText = property.isMortgaged ? "Mortgage: " + formatMoney(property.remainingBalance) : "No mortgage";
+                    return "<div style=\"margin-bottom:8px;\">" +
+                        "<strong>" + property.propertyType + "</strong><br>" +
+                        "Original: " + formatMoney(property.originalPrice) + " | Current: " + formatMoney(property.currentValue) + "<br>" +
+                        "<span style=\"color:" + color + ";\">" + marker + " " + (up ? "+" : "") + delta.pct.toFixed(1) + "%</span> | " + mortgageText +
+                        "</div>";
+                }).join("")
+                : "<div style=\"color:#bdbdbd; margin-bottom:8px;\">No properties owned.</div>";
+
+            const listingsHtml = state.realEstateListings.map(function (listing) {
+                return "<div style=\"margin-bottom:6px;\"><strong>" + listing.propertyType + "</strong> - " +
+                    formatMoney(listing.price) + " (Upkeep " + formatMoney(listing.annualUpkeep) + "/yr)</div>";
+            }).join("");
+
+            const actions = [];
+            state.ownedAssets.forEach(function (property) {
+                actions.push({
+                    label: "Sell " + property.propertyType,
                     handler: function () {
-                        applyActionWithRefresh("You invested 50% cash, and your net worth dropped by 50%.", function () {
-                            const amt = state.cash * 0.5;
-                            state.cash -= amt;
-                            state.investments += amt;
-                            const netWorthBeforeDrop = state.cash + state.investments - state.debt;
-                            const netWorthDrop = Math.abs(netWorthBeforeDrop) * 0.50;
-                            state.cash -= netWorthDrop;
-                        });
+                        openSellPropertyConfirmation(property.id);
                     }
-                },
-                {
-                    label: "Contribute 10% Cash",
+                });
+            });
+
+            state.realEstateListings.forEach(function (listing) {
+                const downPayment = Math.round(listing.price * 0.20);
+                const canBuy = state.cash >= downPayment;
+                actions.push({
+                    label: "Buy " + listing.propertyType + " (" + formatMoney(listing.price) + ")",
+                    disabled: !canBuy,
                     handler: function () {
-                        applyActionWithRefresh("You contributed 10% cash, and your net worth dropped by 10%.", function () {
-                            const amt = state.cash * 0.10;
-                            state.cash -= amt;
-                            state.investments += amt;
-                            const netWorthBeforeDrop = state.cash + state.investments - state.debt;
-                            const netWorthDrop = Math.abs(netWorthBeforeDrop) * 0.10;
-                            state.cash -= netWorthDrop;
-                        });
+                        if (!canBuy) return;
+                        buyProperty(listing.id);
                     }
-                },
-                {
-                    label: "Close",
-                    handler: function () {
-                        closeModal();
-                    }
+                });
+            });
+
+            actions.push({
+                label: canInvest ? "Invest 50% Cash" : "Invest 50% Cash (Unavailable)",
+                disabled: !canInvest,
+                handler: function () {
+                    if (!canInvest) return;
+                    applyActionWithRefresh("You invested 50% cash, and your net worth dropped by 50%.", function () {
+                        const amt = state.cash * 0.5;
+                        state.cash -= amt;
+                        state.investments += amt;
+                        const netWorthBeforeDrop = state.cash + state.investments - state.debt;
+                        const netWorthDrop = Math.abs(netWorthBeforeDrop) * 0.50;
+                        state.cash -= netWorthDrop;
+                    });
                 }
-            ]);
+            });
+            actions.push({
+                label: canInvest ? "Contribute 10% Cash" : "Contribute 10% Cash (Unavailable)",
+                disabled: !canInvest,
+                handler: function () {
+                    if (!canInvest) return;
+                    applyActionWithRefresh("You contributed 10% cash, and your net worth dropped by 10%.", function () {
+                        const amt = state.cash * 0.10;
+                        state.cash -= amt;
+                        state.investments += amt;
+                        const netWorthBeforeDrop = state.cash + state.investments - state.debt;
+                        const netWorthDrop = Math.abs(netWorthBeforeDrop) * 0.10;
+                        state.cash -= netWorthDrop;
+                    });
+                }
+            });
+            actions.push({
+                label: "Close",
+                handler: function () {
+                    closeModal();
+                }
+            });
+
+            openModal(
+                "Assets",
+                marketLabel + "<br><br><strong>My Properties</strong><br>" + myPropertiesHtml +
+                "<br><strong>Broker Listings</strong><br>" + listingsHtml,
+                actions
+            );
         }
 
         function openRelationshipsMenu() {
@@ -1378,9 +1608,11 @@
                 }
             }
 
-            state.cash += (netIncome - state.expenses);
+            state.cash += (netIncome - state.annualExpenses);
+            syncFinancialAliases();
 
             state.investments *= (1 + (Math.random() * 0.25 - 0.10));
+            applyHousingMarketForYear();
 
             logEvent("Age " + state.age + ": You lived another year.");
 
@@ -1416,6 +1648,8 @@
 
             setupScreen.style.display = "none";
             gameUI.style.display = "flex";
+            syncFinancialAliases();
+            generateRealEstateMarket();
 
             logEvent("You chose " + major.charAt(0).toUpperCase() + major.slice(1) + ". Your adult life begins at age 18.");
             updateUI();
