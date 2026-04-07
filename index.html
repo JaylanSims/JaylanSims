@@ -923,6 +923,131 @@
             line-height: 1.4;
         }
 
+        #career-exam-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 10007;
+            background: rgba(10, 18, 28, 0.97);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        #career-exam-overlay.open {
+            display: flex;
+        }
+
+        .career-exam-desk {
+            width: 100%;
+            max-width: 520px;
+            border-radius: 14px;
+            border: 1px solid #2a4a6a;
+            background: linear-gradient(180deg, #152535 0%, #0f1824 100%);
+            box-shadow: 0 20px 50px rgba(0, 40, 80, 0.45);
+            padding: 18px 16px;
+        }
+
+        .career-exam-desk h2 {
+            margin: 0 0 8px;
+            font-size: 1.1rem;
+            color: #90caf9;
+            text-align: center;
+        }
+
+        .career-exam-desk .career-exam-tag {
+            text-align: center;
+            font-size: 0.78rem;
+            color: #5c7fa3;
+            margin-bottom: 14px;
+        }
+
+        .career-exam-desk .career-exam-q {
+            margin: 0 0 16px;
+            line-height: 1.45;
+            color: #e3f2fd;
+            font-size: 0.98rem;
+        }
+
+        .career-exam-option {
+            width: 100%;
+            text-align: left;
+            padding: 12px 14px;
+            margin-bottom: 10px;
+            border-radius: 10px;
+            border: 1px solid #37474f;
+            background: #1c2836;
+            color: #fff;
+            font-size: 0.92rem;
+            cursor: pointer;
+        }
+
+        .career-exam-option.correct {
+            border-color: #43a047;
+            background: #1b3d1f;
+        }
+
+        .career-exam-option.wrong {
+            border-color: #c62828;
+            background: #3d1a1a;
+        }
+
+        #fired-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 10008;
+            background: rgba(20, 0, 0, 0.96);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: #fff;
+            padding: 24px;
+            box-sizing: border-box;
+        }
+
+        .fired-card {
+            max-width: 480px;
+            width: 100%;
+            background: #2a0a0a;
+            border: 2px solid #b71c1c;
+            border-radius: 14px;
+            padding: 24px;
+            text-align: center;
+        }
+
+        .fired-card h2 {
+            margin: 0 0 16px;
+            color: #ef5350;
+            font-size: 1.25rem;
+        }
+
+        .fired-card p {
+            margin: 0 0 20px;
+            line-height: 1.5;
+            color: #ffcdd2;
+            font-size: 0.95rem;
+        }
+
+        .fired-ack-btn {
+            width: 100%;
+            padding: 14px;
+            border-radius: 10px;
+            border: 1px solid #e57373;
+            background: #b71c1c;
+            color: #fff;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
         #eviction-overlay {
             position: fixed;
             top: 0;
@@ -1104,6 +1229,8 @@
     <div id="yearly-exam-react-root"></div>
     <div id="promotion-overlay-root"></div>
     <div id="performance-review-overlay-root"></div>
+    <div id="career-exam-react-root"></div>
+    <div id="fired-overlay-root"></div>
     <div id="eviction-overlay-root"></div>
     <div id="app-container">
         <div id="intro-screen">
@@ -1262,7 +1389,13 @@
             examPerformanceTier: null,
             totalWorkExperience: 0,
             timesFired: 0,
-            naturalAptitude: null
+            naturalAptitude: null,
+            careerPerformanceScore: 0,
+            isCareerExamOpen: false,
+            currentCareerExamQuestion: null,
+            careerExamSelectedIndex: null,
+            careerExamShowFeedback: false,
+            isFiredOverlayOpen: false
         };
 
         const RENTAL_LISTINGS = [
@@ -1300,6 +1433,10 @@
         let promotionOverlayReactRoot = null;
         const performanceReviewOverlayMount = document.getElementById("performance-review-overlay-root");
         let performanceReviewOverlayReactRoot = null;
+        const careerExamReactMount = document.getElementById("career-exam-react-root");
+        let careerExamReactRoot = null;
+        const firedOverlayMount = document.getElementById("fired-overlay-root");
+        let firedOverlayReactRoot = null;
         const evictionOverlayMount = document.getElementById("eviction-overlay-root");
         let evictionOverlayReactRoot = null;
         let higherEdCatalogRoot = null;
@@ -1794,6 +1931,68 @@
             ADVANCED_EXAM_QUESTION_BANKS[pathKey] = ADVANCED_EXAM_QUESTION_BANKS_RAW[pathKey].map(normalizeExamQuestionEntry);
         });
         const EXAM_FEEDBACK_DELAY_MS = 700;
+
+        const CAREER_EXAM_BANKS_RAW = {
+            STEM: [
+                { question: "Your server architecture is experiencing a DDoS attack. What is the immediate first step to mitigate?", options: ["Reroute traffic through a scrubbing center/CDN", "Shut down all servers", "Disable DNS", "Email all users"], correctAnswer: "Reroute traffic through a scrubbing center/CDN" },
+                { question: "In agile software development, what is the primary purpose of a Sprint Retrospective?", options: ["To identify what went well and what needs improvement", "To demo features to stakeholders", "To assign blame for delays", "To estimate the next sprint only"], correctAnswer: "To identify what went well and what needs improvement" },
+                { question: "A patient presents with acute anaphylaxis. What is the first-line medication?", options: ["Epinephrine", "Diphenhydramine only", "Corticosteroids first", "Albuterol only"], correctAnswer: "Epinephrine" },
+                { question: "In structural engineering, what type of load refers to the weight of the building materials themselves?", options: ["Dead Load", "Live Load", "Wind Load", "Seismic Load"], correctAnswer: "Dead Load" },
+                { question: "You discover a critical security vulnerability in your company's live product. Who should you notify first?", options: ["The Information Security Officer / Lead", "Post details on social media", "Fix silently without telling anyone", "Only your direct report if they are not in security"], correctAnswer: "The Information Security Officer / Lead" },
+                { question: "Under HIPAA, what principle limits use of PHI to the minimum necessary for the task?", options: ["Minimum Necessary Standard", "Need-to-know only informal", "Full disclosure default", "Consent waiver"], correctAnswer: "Minimum Necessary Standard" },
+                { question: "What is the primary defense against SQL injection in application code?", options: ["Parameterized queries / prepared statements", "Longer passwords", "HTTPS only", "Firewall rules only"], correctAnswer: "Parameterized queries / prepared statements" },
+                { question: "Which RFC 1918 range is a private IPv4 network block?", options: ["10.0.0.0/8", "8.8.8.0/24", "172.32.0.0/16", "192.0.0.0/8"], correctAnswer: "10.0.0.0/8" },
+                { question: "In a Zero Trust security model, what is the core idea?", options: ["Never trust, always verify explicitly", "Trust everything inside the firewall", "VPN grants permanent trust", "Passwords never expire"], correctAnswer: "Never trust, always verify explicitly" },
+                { question: "In statistics, a very small p-value relative to alpha typically implies what about the null hypothesis?", options: ["Reject the null hypothesis", "Accept the null hypothesis", "The study was underpowered", "No effect exists"], correctAnswer: "Reject the null hypothesis" },
+                { question: "On a statistical process control chart, a point outside control limits usually indicates what?", options: ["Special cause variation", "Common cause only", "Calibration is unnecessary", "Sample size is too large"], correctAnswer: "Special cause variation" },
+                { question: "You have a Git merge conflict. What is the correct first step?", options: ["Open conflicted files, resolve markers, then commit", "Delete the repository", "Force push to main", "Ignore and deploy"], correctAnswer: "Open conflicted files, resolve markers, then commit" },
+                { question: "In radiation safety, what does ALARA stand for?", options: ["As Low As Reasonably Achievable", "Always Leave Area Rapidly", "Annual Limit And Risk Assessment", "Automatic Leak Alarm Response Act"], correctAnswer: "As Low As Reasonably Achievable" },
+                { question: "In software engineering, 'technical debt' most closely means what?", options: ["Short-term shortcuts that create future maintenance cost", "Money borrowed for servers", "Open-source licenses", "Cloud subscription fees"], correctAnswer: "Short-term shortcuts that create future maintenance cost" },
+                { question: "Which HTTP status code commonly indicates the client sent too many requests?", options: ["429", "404", "500", "301"], correctAnswer: "429" },
+                { question: "In incident response, what is the correct general order after detection?", options: ["Contain, eradicate, recover", "Recover first, then investigate", "Ignore until customers complain", "Delete all logs"], correctAnswer: "Contain, eradicate, recover" }
+            ],
+            Humanities: [
+                { question: "In journalism, what ethical principle protects a whistleblower's identity?", options: ["Source Confidentiality", "Prior restraint", "Fair use", "Slander shield"], correctAnswer: "Source Confidentiality" },
+                { question: "As a copywriter, what does 'CTA' stand for in marketing?", options: ["Call to Action", "Cost to Acquire", "Creative Text Asset", "Customer Trend Analysis"], correctAnswer: "Call to Action" },
+                { question: "In corporate law, what document typically outlines initial operating rules of an LLC?", options: ["Operating Agreement", "Articles of Incorporation only", "Prospectus", "Indenture"], correctAnswer: "Operating Agreement" },
+                { question: "When curating a museum exhibit, verifying an artifact's authentic origin is called what?", options: ["Provenance Research", "Conservation framing", "Deaccession review", "Wayfinding study"], correctAnswer: "Provenance Research" },
+                { question: "In PR crisis management, when should an initial holding statement ideally go out?", options: ["Within the first hour", "After one week", "Only if sued", "Never; stay silent"], correctAnswer: "Within the first hour" },
+                { question: "U.S. fair use analysis in copyright law weighs how many statutory factors?", options: ["Four", "Two", "Six", "One"], correctAnswer: "Four" },
+                { question: "Defamation in written form is generally called what?", options: ["Libel", "Slander", "Tortious interference", "Malice"], correctAnswer: "Libel" },
+                { question: "What ensures a brand sounds consistent across campaigns?", options: ["Brand voice guidelines", "Random tone each week", "Only visual style guides", "Ignoring audience"], correctAnswer: "Brand voice guidelines" },
+                { question: "The U.S. Freedom of Information Act (FOIA) primarily applies to what?", options: ["Federal agencies", "Private corporations", "Foreign governments", "State secrets only"], correctAnswer: "Federal agencies" },
+                { question: "Under the ADA, employers must provide what unless it imposes undue hardship?", options: ["Reasonable accommodation", "Unlimited leave without process", "Same job forever", "Salary doubling"], correctAnswer: "Reasonable accommodation" },
+                { question: "What is the main purpose of a startup pitch deck?", options: ["Tell a concise story to secure interest or funding", "Replace a business plan legally", "File taxes", "Replace HR policies"], correctAnswer: "Tell a concise story to secure interest or funding" },
+                { question: "When a lawyer represents conflicting interests without consent, this raises what issue?", options: ["Conflict of interest", "Hearsay", "Res judicata", "Standing"], correctAnswer: "Conflict of interest" },
+                { question: "In client meetings, paraphrasing the client's concern to confirm understanding is part of what skill?", options: ["Active listening", "Passive agreement", "Interrupting", "Monologuing"], correctAnswer: "Active listening" },
+                { question: "Which protects a word or logo identifying goods/services?", options: ["Trademark", "Copyright", "Patent", "Trade secret"], correctAnswer: "Trademark" },
+                { question: "Media coverage you did not pay for is often called what?", options: ["Earned media", "Owned media", "Paid search only", "Native deposit"], correctAnswer: "Earned media" },
+                { question: "In litigation, sworn out-of-court testimony transcribed by a court reporter is a what?", options: ["Deposition", "Arraignment", "Voir dire", "Summons"], correctAnswer: "Deposition" }
+            ],
+            Trades: [
+                { question: "While welding high-pressure pipe, you see porosity in the bead. What is a most likely cause?", options: ["Contaminated base metal or loss of shielding gas", "Too slow travel speed only", "Using AC on steel only", "Paint color"], correctAnswer: "Contaminated base metal or loss of shielding gas" },
+                { question: "Lockout/tagout (LOTO) primarily prevents what hazard?", options: ["Accidental energization of equipment", "Tripping on cords", "Noise exposure", "Sunburn"], correctAnswer: "Accidental energization of equipment" },
+                { question: "In commercial HVAC, what is commonly used to find tiny refrigerant leaks?", options: ["Electronic leak detector or UV dye", "Only a thermometer", "Duct tape", "Bleach"], correctAnswer: "Electronic leak detector or UV dye" },
+                { question: "On a commercial site, who typically has authority to issue a Stop Work order for serious safety violations?", options: ["OSHA inspector or site safety manager", "Any laborer", "The client only by email", "Equipment rental clerk"], correctAnswer: "OSHA inspector or site safety manager" },
+                { question: "Before starting an excavator each day, what must be checked?", options: ["Fluid levels and hydraulic lines", "Only tire pressure on cars", "Paint scratches only", "Radio station presets"], correctAnswer: "Fluid levels and hydraulic lines" },
+                { question: "What does a GFCI device primarily protect against?", options: ["Ground-fault shock hazard", "Overcurrent fires only", "Lightning strikes to the moon", "Voltage spikes from solar"], correctAnswer: "Ground-fault shock hazard" },
+                { question: "In modern NEC practice, which spaces commonly require AFCI protection for branch circuits?", options: ["Bedrooms and many living areas", "Only exterior floodlights", "Server rooms only", "Never in residences"], correctAnswer: "Bedrooms and many living areas" },
+                { question: "What field test checks fresh concrete consistency and workability?", options: ["Slump test", "Hammer echo only", "Color chart", "Weight of truck"], correctAnswer: "Slump test" },
+                { question: "After applying lockout devices, what should workers do before touching equipment?", options: ["Verify zero energy / try operation", "Assume it is safe", "Remove tags for speed", "Skip if in a hurry"], correctAnswer: "Verify zero energy / try operation" },
+                { question: "When climbing a ladder, what contact rule reduces fall risk?", options: ["Three points of contact", "One hand only", "Face away from ladder", "Top cap as step"], correctAnswer: "Three points of contact" },
+                { question: "Disturbing known asbestos-containing material without containment can require what?", options: ["Proper abatement procedures and notifications", "Spray with water only", "Ignore if wearing gloves", "Burn it off"], correctAnswer: "Proper abatement procedures and notifications" },
+                { question: "A confined space entry team usually includes an entrant, attendant, and who?", options: ["Entry supervisor", "Marketing intern", "CFO", "Public notary"], correctAnswer: "Entry supervisor" },
+                { question: "Why torque flange bolts in a star pattern?", options: ["Even gasket compression", "Faster only", "Decorative pattern", "Reduce bolt count"], correctAnswer: "Even gasket compression" },
+                { question: "Flammable liquids storage rooms often require what?", options: ["Adequate ventilation and approved containers", "Open flames for testing", "No labels", "Wood shelves only"], correctAnswer: "Adequate ventilation and approved containers" },
+                { question: "Before lifting with a crane, you verify capacity using what?", options: ["Load chart for configuration and radius", "Guess based on sound", "Truck color", "Weather app only"], correctAnswer: "Load chart for configuration and radius" },
+                { question: "SDS sheets are central to which worker safety program?", options: ["Hazard communication", "401(k) enrollment", "Payroll taxes", "Parking permits"], correctAnswer: "Hazard communication" }
+            ]
+        };
+
+        const CAREER_EXAM_BANKS = {};
+        Object.keys(CAREER_EXAM_BANKS_RAW).forEach(function (pathKey) {
+            CAREER_EXAM_BANKS[pathKey] = CAREER_EXAM_BANKS_RAW[pathKey].map(normalizeExamQuestionEntry);
+        });
 
         const DISEASES = {
             commonCold: {
@@ -2466,7 +2665,7 @@
 
         function openModal(title, description, actions, options) {
             options = options || {};
-            if (state.isExamModalOpen || state.isExamActive || state.isDiagnosisOverlayOpen || state.isPromotionOverlayOpen || state.isPerformanceReviewOverlayOpen || state.isEvictionOverlayOpen) return;
+            if (state.isExamModalOpen || state.isExamActive || state.isDiagnosisOverlayOpen || state.isPromotionOverlayOpen || state.isPerformanceReviewOverlayOpen || state.isCareerExamOpen || state.isFiredOverlayOpen || state.isEvictionOverlayOpen) return;
             if (higherEdCatalogRoot) {
                 higherEdCatalogRoot.render(null);
             }
@@ -2597,6 +2796,233 @@
             state.yearsSinceLastReview = 0;
         }
 
+        function resetCareerPerformanceScore() {
+            state.careerPerformanceScore = 0;
+        }
+
+        function attemptCareerPromotionOrExam() {
+            if (!state.isEmployed || state.jobType !== "Career") return false;
+            var jt = state.jobTitle;
+            if (jt === "Student" || jt === "Unemployed" || jt === "Medical Resident") return false;
+
+            if (state.careerPerformanceScore >= 3 && state.currentJobLevel < 4) {
+                var fastPromo = generatePromotion(state.jobTitle, state.annualIncome, state.currentJobLevel, state.playerPath);
+                if (fastPromo) {
+                    resetCareerPerformanceScore();
+                    state.pendingPromotion = {
+                        newTitle: fastPromo.newTitle,
+                        newSalary: fastPromo.newSalary,
+                        level: fastPromo.level,
+                        previousSalary: state.annualIncome,
+                        fastTrack: true
+                    };
+                    state.isPromotionOverlayOpen = true;
+                    logEvent("Outstanding competency: management fast-tracked a promotion review.");
+                    renderPromotionOverlay();
+                    return true;
+                }
+            }
+
+            if (
+                state.yearsAtCurrentJob >= 3 &&
+                state.currentJobLevel < 4 &&
+                Math.random() < getPromotionTriggerChance()
+            ) {
+                var promo = generatePromotion(state.jobTitle, state.annualIncome, state.currentJobLevel, state.playerPath);
+                if (promo) {
+                    state.pendingPromotion = {
+                        newTitle: promo.newTitle,
+                        newSalary: promo.newSalary,
+                        level: promo.level,
+                        previousSalary: state.annualIncome
+                    };
+                    state.isPromotionOverlayOpen = true;
+                    renderPromotionOverlay();
+                    return true;
+                }
+            }
+
+            if (Math.random() < 0.35) {
+                var bank = CAREER_EXAM_BANKS[state.playerPath];
+                if (bank && bank.length) {
+                    var cq = bank[Math.floor(Math.random() * bank.length)];
+                    state.currentCareerExamQuestion = {
+                        question: cq.question,
+                        options: cq.options.slice(),
+                        correctAnswerIndex: cq.correctAnswerIndex
+                    };
+                    state.careerExamSelectedIndex = null;
+                    state.careerExamShowFeedback = false;
+                    state.isCareerExamOpen = true;
+                    renderCareerExamOverlay();
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        function finishWorkYearCareerPhase() {
+            if (attemptCareerPromotionOrExam()) {
+                updateUI();
+                return;
+            }
+            maybeAlignmentCareerToast();
+            runAgeUpWorkYearAfterPromotion();
+            updateUI();
+        }
+
+        function closeCareerExamOverlay() {
+            state.isCareerExamOpen = false;
+            state.currentCareerExamQuestion = null;
+            state.careerExamSelectedIndex = null;
+            state.careerExamShowFeedback = false;
+            if (careerExamReactRoot) {
+                careerExamReactRoot.render(null);
+            }
+        }
+
+        function handleCareerExamAnswer(selectedIndex) {
+            if (!state.isCareerExamOpen || !state.currentCareerExamQuestion) return;
+            var q = state.currentCareerExamQuestion;
+            var correct = selectedIndex === q.correctAnswerIndex;
+            state.careerExamSelectedIndex = selectedIndex;
+            state.careerExamShowFeedback = true;
+            renderCareerExamOverlay();
+            window.setTimeout(function () {
+                if (correct) {
+                    state.careerPerformanceScore += 1;
+                    showPurchaseToastMessage("Great job! Management noticed your expertise.");
+                    logEvent("Career competency quiz: correct answer (+1 performance score).");
+                } else {
+                    state.careerPerformanceScore -= 2;
+                    showPurchaseToastMessage("Costly mistake. HR has put a note in your file.");
+                    logEvent("Career competency quiz: wrong answer (-2 performance score).");
+                }
+                closeCareerExamOverlay();
+                if (state.careerPerformanceScore <= -4) {
+                    state.isFiredOverlayOpen = true;
+                    renderFiredOverlay();
+                    updateUI();
+                    return;
+                }
+                finishWorkYearCareerPhase();
+            }, EXAM_FEEDBACK_DELAY_MS);
+        }
+
+        function CareerExamOverlay(props) {
+            var q = props.question;
+            if (!q) return null;
+            return (
+                <div id="career-exam-overlay" className="open" role="dialog" aria-modal="true" aria-label="Career competency review">
+                    <div className="career-exam-desk">
+                        <h2>WORKPLACE COMPETENCY REVIEW</h2>
+                        <div className="career-exam-tag">On-the-job knowledge check — {props.track} track</div>
+                        <p className="career-exam-q">{q.question}</p>
+                        <div>
+                            {q.options.map(function (opt, i) {
+                                var cls = "career-exam-option";
+                                if (props.showFeedback) {
+                                    if (i === q.correctAnswerIndex) cls += " correct";
+                                    else if (i === props.selectedIndex) cls += " wrong";
+                                }
+                                return (
+                                    <button
+                                        key={i}
+                                        type="button"
+                                        className={cls}
+                                        disabled={props.showFeedback}
+                                        onClick={function () { props.onSelect(i); }}
+                                    >
+                                        {opt}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        function renderCareerExamOverlay() {
+            if (!careerExamReactMount) return;
+            if (!state.isCareerExamOpen || !state.currentCareerExamQuestion) {
+                if (careerExamReactRoot) careerExamReactRoot.render(null);
+                return;
+            }
+            if (!careerExamReactRoot) {
+                careerExamReactRoot = ReactDOM.createRoot(careerExamReactMount);
+            }
+            careerExamReactRoot.render(
+                <CareerExamOverlay
+                    question={state.currentCareerExamQuestion}
+                    track={state.playerPath || ""}
+                    selectedIndex={state.careerExamSelectedIndex}
+                    showFeedback={state.careerExamShowFeedback}
+                    onSelect={handleCareerExamAnswer}
+                />
+            );
+        }
+
+        function FiredOverlay(props) {
+            return (
+                <div id="fired-overlay" role="dialog" aria-modal="true" aria-label="Terminated for cause">
+                    <div className="fired-card">
+                        <h2>TERMINATED FOR CAUSE</h2>
+                        <p>
+                            Your recent workplace performance has been entirely unacceptable. You made too many critical errors, and the company has decided to let you go due to low performance.
+                        </p>
+                        <button type="button" className="fired-ack-btn" onClick={props.onAcknowledge}>
+                            Acknowledge
+                        </button>
+                    </div>
+                </div>
+            );
+        }
+
+        function renderFiredOverlay() {
+            if (!firedOverlayMount) return;
+            if (!state.isFiredOverlayOpen) {
+                if (firedOverlayReactRoot) firedOverlayReactRoot.render(null);
+                return;
+            }
+            if (!firedOverlayReactRoot) {
+                firedOverlayReactRoot = ReactDOM.createRoot(firedOverlayMount);
+            }
+            firedOverlayReactRoot.render(<FiredOverlay onAcknowledge={handleFiredOverlayAcknowledge} />);
+        }
+
+        function closeFiredOverlay() {
+            state.isFiredOverlayOpen = false;
+            if (firedOverlayReactRoot) {
+                firedOverlayReactRoot.render(null);
+            }
+        }
+
+        function handleFiredOverlayAcknowledge() {
+            state.jobTitle = "Unemployed";
+            state.annualIncome = 0;
+            state.salary = 0;
+            state.isEmployed = false;
+            state.jobType = "None";
+            state.yearsAtCurrentJob = 0;
+            state.currentJobLevel = 1;
+            state.pendingPromotion = null;
+            state.isPromotionOverlayOpen = false;
+            if (promotionOverlayReactRoot) promotionOverlayReactRoot.render(null);
+            state.happiness -= 20;
+            state.timesFired = (state.timesFired || 0) + 1;
+            resetCareerPerformanceScore();
+            resetPerformanceReviewTracking();
+            closePerformanceReviewOverlay();
+            logEvent("Terminated for low performance after competency failures.");
+            closeFiredOverlay();
+            syncFinancialAliases();
+            state.happiness = clampStat(state.happiness);
+            runAgeUpWorkYearAfterPromotion();
+            updateUI();
+        }
+
         function pushYearEndHappinessAndReviewTick() {
             state.happinessHistory.push(state.happiness);
             while (state.happinessHistory.length > 3) {
@@ -2715,6 +3141,7 @@
                 }
                 state.happiness -= 20;
                 state.timesFired = (state.timesFired || 0) + 1;
+                resetCareerPerformanceScore();
                 logEvent("Performance review: terminated — fired for low morale, -20 Happiness.");
             }
             state.yearsSinceLastReview = 0;
@@ -2732,8 +3159,7 @@
             var p = state.pendingPromotion;
             if (!p) {
                 closePromotionOverlay();
-                runAgeUpWorkYearAfterPromotion();
-                updateUI();
+                finishWorkYearCareerPhase();
                 return;
             }
             state.jobTitle = p.newTitle;
@@ -2742,6 +3168,9 @@
             state.currentJobLevel = p.level;
             state.yearsAtCurrentJob = 0;
             resetPerformanceReviewTracking();
+            if (!p.fastTrack) {
+                resetCareerPerformanceScore();
+            }
             state.happiness -= 15;
             logEvent("You accepted a promotion to " + p.newTitle + " with a salary of " + formatMoney(p.newSalary) + ". Stress from the role reduced Happiness by 15.");
             closePromotionOverlay();
@@ -2755,8 +3184,7 @@
             }
             state.happiness += 5;
             closePromotionOverlay();
-            runAgeUpWorkYearAfterPromotion();
-            updateUI();
+            finishWorkYearCareerPhase();
         }
 
         function EvictionOverlay(props) {
@@ -2831,35 +3259,7 @@
                 state.yearsAtCurrentJob += 1;
             }
 
-            if (
-                state.isEmployed &&
-                state.jobType === "Career" &&
-                state.jobTitle !== "Student" &&
-                state.jobTitle !== "Unemployed" &&
-                state.jobTitle !== "Medical Resident" &&
-                state.yearsAtCurrentJob >= 3 &&
-                state.currentJobLevel < 4 &&
-                Math.random() < getPromotionTriggerChance()
-            ) {
-                const promo = generatePromotion(state.jobTitle, state.annualIncome, state.currentJobLevel, state.playerPath);
-                if (promo) {
-                    state.pendingPromotion = {
-                        newTitle: promo.newTitle,
-                        newSalary: promo.newSalary,
-                        level: promo.level,
-                        previousSalary: state.annualIncome
-                    };
-                    state.isPromotionOverlayOpen = true;
-                    renderPromotionOverlay();
-                    updateUI();
-                    return;
-                }
-            }
-
-            maybeAlignmentCareerToast();
-
-            runAgeUpWorkYearAfterPromotion();
-            updateUI();
+            finishWorkYearCareerPhase();
         }
 
         function PromotionOverlay(props) {
@@ -3655,6 +4055,7 @@
             state.pendingPromotion = null;
             state.isPromotionOverlayOpen = false;
             resetPerformanceReviewTracking();
+            resetCareerPerformanceScore();
             closePerformanceReviewOverlay();
             if (promotionOverlayReactRoot) {
                 promotionOverlayReactRoot.render(null);
@@ -3698,6 +4099,7 @@
                 state.isPromotionOverlayOpen = false;
                 if (!isOddJob) {
                     resetPerformanceReviewTracking();
+                    resetCareerPerformanceScore();
                 }
                 if (promotionOverlayReactRoot) {
                     promotionOverlayReactRoot.render(null);
@@ -5104,6 +5506,8 @@
             closeYearlyExamOverlay();
             closePromotionOverlay();
             closePerformanceReviewOverlay();
+            closeCareerExamOverlay();
+            closeFiredOverlay();
             closeEvictionOverlay();
             closeDiagnosisOverlay();
             gameUI.style.display = "none";
@@ -5206,7 +5610,7 @@
         }
 
         function ageUp() {
-            if (state.isDead || !state.playerPath || state.isExamModalOpen || state.isExamActive || state.isDiagnosisOverlayOpen || state.isPromotionOverlayOpen || state.isPerformanceReviewOverlayOpen || state.isEvictionOverlayOpen) return;
+            if (state.isDead || !state.playerPath || state.isExamModalOpen || state.isExamActive || state.isDiagnosisOverlayOpen || state.isPromotionOverlayOpen || state.isPerformanceReviewOverlayOpen || state.isCareerExamOpen || state.isFiredOverlayOpen || state.isEvictionOverlayOpen) return;
 
             if (state.isInSchool && state.currentlyPursuing) {
                 openYearlyExamOverlay();
@@ -5240,35 +5644,7 @@
                 state.yearsAtCurrentJob += 1;
             }
 
-            if (
-                state.isEmployed &&
-                state.jobType === "Career" &&
-                state.jobTitle !== "Student" &&
-                state.jobTitle !== "Unemployed" &&
-                state.jobTitle !== "Medical Resident" &&
-                state.yearsAtCurrentJob >= 3 &&
-                state.currentJobLevel < 4 &&
-                Math.random() < getPromotionTriggerChance()
-            ) {
-                const promo = generatePromotion(state.jobTitle, state.annualIncome, state.currentJobLevel, state.playerPath);
-                if (promo) {
-                    state.pendingPromotion = {
-                        newTitle: promo.newTitle,
-                        newSalary: promo.newSalary,
-                        level: promo.level,
-                        previousSalary: state.annualIncome
-                    };
-                    state.isPromotionOverlayOpen = true;
-                    renderPromotionOverlay();
-                    updateUI();
-                    return;
-                }
-            }
-
-            maybeAlignmentCareerToast();
-
-            runAgeUpWorkYearAfterPromotion();
-            updateUI();
+            finishWorkYearCareerPhase();
         }
 
         function choosePath(path) {
@@ -5322,16 +5698,16 @@
 
         document.getElementById("age-up-btn").addEventListener("click", ageUp);
         document.getElementById("education-nav-btn").addEventListener("click", function () {
-            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isPerformanceReviewOverlayOpen && !state.isEvictionOverlayOpen) openEducationTab();
+            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isPerformanceReviewOverlayOpen && !state.isCareerExamOpen && !state.isFiredOverlayOpen && !state.isEvictionOverlayOpen) openEducationTab();
         });
         document.getElementById("careers-nav-btn").addEventListener("click", function () {
-            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isPerformanceReviewOverlayOpen && !state.isEvictionOverlayOpen) openCareersTab();
+            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isPerformanceReviewOverlayOpen && !state.isCareerExamOpen && !state.isFiredOverlayOpen && !state.isEvictionOverlayOpen) openCareersTab();
         });
         document.getElementById("activities-nav-btn").addEventListener("click", function () {
-            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isPerformanceReviewOverlayOpen && !state.isEvictionOverlayOpen) openActivitiesMenu();
+            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isPerformanceReviewOverlayOpen && !state.isCareerExamOpen && !state.isFiredOverlayOpen && !state.isEvictionOverlayOpen) openActivitiesMenu();
         });
         document.getElementById("assets-nav-btn").addEventListener("click", function () {
-            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isPerformanceReviewOverlayOpen && !state.isEvictionOverlayOpen) openAssetsMenu();
+            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isPerformanceReviewOverlayOpen && !state.isCareerExamOpen && !state.isFiredOverlayOpen && !state.isEvictionOverlayOpen) openAssetsMenu();
         });
         document.getElementById("play-again-btn").addEventListener("click", function () {
             location.reload();
