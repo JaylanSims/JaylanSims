@@ -218,7 +218,7 @@
         #event-log {
             flex: 1;
             overflow-y: auto;
-            padding: 12px 14px 188px;
+            padding: 12px 14px 120px;
             min-height: 0;
         }
 
@@ -232,66 +232,115 @@
             font-size: 0.95rem;
         }
 
-        #action-area {
-            position: absolute;
-            left: 0;
-            right: 0;
-            bottom: 65px;
-            height: 0;
-            flex-shrink: 0;
-            z-index: 8;
-            pointer-events: none;
-        }
-
-        #age-up-btn {
-            width: 110px;
-            height: 110px;
-            border-radius: 50%;
-            border: none;
-            background: linear-gradient(135deg, #00C853, #64DD17);
-            color: #fff;
-            font-size: 1.1rem;
-            font-weight: 700;
-            text-align: center;
-            line-height: 1.15;
-            position: absolute;
-            left: 50%;
-            bottom: -40px;
-            transform: translateX(-50%);
-            z-index: 9;
-            cursor: pointer;
-            box-shadow: 0 16px 35px rgba(0, 200, 83, 0.5), 0 5px 12px rgba(0, 0, 0, 0.7);
-            pointer-events: auto;
-        }
-
-        #age-up-btn:active {
-            transform: translateX(-50%) scale(0.97);
-        }
-
         #bottom-nav {
             flex-shrink: 0;
-            height: 65px;
+            min-height: 72px;
+            padding: 8px 4px 12px;
             background: #1E1E1E;
             border-top: 1px solid #333;
             display: flex;
-            align-items: center;
-            justify-content: stretch;
+            flex-direction: row;
+            align-items: flex-end;
+            justify-content: space-between;
+            gap: 0;
             position: relative;
-            z-index: 3;
+            z-index: 12;
+        }
+
+        .nav-group {
+            flex: 1 1 0;
+            display: flex;
+            flex-direction: row;
+            align-items: stretch;
+            min-width: 0;
+            gap: 2px;
+        }
+
+        .nav-group--left {
+            justify-content: flex-end;
+            padding-right: 4px;
+        }
+
+        .nav-group--right {
+            justify-content: flex-start;
+            padding-left: 4px;
+        }
+
+        .nav-fab-slot {
+            flex: 0 0 104px;
+            width: 104px;
+            min-width: 104px;
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            position: relative;
+            z-index: 15;
+            pointer-events: none;
+        }
+
+        .nav-fab-slot #age-up-btn {
+            pointer-events: auto;
+        }
+
+        #age-up-btn {
+            width: 92px;
+            height: 92px;
+            border-radius: 50%;
+            border: 3px solid rgba(255, 255, 255, 0.16);
+            background: linear-gradient(145deg, #00C853, #43A047);
+            color: #fff;
+            font-size: 1.02rem;
+            font-weight: 800;
+            letter-spacing: 0.02em;
+            line-height: 1.12;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 12px 10px;
+            margin-bottom: 2px;
+            cursor: pointer;
+            box-shadow:
+                0 0 0 5px #121212,
+                0 8px 24px rgba(76, 175, 80, 0.4),
+                0 4px 14px rgba(0, 0, 0, 0.45);
+            transition: transform 0.12s ease, box-shadow 0.2s ease;
+        }
+
+        #age-up-btn:hover {
+            box-shadow:
+                0 0 0 5px #121212,
+                0 10px 28px rgba(76, 175, 80, 0.45),
+                0 5px 16px rgba(0, 0, 0, 0.5);
+        }
+
+        #age-up-btn:active {
+            transform: scale(0.97);
         }
 
         .nav-btn {
-            flex: 1;
-            height: 100%;
+            flex: 1 1 0;
+            min-width: 0;
+            min-height: 48px;
             border: none;
             background: transparent;
-            color: #fff;
-            font-size: 0.92rem;
+            color: #c8c8c8;
+            font-size: 0.88rem;
+            font-weight: 500;
             cursor: pointer;
+            padding: 8px 4px;
+            border-radius: 10px;
+            transition: color 0.15s ease, background 0.15s ease;
+        }
+
+        .nav-btn:hover {
+            color: #ffffff;
+            background: rgba(255, 255, 255, 0.06);
         }
 
         .nav-btn:active {
-            background: rgba(255, 255, 255, 0.08);
+            background: rgba(255, 255, 255, 0.1);
         }
 
         #modal-overlay {
@@ -771,15 +820,18 @@
 
             <main id="event-log"></main>
 
-            <div id="action-area">
-                <button id="age-up-btn">+1 Year</button>
-            </div>
-
-            <nav id="bottom-nav">
-                <button class="nav-btn" id="education-nav-btn">Education</button>
-                <button class="nav-btn" id="careers-nav-btn">Careers</button>
-                <button class="nav-btn" id="activities-nav-btn">Activities</button>
-                <button class="nav-btn" id="assets-nav-btn">Assets</button>
+            <nav id="bottom-nav" aria-label="Main navigation">
+                <div class="nav-group nav-group--left">
+                    <button type="button" class="nav-btn" id="education-nav-btn">Education</button>
+                    <button type="button" class="nav-btn" id="careers-nav-btn">Careers</button>
+                </div>
+                <div class="nav-fab-slot">
+                    <button type="button" id="age-up-btn">+1 Year</button>
+                </div>
+                <div class="nav-group nav-group--right">
+                    <button type="button" class="nav-btn" id="activities-nav-btn">Activities</button>
+                    <button type="button" class="nav-btn" id="assets-nav-btn">Assets</button>
+                </div>
             </nav>
         </div>
 
