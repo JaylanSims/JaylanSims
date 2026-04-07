@@ -3330,6 +3330,12 @@
             return true;
         }
 
+        function applySchoolYearRetirementLivingCosts() {
+            state.cash -= state.annualExpenses;
+            syncFinancialAliases();
+            logEvent("Age " + state.age + ": Annual living expenses deducted after school year.");
+        }
+
         function completeAgeUpTick() {
             state.cash -= state.annualExpenses;
             state.health -= 1;
@@ -3426,7 +3432,9 @@
             state.retirementInterceptSkipsAgeTick = false;
             applyRetirementChoice(offer);
             closeRetirementOverlay();
-            if (!skipTick) {
+            if (skipTick) {
+                applySchoolYearRetirementLivingCosts();
+            } else {
                 completeAgeUpTick();
             }
             updateUI();
@@ -3438,7 +3446,9 @@
             state.retirementInterceptSkipsAgeTick = false;
             logEvent("You declined retirement at 72 and chose to keep working.");
             closeRetirementOverlay();
-            if (!skipTick) {
+            if (skipTick) {
+                applySchoolYearRetirementLivingCosts();
+            } else {
                 completeAgeUpTick();
             }
             updateUI();
