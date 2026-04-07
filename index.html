@@ -563,7 +563,7 @@
             width: 100vw;
             height: 100vh;
             z-index: 9999;
-            background: rgba(0, 0, 0, 0.98);
+            background: rgba(0, 0, 0, 0.95);
             display: none;
             flex-direction: column;
             align-items: center;
@@ -636,6 +636,62 @@
             line-height: 1.35;
             color: #c9a227;
             text-align: center;
+        }
+
+        #academic-dismissal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 10004;
+            background: rgba(0, 0, 0, 0.95);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        #academic-dismissal-card {
+            width: 100%;
+            max-width: 540px;
+            border-radius: 14px;
+            border: 1px solid #7f1d1d;
+            background: #1b1111;
+            box-shadow: 0 18px 50px rgba(0, 0, 0, 0.65);
+            padding: 18px;
+        }
+
+        #academic-dismissal-title {
+            margin: 0 0 10px;
+            font-size: 1.2rem;
+            color: #ffb4b4;
+        }
+
+        #academic-dismissal-text {
+            margin: 0;
+            color: #e3d7d7;
+            line-height: 1.4;
+        }
+
+        #academic-dismissal-actions {
+            display: grid;
+            gap: 10px;
+            margin-top: 16px;
+        }
+
+        .academic-dismissal-btn {
+            width: 100%;
+            border: 1px solid #7f1d1d;
+            border-radius: 10px;
+            background: #3a1515;
+            color: #fff;
+            text-align: left;
+            padding: 13px;
+            font-size: 0.98rem;
+            cursor: pointer;
+            min-height: 52px;
         }
 
         #promotion-overlay {
@@ -789,7 +845,7 @@
             align-items: center;
             justify-content: center;
             padding: 20px;
-            background: rgba(0, 0, 0, 0.9);
+            background: rgba(0, 0, 0, 0.95);
             z-index: 10000;
         }
 
@@ -855,7 +911,7 @@
 
         #death-screen.suicide-theme {
             background: linear-gradient(180deg, #0b0f1a 0%, #101a2c 100%);
-            filter: grayscale(35%);
+            filter: grayscale(100%);
             border-top: 1px solid #2f3c56;
         }
 
@@ -900,6 +956,7 @@
 </head>
 <body>
     <div id="yearly-exam-react-root"></div>
+    <div id="academic-dismissal-overlay-root"></div>
     <div id="promotion-overlay-root"></div>
     <div id="eviction-overlay-root"></div>
     <div id="app-container">
@@ -1046,6 +1103,8 @@
             currentJobLevel: 1,
             pendingPromotion: null,
             isPromotionOverlayOpen: false,
+            isAcademicDismissalOverlayOpen: false,
+            pendingAcademicDismissal: null,
             isEvictionOverlayOpen: false,
             currentHousing: null,
             roommate: null,
@@ -1083,6 +1142,8 @@
         const resignationText = document.getElementById("resignation-text");
         const yearlyExamReactMount = document.getElementById("yearly-exam-react-root");
         let yearlyExamReactRoot = null;
+        const academicDismissalOverlayMount = document.getElementById("academic-dismissal-overlay-root");
+        let academicDismissalOverlayReactRoot = null;
         const promotionOverlayMount = document.getElementById("promotion-overlay-root");
         let promotionOverlayReactRoot = null;
         const evictionOverlayMount = document.getElementById("eviction-overlay-root");
@@ -1414,6 +1475,7 @@
         Object.keys(EXAM_QUESTION_BANKS_RAW).forEach(function (pathKey) {
             EXAM_QUESTION_BANKS[pathKey] = EXAM_QUESTION_BANKS_RAW[pathKey].map(normalizeExamQuestionEntry);
         });
+        const EXAMS_PER_SCHOOL_YEAR = 1;
         const EXAM_FEEDBACK_DELAY_MS = 700;
 
         const DISEASES = {
@@ -1567,7 +1629,7 @@
             { key: "measles", weight: 2 }, { key: "whoopingCough", weight: 2 }, { key: "tuberculosis", weight: 2 },
             { key: "malaria", weight: 2 }, { key: "yellowFever", weight: 1.5 }, { key: "chlamydia", weight: 4 },
             { key: "gonorrhea", weight: 3 }, { key: "genitalHerpes", weight: 2 }, { key: "hepatitisB", weight: 1.2 },
-            { key: "hepatitisC", weight: 1 }, { key: "depression", weight: 6 }, { key: "anxiety", weight: 7 },
+            { key: "hepatitisC", weight: 1 }, { key: "depression", weight: 6 }, { key: "mildAnxiety", weight: 7 },
             { key: "ptsd", weight: 2 }, { key: "schizophrenia", weight: 0.6 }, { key: "epilepsy", weight: 0.9 },
             { key: "diabetes", weight: 2 }, { key: "heartDisease", weight: 1.2 }, { key: "cancer", weight: 1.2 },
             { key: "alzheimers", weight: 0.4 }, { key: "stroke", weight: 0.7 }, { key: "hiv", weight: 0.6 },
@@ -1592,38 +1654,15 @@
 
         const MENTAL_ILLNESS_DEFINITIONS = {
             seasonalAffectiveDisorder: { name: "Seasonal Affective Disorder", tier: "mild", curable: true, minVisits: 3, maxVisits: 5 },
-            specificPhobia: { name: "Specific Phobia", tier: "mild", curable: true, minVisits: 4, maxVisits: 6 },
-            adjustmentDisorder: { name: "Adjustment Disorder", tier: "mild", curable: true, minVisits: 3, maxVisits: 5 },
-            mildAnxiety: { name: "Mild Anxiety", tier: "mild", curable: true, minVisits: 4, maxVisits: 8 },
             insomnia: { name: "Insomnia", tier: "mild", curable: true, minVisits: 3, maxVisits: 6 },
-            mildDepression: { name: "Mild Depression", tier: "mild", curable: true, minVisits: 5, maxVisits: 8 },
-            socialAnxiety: { name: "Social Anxiety", tier: "mild", curable: true, minVisits: 6, maxVisits: 10 },
-            hypochondria: { name: "Hypochondria", tier: "mild", curable: true, minVisits: 6, maxVisits: 10 },
+            mildAnxiety: { name: "Mild Anxiety", tier: "mild", curable: true, minVisits: 4, maxVisits: 8 },
 
-            panicDisorder: { name: "Panic Disorder", tier: "medium", curable: true, minVisits: 10, maxVisits: 15 },
+            depression: { name: "Depression", tier: "medium", curable: false, annualHealthDrain: 0, annualHappinessDrainOverride: 25 },
             ptsd: { name: "PTSD", tier: "medium", curable: true, minVisits: 12, maxVisits: 20 },
-            moderateOcd: { name: "Moderate OCD", tier: "medium", curable: true, minVisits: 15, maxVisits: 25 },
-            bulimia: { name: "Bulimia", tier: "medium", curable: true, minVisits: 15, maxVisits: 25 },
-            depression: { name: "Moderate Depression", tier: "medium", curable: true, minVisits: 12, maxVisits: 20, annualHealthDrain: 5 },
-            anxiety: { name: "Moderate Anxiety", tier: "medium", curable: true, minVisits: 10, maxVisits: 18 },
-            moderateAdhd: { name: "Moderate ADHD", tier: "medium", curable: false },
+            ocd: { name: "OCD", tier: "medium", curable: true, minVisits: 12, maxVisits: 20 },
             bipolarII: { name: "Bipolar II", tier: "medium", curable: false },
-            severeAcademicBurnout: {
-                name: "Severe Academic Burnout",
-                tier: "medium",
-                curable: true,
-                minVisits: 8,
-                maxVisits: 14,
-                annualHappinessDrainOverride: 25
-            },
 
             schizophrenia: { name: "Schizophrenia", tier: "severe", curable: false },
-            bipolarI: { name: "Bipolar I", tier: "severe", curable: false },
-            severeOcd: { name: "Severe OCD", tier: "severe", curable: false },
-            anorexiaNervosa: { name: "Anorexia Nervosa", tier: "severe", curable: true, minVisits: 30, maxVisits: 45 },
-            borderlinePersonalityDisorder: { name: "Borderline Personality Disorder (BPD)", tier: "severe", curable: false },
-            dissociativeIdentityDisorder: { name: "Dissociative Identity Disorder (DID)", tier: "severe", curable: false },
-            schizoaffectiveDisorder: { name: "Schizoaffective Disorder", tier: "severe", curable: false },
             severeDepressionPsychosis: { name: "Severe Depression with Psychosis", tier: "severe", curable: false }
         };
 
@@ -1652,24 +1691,13 @@
 
             const extraMentalRolls = [
                 { key: "seasonalAffectiveDisorder", weight: 3.2 },
-                { key: "specificPhobia", weight: 2.8 },
-                { key: "adjustmentDisorder", weight: 2.5 },
                 { key: "mildAnxiety", weight: 3.6 },
                 { key: "insomnia", weight: 3.3 },
-                { key: "mildDepression", weight: 2.9 },
-                { key: "socialAnxiety", weight: 2.5 },
-                { key: "hypochondria", weight: 2.4 },
-                { key: "panicDisorder", weight: 1.8 },
-                { key: "moderateOcd", weight: 1.1 },
-                { key: "bulimia", weight: 0.9 },
-                { key: "moderateAdhd", weight: 1.0 },
+                { key: "depression", weight: 2.9 },
+                { key: "ptsd", weight: 1.8 },
+                { key: "ocd", weight: 1.1 },
                 { key: "bipolarII", weight: 0.6 },
-                { key: "bipolarI", weight: 0.25 },
-                { key: "severeOcd", weight: 0.3 },
-                { key: "anorexiaNervosa", weight: 0.25 },
-                { key: "borderlinePersonalityDisorder", weight: 0.35 },
-                { key: "dissociativeIdentityDisorder", weight: 0.12 },
-                { key: "schizoaffectiveDisorder", weight: 0.2 },
+                { key: "schizophrenia", weight: 0.25 },
                 { key: "severeDepressionPsychosis", weight: 0.18 },
                 { key: "severeAcademicBurnout", weight: 0.15 }
             ];
@@ -2228,11 +2256,27 @@
             );
         }
 
+        function AcademicDismissalOverlay(props) {
+            return (
+                <div id="academic-dismissal-overlay" role="dialog" aria-modal="true" aria-label="Academic dismissal">
+                    <div id="academic-dismissal-card">
+                        <h2 id="academic-dismissal-title">ACADEMIC DISMISSAL</h2>
+                        <p id="academic-dismissal-text">{props.message}</p>
+                        <div id="academic-dismissal-actions">
+                            <button type="button" className="academic-dismissal-btn" onClick={props.onContinue}>
+                                Continue
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
         function YearlyExamOverlay(props) {
             const q = props.question;
             if (!q) return null;
             const part = props.questionPart || 1;
-            const totalParts = props.questionsPerYear || 2;
+            const totalParts = props.questionsPerYear || EXAMS_PER_SCHOOL_YEAR;
             return (
                 <div id="yearly-exam-overlay" className="open" role="dialog" aria-modal="true" aria-label="Yearly Exam">
                     <div id="exam-desk">
@@ -2275,8 +2319,9 @@
         }
 
         function startExamYearQuestionQueue(path) {
-            const bank = EXAM_QUESTION_BANKS[path] || [];
-            if (bank.length < 2) {
+            const yearlyQuestionCount = EXAMS_PER_SCHOOL_YEAR;
+            const bank = (EXAM_QUESTION_BANKS[path] || []).slice(0, 4);
+            if (bank.length < yearlyQuestionCount) {
                 state.examYearQuestionQueue = [];
                 return;
             }
@@ -2288,16 +2333,16 @@
                 indices[j] = t;
             }
             var pick = [];
-            for (var k = 0; k < indices.length && pick.length < 2; k++) {
+            for (var k = 0; k < indices.length && pick.length < yearlyQuestionCount; k++) {
                 var idx = indices[k];
                 var id = examQuestionId(path, idx);
                 if (state.examYearUsedQuestionIds.indexOf(id) === -1) {
                     pick.push(idx);
                 }
             }
-            if (pick.length < 2) {
+            if (pick.length < yearlyQuestionCount) {
                 state.examYearUsedQuestionIds = [];
-                pick = indices.slice(0, 2);
+                pick = indices.slice(0, yearlyQuestionCount);
             }
             pick.forEach(function (idx) {
                 state.examYearUsedQuestionIds.push(examQuestionId(path, idx));
@@ -2335,7 +2380,7 @@
                     currentSchoolYear={state.yearsInSchool + 1}
                     question={state.currentExamQuestion}
                     questionPart={state.examQuestionsThisYearAnswered + 1}
-                    questionsPerYear={state.examQuestionsThisYearTotal || 2}
+                    questionsPerYear={state.examQuestionsThisYearTotal || EXAMS_PER_SCHOOL_YEAR}
                     selectedOptionIndex={selectedOptionIndex}
                     showFeedback={showFeedback}
                     onSelectOption={handleYearlyExamAnswer}
@@ -2352,6 +2397,47 @@
             }
         }
 
+        function renderAcademicDismissalOverlay() {
+            if (!academicDismissalOverlayMount) return;
+            if (!state.isAcademicDismissalOverlayOpen || !state.pendingAcademicDismissal) {
+                if (academicDismissalOverlayReactRoot) {
+                    academicDismissalOverlayReactRoot.render(null);
+                }
+                return;
+            }
+            if (!academicDismissalOverlayReactRoot) {
+                academicDismissalOverlayReactRoot = ReactDOM.createRoot(academicDismissalOverlayMount);
+            }
+            academicDismissalOverlayReactRoot.render(
+                <AcademicDismissalOverlay
+                    message={state.pendingAcademicDismissal.message}
+                    onContinue={handleAcademicDismissalContinue}
+                />
+            );
+        }
+
+        function closeAcademicDismissalOverlay() {
+            state.isAcademicDismissalOverlayOpen = false;
+            state.pendingAcademicDismissal = null;
+            if (academicDismissalOverlayReactRoot) {
+                academicDismissalOverlayReactRoot.render(null);
+            }
+        }
+
+        function openAcademicDismissalOverlay(message) {
+            closeModal();
+            state.isAcademicDismissalOverlayOpen = true;
+            state.pendingAcademicDismissal = { message: message };
+            renderAcademicDismissalOverlay();
+        }
+
+        function handleAcademicDismissalContinue() {
+            closeAcademicDismissalOverlay();
+            state.happiness = 0;
+            diagnoseIllness("depression", { setHappinessZero: true, skipHappinessPenalty: true, forceOverlay: true });
+            updateUI();
+        }
+
         function escapeHtml(text) {
             return String(text)
                 .replace(/&/g, "&amp;")
@@ -2364,11 +2450,10 @@
         function DiagnosisOverlay(props) {
             const disease = DISEASES[props.illnessKey];
             if (!disease) return "";
-            const isMental = isMentalIllness(props.illnessKey);
             const doctorBtnAttrs = props.canAccessDoctor ? "" : "disabled";
             const doctorLabel = props.canAccessDoctor
-                ? (isMental ? "Visit Psychiatrist" : "Go to the Doctor")
-                : (isMental ? "Visit Psychiatrist (Unavailable)" : "Go to the Doctor (Unavailable)");
+                ? "Go to Doctor/Psychiatrist"
+                : "Go to Doctor/Psychiatrist (Unavailable)";
             return "<div id=\"diagnosis-overlay\" class=\"open\" role=\"dialog\" aria-modal=\"true\" aria-label=\"Medical Diagnosis\">" +
                 "<div id=\"diagnosis-card\">" +
                 "<h2 id=\"diagnosis-title\">MEDICAL DIAGNOSIS 🩺</h2>" +
@@ -2544,7 +2629,8 @@
             updateUI();
         }
 
-        function applyAnnualMentalHealthLogic() {
+        function applyAnnualMentalHealthLogic(options) {
+            const config = options || {};
             const activeMentalIllnesses = state.currentIllnesses.filter(function (key) {
                 return isMentalIllness(key);
             });
@@ -2580,7 +2666,7 @@
                 }
             });
 
-            if (hadUnsuppressedAtZero && Math.random() < 0.5) {
+            if (config.allowEscalation !== false && hadUnsuppressedAtZero && Math.random() < 0.5) {
                 const currentTierIndex = getMentalTierIndex(highestTier);
                 const worseningTier = MENTAL_TIER_ORDER[Math.min(MENTAL_TIER_ORDER.length - 1, currentTierIndex + 1)];
                 const worseningIllness = getRandomMentalIllnessKey({ minTier: worseningTier, maxTier: "severe", excludeActive: true });
@@ -2613,22 +2699,38 @@
             triggerDeath(SUICIDE_DEATH_MESSAGE, "suicide");
         }
 
+        function checkHappinessZeroConsecutiveYears() {
+            if (state.happiness < 0) {
+                state.happiness = 0;
+            }
+            if (state.happiness === 0) {
+                state.happinessZeroStreakYears += 1;
+            } else {
+                state.happinessZeroStreakYears = 0;
+            }
+            if (state.happinessZeroStreakYears >= 2) {
+                handleSuicideDeath();
+                return true;
+            }
+            return false;
+        }
+
         function maybeTriggerDepressionFromLowStats() {
             if (state.currentIllnesses.includes("depression")) return false;
             if (state.happiness > 0) return false;
-            return diagnoseIllness("depression", { setHappinessZero: true, skipHappinessPenalty: true });
+            return diagnoseIllness("depression", { setHappinessZero: true, skipHappinessPenalty: true, forceOverlay: true });
+        }
+
+        function getTotalExamQuestionsForProgram(program) {
+            return (program ? program.yearsRequired : 0) * EXAMS_PER_SCHOOL_YEAR;
         }
 
         function getRequiredExamPassesForProgram(program) {
-            var totalQuestions = program.yearsRequired * 2;
+            var totalQuestions = getTotalExamQuestionsForProgram(program);
             if (program && program.pipeline && program.pipeline !== "undergrad") {
                 return Math.ceil(totalQuestions * 0.5);
             }
-            var byRatio = Math.ceil(totalQuestions * 0.75);
-            if (program.yearsRequired >= 4) {
-                return Math.max(6, byRatio);
-            }
-            return byRatio;
+            return 3;
         }
 
         function clearEnrollmentAfterDismissalOrQuit() {
@@ -2651,6 +2753,7 @@
 
         function handleAdvancedAcademicDismissal(program, requiredPasses) {
             const passedCount = state.examsPassedThisDegree;
+            const totalExamQuestions = getTotalExamQuestionsForProgram(program);
             const debtLine = "You have finished your studies with " + formatMoney(state.existingDebt) + " in student debt.";
             logEvent("Academic dismissal: failed to meet exam threshold for " + program.degreeName + ". No degree awarded; tuition debt remains.");
             clearEnrollmentAfterDismissalOrQuit();
@@ -2659,7 +2762,7 @@
             openModal(
                 "Academic Dismissal",
                 "<strong>You did not pass at least 50% of the required exam questions for " + program.degreeName + ".</strong><br><br>" +
-                "You passed " + passedCount + "/" + (program.yearsRequired * 2) + " exam questions (minimum required: " + requiredPasses + "). " +
+                "You passed " + passedCount + "/" + totalExamQuestions + " exam questions (minimum required: " + requiredPasses + "). " +
                 "You are not awarded this degree. Accumulated program debt remains on your record.<br><br>" + debtLine,
                 [{ label: "Continue", handler: function () { closeModal(); updateUI(); } }]
             );
@@ -2668,6 +2771,7 @@
 
         function handleAcademicDismissal(program, requiredPasses) {
             const passedCount = state.examsPassedThisDegree;
+            const totalExamQuestions = getTotalExamQuestionsForProgram(program);
 
             if (program && program.pipeline && program.pipeline !== "undergrad") {
                 handleAdvancedAcademicDismissal(program, requiredPasses);
@@ -2692,23 +2796,10 @@
             state.examYearUsedQuestionIds = [];
             state.examQuestionsThisYearTotal = 0;
             state.examQuestionsThisYearAnswered = 0;
-
-            openModal(
-                "Academic Dismissal — Failed Final Year",
-                "<strong>You did not meet the graduation exam requirement.</strong><br><br>You passed " + passedCount + "/" + (program.yearsRequired * 2) +
-                " exam questions (minimum required: " + requiredPasses + "). You must restart " +
-                program.degreeName + " from Year 1. Careers and Find a Job stay locked until you graduate successfully.<br><br>" + debtLine,
-                [
-                    {
-                        label: "Continue",
-                        handler: function () {
-                            closeModal();
-                            state.happiness = 0;
-                            diagnoseIllness("depression", { setHappinessZero: true, skipHappinessPenalty: true, forceOverlay: true });
-                            updateUI();
-                        }
-                    }
-                ]
+            openAcademicDismissalOverlay(
+                "You failed to meet graduation requirements (" + passedCount + "/" + totalExamQuestions + " exam passes; " +
+                requiredPasses + " required). You must restart " + program.degreeName + " from Year 1. " +
+                "Careers remain locked until you graduate successfully. " + debtLine
             );
             updateUI();
         }
@@ -2766,16 +2857,34 @@
             syncCurrentEnrollment();
 
             logEvent(
-                "Age " + state.age + ": Completed " + (state.examQuestionsThisYearTotal || 2) + " final exam questions. " +
+                "Age " + state.age + ": Completed " + (state.examQuestionsThisYearTotal || EXAMS_PER_SCHOOL_YEAR) + " final exam question(s). " +
                 "School year " + state.yearsInSchool + "/" + program.yearsRequired + " in " + program.degreeName + "."
             );
 
             state.examQuestionsThisYearTotal = 0;
             state.examQuestionsThisYearAnswered = 0;
 
+            state.investments *= (1 + (Math.random() * 0.25 - 0.10));
+            applyHousingMarketForYear();
+
+            if (processIllnessesForYear()) {
+                yearlyResetMentalSuppression();
+                return;
+            }
+            applyAnnualMentalHealthLogic({ allowEscalation: false });
+            if (state.isDead) {
+                yearlyResetMentalSuppression();
+                return;
+            }
+
             syncFinancialAliases();
             if (state.health <= 0) {
                 onPlayerDeath(GENERIC_HEALTH_DEATH_MESSAGE);
+                yearlyResetMentalSuppression();
+                return;
+            }
+            if (checkHappinessZeroConsecutiveYears()) {
+                yearlyResetMentalSuppression();
                 return;
             }
 
@@ -2786,9 +2895,11 @@
                 } else {
                     handleAcademicDismissal(program, requiredPasses);
                 }
+                yearlyResetMentalSuppression();
                 return;
             }
 
+            yearlyResetMentalSuppression();
             updateUI();
         }
 
@@ -2836,7 +2947,7 @@
             }
 
             closeModal();
-            state.examQuestionsThisYearTotal = 2;
+            state.examQuestionsThisYearTotal = EXAMS_PER_SCHOOL_YEAR;
             state.examQuestionsThisYearAnswered = 0;
             state.isExamModalOpen = true;
             state.currentExamQuestion = first;
@@ -2877,12 +2988,12 @@
 
         function getHireChance() {
             if (state.playerPath === "Trades") {
-                return 0.75 + Math.random() * 0.15;
+                return 0.85;
             }
             if (state.playerPath === "STEM") {
-                return 0.50 + Math.random() * 0.20;
+                return 0.60;
             }
-            return 0.15 + Math.random() * 0.15;
+            return 0.20;
         }
 
         function quitJob() {
@@ -2952,45 +3063,52 @@
         function openJobBoard() {
             const enrProg = state.currentlyPursuing ? EDUCATION_PROGRAMS[state.currentlyPursuing] : null;
             if (enrProg && enrProg.pipeline === "residency") {
-                openModal("Career Path Jobs", "You cannot take a standard job during Medical Residency.", [
+                openModal("Find a Job", "You cannot take a standard job during Medical Residency.", [
                     { label: "Close", handler: function () { closeModal(); } }
                 ]);
                 return;
             }
             if (state.isEmployed) {
-                openModal("Career Path Jobs", "You already have a job. Use Quit Job in Careers if you want to apply elsewhere.", [
+                openModal("Find a Job", "You already have a job. Use Quit Job in Careers if you want to apply elsewhere.", [
                     { label: "Close", handler: function () { closeModal(); } }
                 ]);
                 return;
             }
             if (state.currentlyPursuing) {
-                openModal("Career Path Jobs", "Degree-track careers unlock after you graduate. Use Odd Jobs & Part-Time while in school.", [
+                openModal("Find a Job", "Find a Job remains locked while you are in school.", [
                     { label: "Close", handler: function () { closeModal(); } }
                 ]);
                 return;
             }
             if (state.jobSearchBlocked) {
-                openModal("Career Path Jobs", "Career applications are locked until you resolve academic dismissal and graduate.", [
+                openModal("Find a Job", "Find a Job is locked until you resolve academic dismissal and graduate.", [
                     { label: "Close", handler: function () { closeModal(); } }
                 ]);
                 return;
             }
             const jobs = JOB_MARKET[state.playerPath] || [];
-            const actions = jobs.map(function (job) {
-                const eligible = meetsEducationRequirement(job.requiredEducation);
+            const eligibleJobs = jobs.filter(function (job) {
+                return meetsEducationRequirement(job.requiredEducation);
+            });
+            if (!eligibleJobs.length) {
+                openModal(
+                    "Find a Job",
+                    "No current postings match your education credentials on the " + (state.playerPath === "Humanities" ? "Arts" : state.playerPath) + " path.",
+                    [{ label: "Close", handler: function () { closeModal(); } }]
+                );
+                return;
+            }
+            const hirePctLabel = state.playerPath === "Trades" ? "85%" : state.playerPath === "STEM" ? "60%" : "20%";
+            const actions = eligibleJobs.map(function (job) {
                 return {
-                    label: eligible
-                        ? "Apply: " + job.title + " — " + formatMoney(job.salary)
-                        : job.title + " — Requires " + job.requiredEducation,
-                    disabled: !eligible,
+                    label: "Apply: " + job.title + " — " + formatMoney(job.salary),
                     handler: function () {
-                        if (!eligible) return;
                         applyForJob(job);
                     }
                 };
             });
             actions.push({ label: "Close", handler: function () { closeModal(); } });
-            openModal("Career Path (Requires Degree)", "Professional roles on your " + state.playerPath + " path. Hiring is competitive.", actions);
+            openModal("Find a Job", "Path: " + (state.playerPath === "Humanities" ? "Arts" : state.playerPath) + ". Current hiring chance: " + hirePctLabel + ".", actions);
         }
 
         function openOddJobsBoard() {
@@ -3027,13 +3145,12 @@
         function openCareersTab() {
             const enrProg = state.currentlyPursuing ? EDUCATION_PROGRAMS[state.currentlyPursuing] : null;
             const residencyBlock = enrProg && enrProg.pipeline === "residency";
-            const canCareerBoard = !state.isEmployed && !state.currentlyPursuing && !state.jobSearchBlocked && !residencyBlock;
-            const canOddJobsBoard = !state.isEmployed && state.playerPath && !residencyBlock;
+            const canFindJob = !state.isEmployed && !state.currentlyPursuing && !state.jobSearchBlocked && !residencyBlock;
             const lockReason = state.currentlyPursuing
                 ? "You are currently enrolled in school."
                 : state.jobSearchBlocked
-                    ? "Career applications are locked due to academic dismissal."
-                    : "Career applications are available.";
+                    ? "Find a Job is locked due to academic dismissal."
+                    : "Find a Job is available.";
 
             if (state.isEmployed) {
                 const panel =
@@ -3041,7 +3158,7 @@
                     "Type: " + (state.jobType === "OddJob" ? "Part-time / Odd Job" : state.jobType === "Career" ? "Career" : "Other") + "<br>" +
                     "Current Position: " + state.jobTitle + "<br>" +
                     "Current Salary: " + formatMoney(state.annualIncome) + " / year<br><br>" +
-                    "<span style=\"color:#bdbdbd;font-size:0.9rem;\">Career jobs use your " + state.playerPath + " path and credentials. Odd jobs never require a degree.</span>";
+                    "<span style=\"color:#bdbdbd;font-size:0.9rem;\">Career jobs use your path and earned degree credentials.</span>";
                 openModal(
                     "Careers",
                     panel,
@@ -3061,20 +3178,13 @@
             openModal(
                 "Careers",
                 "Status: " + state.jobTitle + " | Annual Income: " + formatMoney(state.annualIncome) + "<br>" + lockReason +
-                    "<br><br><strong>Choose a job board:</strong>",
+                    "<br><br><strong>Career Market:</strong>",
                 [
                     {
-                        label: canCareerBoard ? "Career Path (Requires Degree)" : "Career Path (Locked)",
-                        disabled: !canCareerBoard,
+                        label: canFindJob ? "Find a Job" : "Find a Job (Locked)",
+                        disabled: !canFindJob,
                         handler: function () {
-                            if (canCareerBoard) openJobBoard();
-                        }
-                    },
-                    {
-                        label: canOddJobsBoard ? "Odd Jobs & Part-Time" : "Odd Jobs (Unavailable)",
-                        disabled: !canOddJobsBoard,
-                        handler: function () {
-                            if (canOddJobsBoard) openOddJobsBoard();
+                            if (canFindJob) openJobBoard();
                         }
                     },
                     { label: "Close", handler: function () { closeModal(); } }
@@ -3344,7 +3454,7 @@
                 : "You are not currently enrolled in school.";
             const examProgress = program
                 ? "Exam questions (this degree): " + state.examsPassedThisDegree + "/" + state.examsTakenThisDegree +
-                    " (2 per year; need " + getRequiredExamPassesForProgram(program) + "+ correct to graduate)."
+                    " (" + EXAMS_PER_SCHOOL_YEAR + " per year; need " + getRequiredExamPassesForProgram(program) + "/" + getTotalExamQuestionsForProgram(program) + " correct to graduate)."
                 : "";
             const enrollLine = state.currentEnrollment
                 ? "<br><strong>Current enrollment:</strong> " + state.currentEnrollment.degreeName +
@@ -3576,28 +3686,15 @@
         }
 
         function getGlobalHousingMarketShiftForYear() {
-            let shift = 0;
-            let eventType = "stable";
-            if (Math.random() < 0.05) {
-                if (Math.random() < 0.5) {
-                    shift = -0.20;
-                    eventType = "crash";
-                    logEvent("Housing Market Crash: real estate values dropped by 20% this year.");
-                } else {
-                    shift = 0.20;
-                    eventType = "boom";
-                    logEvent("Housing Boom: real estate values jumped by 20% this year.");
-                }
-            }
-            state.currentHousingMarketShift = shift;
-            state.currentHousingMarketEvent = eventType;
+            state.currentHousingMarketShift = 0;
+            state.currentHousingMarketEvent = "stable";
         }
 
         function applyHousingMarketForYear() {
             getGlobalHousingMarketShiftForYear();
 
             state.ownedAssets.forEach(function (property) {
-                const marketFluctuation = Math.random() * 0.12 - 0.05;
+                const marketFluctuation = Math.random() * 0.10 - 0.05;
                 const totalShift = marketFluctuation + state.currentHousingMarketShift;
                 property.currentValue = Math.max(10000, Math.round(property.currentValue * (1 + totalShift)));
                 property.lastMarketFluctuation = totalShift;
@@ -4125,7 +4222,7 @@
                 }
             });
             actions.push({
-                label: (focusPsychiatrist ? "➡ " : "") + "Psychiatrist (" + formatMoney(PSYCHIATRIST_VISIT_COST) + ")",
+                label: (focusPsychiatrist ? "➡ " : "") + "Psychiatrist (" + formatMoney(PSYCHIATRIST_VISIT_COST) + "/visit)",
                 handler: function () {
                     visitPsychiatrist();
                 }
@@ -4148,10 +4245,10 @@
         function openPsychiatristService() {
             openModal(
                 "Psychiatrist Service",
-                "Cost per visit: " + formatMoney(PSYCHIATRIST_VISIT_COST) + ". This suppresses all active mental illnesses for the year and can cure curable mental illnesses over repeated visits.",
+                "Cost per visit: " + formatMoney(PSYCHIATRIST_VISIT_COST) + ". This suppresses all active mental illnesses for the year (reducing total happiness drain by 75%) and can cure curable mental illnesses over repeated visits.",
                 [
                     {
-                        label: "Visit Psychiatrist (" + formatMoney(PSYCHIATRIST_VISIT_COST) + ")",
+                        label: "Visit Psychiatrist (" + formatMoney(PSYCHIATRIST_VISIT_COST) + "/visit)",
                         handler: function () {
                             visitPsychiatrist();
                         }
@@ -4245,6 +4342,7 @@
             state.isDead = true;
             closeModal();
             closeYearlyExamOverlay();
+            closeAcademicDismissalOverlay();
             closePromotionOverlay();
             closeEvictionOverlay();
             closeDiagnosisOverlay();
@@ -4312,13 +4410,7 @@
                 return;
             }
 
-            if (state.happiness <= 0) {
-                state.happinessZeroStreakYears += 1;
-            } else {
-                state.happinessZeroStreakYears = 0;
-            }
-            if (state.happinessZeroStreakYears >= 2) {
-                handleSuicideDeath();
+            if (checkHappinessZeroConsecutiveYears()) {
                 yearlyResetMentalSuppression();
                 return;
             }
@@ -4335,7 +4427,7 @@
         }
 
         function ageUp() {
-            if (state.isDead || !state.playerPath || state.isExamModalOpen || state.isExamActive || state.isDiagnosisOverlayOpen || state.isPromotionOverlayOpen || state.isEvictionOverlayOpen) return;
+            if (state.isDead || !state.playerPath || state.isExamModalOpen || state.isExamActive || state.isDiagnosisOverlayOpen || state.isPromotionOverlayOpen || state.isAcademicDismissalOverlayOpen || state.isEvictionOverlayOpen) return;
 
             if (state.isInSchool && state.currentlyPursuing) {
                 openYearlyExamOverlay();
@@ -4431,16 +4523,16 @@
 
         document.getElementById("age-up-btn").addEventListener("click", ageUp);
         document.getElementById("education-nav-btn").addEventListener("click", function () {
-            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isEvictionOverlayOpen) openEducationTab();
+            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isAcademicDismissalOverlayOpen && !state.isEvictionOverlayOpen) openEducationTab();
         });
         document.getElementById("careers-nav-btn").addEventListener("click", function () {
-            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isEvictionOverlayOpen) openCareersTab();
+            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isAcademicDismissalOverlayOpen && !state.isEvictionOverlayOpen) openCareersTab();
         });
         document.getElementById("activities-nav-btn").addEventListener("click", function () {
-            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isEvictionOverlayOpen) openActivitiesMenu();
+            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isAcademicDismissalOverlayOpen && !state.isEvictionOverlayOpen) openActivitiesMenu();
         });
         document.getElementById("assets-nav-btn").addEventListener("click", function () {
-            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isEvictionOverlayOpen) openAssetsMenu();
+            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isAcademicDismissalOverlayOpen && !state.isEvictionOverlayOpen) openAssetsMenu();
         });
         document.getElementById("play-again-btn").addEventListener("click", function () {
             location.reload();
