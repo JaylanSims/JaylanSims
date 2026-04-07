@@ -454,6 +454,11 @@
             min-height: 52px;
         }
 
+        .diagnosis-btn:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+        }
+
         #death-screen {
             display: none;
             flex: 1;
@@ -463,6 +468,21 @@
             text-align: center;
             padding: 24px;
             gap: 14px;
+        }
+
+        #death-screen.suicide-theme {
+            background: linear-gradient(180deg, #0b0f1a 0%, #101a2c 100%);
+            filter: grayscale(35%);
+            border-top: 1px solid #2f3c56;
+        }
+
+        #death-screen.suicide-theme #death-title {
+            color: #c8d4ea;
+        }
+
+        #death-screen.suicide-theme #death-summary,
+        #death-screen.suicide-theme #death-life-note {
+            color: #b8c2d4;
         }
 
         #tombstone {
@@ -590,7 +610,9 @@
             isExamModalOpen: false, currentExamQuestion: null, examsPassedThisDegree: 0,
             examsTakenThisDegree: 0, jobSearchBlocked: true, academicDismissed: false,
             isDiagnosisOverlayOpen: false, currentDiagnosisIllnessKey: null,
-            canAccessDoctor: true, activeView: "MainGameplay"
+            canAccessDoctor: true, activeView: "MainGameplay",
+            mentalIllnessState: {},
+            happinessZeroStreakYears: 0
         };
 
         const setupScreen = document.getElementById("setup-screen");
@@ -605,6 +627,7 @@
         const yearlyExamRoot = document.getElementById("yearly-exam-root");
         const diagnosisOverlayRoot = document.getElementById("diagnosis-overlay-root");
         const deathScreen = document.getElementById("death-screen");
+        const deathTitle = document.getElementById("death-title");
         const deathSummary = document.getElementById("death-summary");
         const deathLifeNote = document.getElementById("death-life-note");
         const deathSound = new Audio("Danzon De Pasion (Sting) - Jimmy Fontanez_Media Right Productions.mp3");
@@ -988,6 +1011,134 @@
 
         const HAPPINESS_PENALTY_ON_DIAGNOSIS = 4;
         const GENERIC_HEALTH_DEATH_MESSAGE = "Your health slowly deteriorated until your body could take no more.";
+        const SUICIDE_DEATH_MESSAGE = "The emotional burden became too heavy to carry. You have died by suicide. If you or someone you know is struggling, please reach out to the National Suicide Prevention Lifeline or a local crisis center.";
+        const PSYCHIATRIST_VISIT_COST = 350;
+        const MENTAL_HEALTH_SUPPRESSION_FACTOR = 0.25;
+        const STEM_MENTAL_RISK_MULTIPLIER = 1.4;
+
+        const MENTAL_TIER_ORDER = ["mild", "medium", "severe"];
+        const MENTAL_TIER_HAPPINESS_DRAIN = {
+            mild: 10,
+            medium: 25,
+            severe: 50
+        };
+
+        const MENTAL_ILLNESS_DEFINITIONS = {
+            seasonalAffectiveDisorder: { name: "Seasonal Affective Disorder", tier: "mild", curable: true, minVisits: 3, maxVisits: 5 },
+            specificPhobia: { name: "Specific Phobia", tier: "mild", curable: true, minVisits: 4, maxVisits: 6 },
+            adjustmentDisorder: { name: "Adjustment Disorder", tier: "mild", curable: true, minVisits: 3, maxVisits: 5 },
+            mildAnxiety: { name: "Mild Anxiety", tier: "mild", curable: true, minVisits: 4, maxVisits: 8 },
+            insomnia: { name: "Insomnia", tier: "mild", curable: true, minVisits: 3, maxVisits: 6 },
+            mildDepression: { name: "Mild Depression", tier: "mild", curable: true, minVisits: 5, maxVisits: 8 },
+            socialAnxiety: { name: "Social Anxiety", tier: "mild", curable: true, minVisits: 6, maxVisits: 10 },
+            hypochondria: { name: "Hypochondria", tier: "mild", curable: true, minVisits: 6, maxVisits: 10 },
+
+            panicDisorder: { name: "Panic Disorder", tier: "medium", curable: true, minVisits: 10, maxVisits: 15 },
+            ptsd: { name: "PTSD", tier: "medium", curable: true, minVisits: 12, maxVisits: 20 },
+            moderateOcd: { name: "Moderate OCD", tier: "medium", curable: true, minVisits: 15, maxVisits: 25 },
+            bulimia: { name: "Bulimia", tier: "medium", curable: true, minVisits: 15, maxVisits: 25 },
+            depression: { name: "Moderate Depression", tier: "medium", curable: true, minVisits: 12, maxVisits: 20, annualHealthDrain: 5 },
+            anxiety: { name: "Moderate Anxiety", tier: "medium", curable: true, minVisits: 10, maxVisits: 18 },
+            moderateAdhd: { name: "Moderate ADHD", tier: "medium", curable: false },
+            bipolarII: { name: "Bipolar II", tier: "medium", curable: false },
+
+            schizophrenia: { name: "Schizophrenia", tier: "severe", curable: false },
+            bipolarI: { name: "Bipolar I", tier: "severe", curable: false },
+            severeOcd: { name: "Severe OCD", tier: "severe", curable: false },
+            anorexiaNervosa: { name: "Anorexia Nervosa", tier: "severe", curable: true, minVisits: 30, maxVisits: 45 },
+            borderlinePersonalityDisorder: { name: "Borderline Personality Disorder (BPD)", tier: "severe", curable: false },
+            dissociativeIdentityDisorder: { name: "Dissociative Identity Disorder (DID)", tier: "severe", curable: false },
+            schizoaffectiveDisorder: { name: "Schizoaffective Disorder", tier: "severe", curable: false },
+            severeDepressionPsychosis: { name: "Severe Depression with Psychosis", tier: "severe", curable: false }
+        };
+
+        function randomIntBetween(min, max) {
+            return min + Math.floor(Math.random() * (max - min + 1));
+        }
+
+        function addMentalIllnessDefinitions() {
+            Object.keys(MENTAL_ILLNESS_DEFINITIONS).forEach(function (key) {
+                const def = MENTAL_ILLNESS_DEFINITIONS[key];
+                const drain = MENTAL_TIER_HAPPINESS_DRAIN[def.tier] || 10;
+                const existing = DISEASES[key] || {};
+                DISEASES[key] = Object.assign({}, existing, {
+                    name: def.name,
+                    curable: def.curable,
+                    cureCost: PSYCHIATRIST_VISIT_COST,
+                    annualHealthDrain: typeof def.annualHealthDrain === "number" ? def.annualHealthDrain : (existing.annualHealthDrain || 0),
+                    annualHappinessDrain: drain,
+                    mentalTier: def.tier,
+                    mentalCurable: def.curable,
+                    mentalMinVisits: def.minVisits || null,
+                    mentalMaxVisits: def.maxVisits || null
+                });
+            });
+
+            const extraMentalRolls = [
+                { key: "seasonalAffectiveDisorder", weight: 3.2 },
+                { key: "specificPhobia", weight: 2.8 },
+                { key: "adjustmentDisorder", weight: 2.5 },
+                { key: "mildAnxiety", weight: 3.6 },
+                { key: "insomnia", weight: 3.3 },
+                { key: "mildDepression", weight: 2.9 },
+                { key: "socialAnxiety", weight: 2.5 },
+                { key: "hypochondria", weight: 2.4 },
+                { key: "panicDisorder", weight: 1.8 },
+                { key: "moderateOcd", weight: 1.1 },
+                { key: "bulimia", weight: 0.9 },
+                { key: "moderateAdhd", weight: 1.0 },
+                { key: "bipolarII", weight: 0.6 },
+                { key: "bipolarI", weight: 0.25 },
+                { key: "severeOcd", weight: 0.3 },
+                { key: "anorexiaNervosa", weight: 0.25 },
+                { key: "borderlinePersonalityDisorder", weight: 0.35 },
+                { key: "dissociativeIdentityDisorder", weight: 0.12 },
+                { key: "schizoaffectiveDisorder", weight: 0.2 },
+                { key: "severeDepressionPsychosis", weight: 0.18 }
+            ];
+
+            extraMentalRolls.forEach(function (entry) {
+                const alreadyPresent = ILLNESS_ROLL_TABLE.some(function (roll) { return roll.key === entry.key; });
+                if (!alreadyPresent) {
+                    ILLNESS_ROLL_TABLE.push(entry);
+                }
+            });
+        }
+
+        function isMentalIllness(illnessKey) {
+            return !!MENTAL_ILLNESS_DEFINITIONS[illnessKey];
+        }
+
+        function getMentalRiskMultiplier() {
+            return state.playerPath === "STEM" ? STEM_MENTAL_RISK_MULTIPLIER : 1;
+        }
+
+        function getMentalTierIndex(tier) {
+            return MENTAL_TIER_ORDER.indexOf(tier);
+        }
+
+        function getRandomMentalIllnessKey(options) {
+            const config = options || {};
+            const minTierIdx = typeof config.minTier === "string" ? Math.max(0, getMentalTierIndex(config.minTier)) : 0;
+            const maxTierIdx = typeof config.maxTier === "string"
+                ? Math.min(MENTAL_TIER_ORDER.length - 1, getMentalTierIndex(config.maxTier))
+                : MENTAL_TIER_ORDER.length - 1;
+            const candidates = Object.keys(MENTAL_ILLNESS_DEFINITIONS).filter(function (key) {
+                const tierIdx = getMentalTierIndex(MENTAL_ILLNESS_DEFINITIONS[key].tier);
+                if (tierIdx < minTierIdx || tierIdx > maxTierIdx) return false;
+                if (config.excludeActive && state.currentIllnesses.includes(key)) return false;
+                return true;
+            });
+            if (!candidates.length) return null;
+            return candidates[Math.floor(Math.random() * candidates.length)];
+        }
+
+        function yearlyResetMentalSuppression() {
+            Object.keys(state.mentalIllnessState).forEach(function (illnessKey) {
+                state.mentalIllnessState[illnessKey].isSuppressed = false;
+            });
+        }
+        addMentalIllnessDefinitions();
 
         const proceduralWordBanks = {
             relative: ["cousin", "uncle", "aunt", "step-brother", "grandma"],
@@ -1187,8 +1338,11 @@
         function DiagnosisOverlay(props) {
             const disease = DISEASES[props.illnessKey];
             if (!disease) return "";
+            const isMental = isMentalIllness(props.illnessKey);
             const doctorBtnAttrs = props.canAccessDoctor ? "" : "disabled";
-            const doctorLabel = props.canAccessDoctor ? "Go to the Doctor" : "Go to the Doctor (Unavailable)";
+            const doctorLabel = props.canAccessDoctor
+                ? (isMental ? "Visit Psychiatrist" : "Go to the Doctor")
+                : (isMental ? "Visit Psychiatrist (Unavailable)" : "Go to the Doctor (Unavailable)");
             return "<div id=\"diagnosis-overlay\" class=\"open\" role=\"dialog\" aria-modal=\"true\" aria-label=\"Medical Diagnosis\">" +
                 "<div id=\"diagnosis-card\">" +
                 "<h2 id=\"diagnosis-title\">MEDICAL DIAGNOSIS 🩺</h2>" +
@@ -1223,9 +1377,30 @@
             }
             if (doctorBtn && state.canAccessDoctor) {
                 doctorBtn.addEventListener("click", function () {
+                    const diagnosisKey = state.currentDiagnosisIllnessKey;
                     closeDiagnosisOverlay();
-                    openDoctorComponent();
+                    if (isMentalIllness(diagnosisKey)) {
+                        openPsychiatristFromOverlay();
+                    } else {
+                        openDoctorComponent();
+                    }
                 });
+            }
+        }
+
+        function applyMentalDefaultsForIllness(illnessKey, disease) {
+            if (!isMentalIllness(illnessKey)) return;
+            if (!state.mentalIllnessState[illnessKey]) {
+                let requiredVisits = 0;
+                if (disease.mentalCurable && typeof disease.mentalMinVisits === "number" && typeof disease.mentalMaxVisits === "number") {
+                    requiredVisits = randomIntBetween(disease.mentalMinVisits, disease.mentalMaxVisits);
+                }
+                state.mentalIllnessState[illnessKey] = {
+                    isSuppressed: false,
+                    requiredVisitsRemaining: requiredVisits
+                };
+            } else {
+                state.mentalIllnessState[illnessKey].isSuppressed = false;
             }
         }
 
@@ -1248,6 +1423,11 @@
             openDoctorMenu();
         }
 
+        function openPsychiatristFromOverlay() {
+            state.activeView = "PsychiatristService";
+            openAssetsMenu(true);
+        }
+
         function diagnoseIllness(illnessKey, options) {
             const disease = DISEASES[illnessKey];
             const config = options || {};
@@ -1258,6 +1438,7 @@
                 if (state.currentIllnesses.length >= 4) return false;
                 state.currentIllnesses.push(illnessKey);
                 state.illnessYears[illnessKey] = 0;
+                applyMentalDefaultsForIllness(illnessKey, disease);
             }
 
             if (config.setHappinessZero || illnessKey === "depression") {
@@ -1282,6 +1463,118 @@
                 openDiagnosisOverlayForIllness(illnessKey);
             }
             return true;
+        }
+
+        function visitPsychiatrist() {
+            if (state.cash < PSYCHIATRIST_VISIT_COST) {
+                logEvent("You couldn't afford a psychiatrist visit.");
+                closeModal();
+                updateUI();
+                return;
+            }
+
+            const activeMentalIllnesses = state.currentIllnesses.filter(function (key) { return isMentalIllness(key); });
+            if (!activeMentalIllnesses.length) {
+                logEvent("You attended psychiatry, but had no active mental illnesses to treat.");
+                closeModal();
+                updateUI();
+                return;
+            }
+
+            state.cash -= PSYCHIATRIST_VISIT_COST;
+            const cured = [];
+
+            activeMentalIllnesses.forEach(function (illnessKey) {
+                const disease = DISEASES[illnessKey];
+                applyMentalDefaultsForIllness(illnessKey, disease);
+                const mentalState = state.mentalIllnessState[illnessKey];
+                mentalState.isSuppressed = true;
+
+                if (disease.mentalCurable && mentalState.requiredVisitsRemaining > 0) {
+                    mentalState.requiredVisitsRemaining -= 1;
+                    if (mentalState.requiredVisitsRemaining <= 0) {
+                        cured.push(illnessKey);
+                    }
+                }
+            });
+
+            if (cured.length) {
+                state.currentIllnesses = state.currentIllnesses.filter(function (key) {
+                    return !cured.includes(key);
+                });
+                cured.forEach(function (illnessKey) {
+                    delete state.illnessYears[illnessKey];
+                    delete state.mentalIllnessState[illnessKey];
+                });
+                logEvent("Psychiatry sessions resolved: " + cured.map(function (key) { return DISEASES[key].name; }).join(", ") + ".");
+            } else {
+                logEvent("You visited the psychiatrist. Mental illness symptoms were suppressed this year.");
+            }
+
+            closeModal();
+            updateUI();
+        }
+
+        function applyAnnualMentalHealthLogic() {
+            const activeMentalIllnesses = state.currentIllnesses.filter(function (key) {
+                return isMentalIllness(key);
+            });
+            if (!activeMentalIllnesses.length) {
+                if (state.happiness > 80) {
+                    state.happiness += 5;
+                    logEvent("Mental Clarity: with no active mental illnesses, you gained +5 Happiness.");
+                }
+                return;
+            }
+
+            let hadUnsuppressedAtZero = false;
+            let highestTier = "mild";
+
+            activeMentalIllnesses.forEach(function (illnessKey) {
+                const disease = DISEASES[illnessKey];
+                applyMentalDefaultsForIllness(illnessKey, disease);
+                const mentalState = state.mentalIllnessState[illnessKey];
+                const tier = disease.mentalTier || "mild";
+                if (getMentalTierIndex(tier) > getMentalTierIndex(highestTier)) {
+                    highestTier = tier;
+                }
+
+                const baseDrain = MENTAL_TIER_HAPPINESS_DRAIN[tier] || 10;
+                const appliedDrain = mentalState.isSuppressed
+                    ? Math.round(baseDrain * MENTAL_HEALTH_SUPPRESSION_FACTOR)
+                    : baseDrain;
+
+                state.happiness -= appliedDrain;
+                logEvent(disease.name + " mental strain: -" + appliedDrain + " Happiness this year" + (mentalState.isSuppressed ? " (suppressed)." : "."));
+                if (!mentalState.isSuppressed && state.happiness <= 0) {
+                    hadUnsuppressedAtZero = true;
+                }
+            });
+
+            if (hadUnsuppressedAtZero && Math.random() < 0.5) {
+                const currentTierIndex = getMentalTierIndex(highestTier);
+                const worseningTier = MENTAL_TIER_ORDER[Math.min(MENTAL_TIER_ORDER.length - 1, currentTierIndex + 1)];
+                const worseningIllness = getRandomMentalIllnessKey({ minTier: worseningTier, maxTier: "severe", excludeActive: true });
+                if (worseningIllness) {
+                    diagnoseIllness(worseningIllness, { skipHappinessPenalty: true, forceOverlay: true });
+                    logEvent("Mental health worsened due to neglect.");
+                }
+            }
+        }
+
+        function maybeTriggerPathBasedMentalDiagnosis() {
+            const baselineChance = 0.06;
+            const chance = baselineChance * getMentalRiskMultiplier();
+            if (Math.random() >= chance) return;
+
+            const key = getRandomMentalIllnessKey({ excludeActive: true });
+            if (key) {
+                diagnoseIllness(key, { forceOverlay: true });
+            }
+        }
+
+        function handleSuicideDeath() {
+            triggerDeath(SUICIDE_DEATH_MESSAGE, "suicide");
         }
 
         function maybeTriggerDepressionFromLowStats() {
@@ -1941,7 +2234,7 @@
                 if (healthDrain > 0) {
                     state.health -= healthDrain;
                 }
-                if (disease.annualHappinessDrain) {
+                if (disease.annualHappinessDrain && !isMentalIllness(key)) {
                     state.happiness -= disease.annualHappinessDrain;
                 }
                 if (disease.annualSmartsDrain) {
@@ -1982,7 +2275,7 @@
 
         function maybeContractDisease() {
             if (state.currentIllnesses.length >= 4) return;
-            if (Math.random() >= 0.26) return;
+            if (Math.random() >= 0.26 * getMentalRiskMultiplier()) return;
 
             const available = ILLNESS_ROLL_TABLE.filter(function (entry) {
                 return !state.currentIllnesses.includes(entry.key);
@@ -2000,17 +2293,7 @@
                 }
             }
 
-            const disease = DISEASES[selected];
-            state.currentIllnesses.push(selected);
-            state.illnessYears[selected] = 0;
-            state.happiness -= HAPPINESS_PENALTY_ON_DIAGNOSIS;
-
-            if (disease.oneTimeHealthHit) {
-                state.health -= disease.oneTimeHealthHit;
-                logEvent("You were diagnosed with " + disease.name + ". Immediate health impact: -" + disease.oneTimeHealthHit + " HP.");
-            } else {
-                logEvent("You were diagnosed with " + disease.name + ". Happiness dropped slightly.");
-            }
+            diagnoseIllness(selected, { forceOverlay: true });
         }
 
         function openDoctorMenu() {
@@ -2042,7 +2325,11 @@
                             delete state.illnessYears[key];
                             const recovery = getCureRecoveryAmount(disease);
                             state.health += recovery;
-                            logEvent("Doctor treated and cured " + disease.name + " for " + formatMoney(disease.cureCost) + ". Health recovered by +" + recovery + ".");
+                            state.happiness = 100;
+                            if (isMentalIllness(key)) {
+                                delete state.mentalIllnessState[key];
+                            }
+                            logEvent("Doctor treated and cured " + disease.name + " for " + formatMoney(disease.cureCost) + ". Health recovered by +" + recovery + ". Happiness fully restored.");
                         } else {
                             logEvent("Doctor visit for " + disease.name + " cost " + formatMoney(disease.cureCost) + ", but it remains incurable.");
                         }
@@ -2144,7 +2431,7 @@
             ]);
         }
 
-        function openAssetsMenu() {
+        function openAssetsMenu(focusPsychiatrist) {
             if (state.realEstateListings.length === 0) {
                 generateRealEstateMarket();
             }
@@ -2231,6 +2518,12 @@
                 }
             });
             actions.push({
+                label: (focusPsychiatrist ? "➡ " : "") + "Psychiatrist (" + formatMoney(PSYCHIATRIST_VISIT_COST) + ")",
+                handler: function () {
+                    visitPsychiatrist();
+                }
+            });
+            actions.push({
                 label: "Close",
                 handler: function () {
                     closeModal();
@@ -2242,6 +2535,27 @@
                 marketLabel + "<br><br><strong>My Properties</strong><br>" + myPropertiesHtml +
                 "<br><strong>Broker Listings</strong><br>" + listingsHtml,
                 actions
+            );
+        }
+
+        function openPsychiatristService() {
+            openModal(
+                "Psychiatrist Service",
+                "Cost per visit: " + formatMoney(PSYCHIATRIST_VISIT_COST) + ". This suppresses all active mental illnesses for the year and can cure curable mental illnesses over repeated visits.",
+                [
+                    {
+                        label: "Visit Psychiatrist (" + formatMoney(PSYCHIATRIST_VISIT_COST) + ")",
+                        handler: function () {
+                            visitPsychiatrist();
+                        }
+                    },
+                    {
+                        label: "Close",
+                        handler: function () {
+                            closeModal();
+                        }
+                    }
+                ]
             );
         }
 
@@ -2320,10 +2634,11 @@
             openModal(eventObj.name, eventObj.text, actions);
         }
 
-        function triggerDeath(customDeathMessage) {
+        function triggerDeath(customDeathMessage, deathType) {
             state.isDead = true;
             closeModal();
             closeYearlyExamOverlay();
+            closeDiagnosisOverlay();
             gameUI.style.display = "none";
             deathScreen.style.display = "flex";
 
@@ -2331,12 +2646,21 @@
             const causeMessage = customDeathMessage || GENERIC_HEALTH_DEATH_MESSAGE;
             deathSummary.textContent = causeMessage + " You died at Age " + state.age + ". Final Net Worth: " + formatMoney(netWorth) + ".";
 
-            if (state.happiness > 80) {
-                deathLifeNote.textContent = "You lived a deeply happy life.";
-            } else if (state.happiness < 40) {
-                deathLifeNote.textContent = "You died stressed and miserable.";
+            deathScreen.classList.remove("suicide-theme");
+            if (deathType === "suicide") {
+                deathTitle.textContent = "A Heartbreaking End";
+                deathScreen.classList.add("suicide-theme");
+                deathSummary.textContent = causeMessage;
+                deathLifeNote.textContent = "Please seek support immediately if you or someone you know is in crisis.";
             } else {
-                deathLifeNote.textContent = "A perfectly average life.";
+                deathTitle.textContent = "Game Over";
+                if (state.happiness > 80) {
+                    deathLifeNote.textContent = "You lived a deeply happy life.";
+                } else if (state.happiness < 40) {
+                    deathLifeNote.textContent = "You died stressed and miserable.";
+                } else {
+                    deathLifeNote.textContent = "A perfectly average life.";
+                }
             }
         }
 
@@ -2348,7 +2672,7 @@
         }
 
         function ageUp() {
-            if (state.isDead || !state.playerPath || state.isExamModalOpen) return;
+            if (state.isDead || !state.playerPath || state.isExamModalOpen || state.isDiagnosisOverlayOpen) return;
 
             if (state.currentlyPursuing) {
                 openYearlyExamOverlay();
@@ -2371,13 +2695,40 @@
                 logEvent("Age " + state.age + ": You had no income this year.");
             }
 
+            yearlyResetMentalSuppression();
             state.investments *= (1 + (Math.random() * 0.25 - 0.10));
             applyHousingMarketForYear();
 
             if (processIllnessesForYear()) {
                 return;
             }
+            applyAnnualMentalHealthLogic();
+            if (state.isDead) return;
+            maybeTriggerPathBasedMentalDiagnosis();
+            if (state.isDiagnosisOverlayOpen || state.isDead) {
+                updateUI();
+                return;
+            }
             maybeContractDisease();
+            if (state.isDiagnosisOverlayOpen || state.isDead) {
+                updateUI();
+                return;
+            }
+            maybeTriggerDepressionFromLowStats();
+            if (state.isDiagnosisOverlayOpen || state.isDead) {
+                updateUI();
+                return;
+            }
+
+            if (state.happiness <= 0) {
+                state.happinessZeroStreakYears += 1;
+            } else {
+                state.happinessZeroStreakYears = 0;
+            }
+            if (state.happinessZeroStreakYears >= 2) {
+                handleSuicideDeath();
+                return;
+            }
 
             if (state.health <= 0) {
                 onPlayerDeath(GENERIC_HEALTH_DEATH_MESSAGE);
@@ -2401,6 +2752,7 @@
             } else {
                 enrollInProgram("TRADES_BASE");
             }
+            state.happinessZeroStreakYears = 0;
 
             setupScreen.style.display = "none";
             gameUI.style.display = "flex";
@@ -2419,16 +2771,16 @@
 
         document.getElementById("age-up-btn").addEventListener("click", ageUp);
         document.getElementById("education-nav-btn").addEventListener("click", function () {
-            if (!state.isDead && state.playerPath && !state.isExamModalOpen) openEducationTab();
+            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isDiagnosisOverlayOpen) openEducationTab();
         });
         document.getElementById("careers-nav-btn").addEventListener("click", function () {
-            if (!state.isDead && state.playerPath && !state.isExamModalOpen) openCareersTab();
+            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isDiagnosisOverlayOpen) openCareersTab();
         });
         document.getElementById("activities-nav-btn").addEventListener("click", function () {
-            if (!state.isDead && state.playerPath && !state.isExamModalOpen) openActivitiesMenu();
+            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isDiagnosisOverlayOpen) openActivitiesMenu();
         });
         document.getElementById("assets-nav-btn").addEventListener("click", function () {
-            if (!state.isDead && state.playerPath && !state.isExamModalOpen) openAssetsMenu();
+            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isDiagnosisOverlayOpen) openAssetsMenu();
         });
         document.getElementById("play-again-btn").addEventListener("click", function () {
             location.reload();
