@@ -32,6 +32,38 @@
             box-shadow: 0 0 20px rgba(0, 0, 0, 0.8);
         }
 
+        #game-ui {
+            position: relative;
+        }
+
+        #hud-volume-btn {
+            position: absolute;
+            top: 8px;
+            right: 10px;
+            z-index: 50;
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            border: 1px solid #444;
+            background: rgba(30, 30, 30, 0.92);
+            color: #e0e0e0;
+            font-size: 1.15rem;
+            line-height: 1;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+        }
+
+        #hud-volume-btn:hover {
+            background: rgba(50, 50, 50, 0.95);
+        }
+
+        #hud-volume-btn[aria-pressed="true"] {
+            opacity: 0.65;
+        }
+
         #intro-screen {
             position: fixed;
             top: 0;
@@ -1972,6 +2004,7 @@
         </div>
 
         <div id="game-ui" style="display: none; flex-direction: column; height: 100%;">
+            <button type="button" id="hud-volume-btn" aria-label="Toggle sound" title="Mute / unmute" aria-pressed="false">🔊</button>
             <header id="stats-bar">
                 <div class="stats-bar-row">
                     <div class="stat-block">
@@ -2061,6 +2094,8 @@
 
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/howler@2.2.4/dist/howler.min.js" crossorigin></script>
+    <script src="SoundManager.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js" crossorigin></script>
     <script type="text/babel" data-presets="react">
         let state = {
@@ -2075,7 +2110,7 @@
             major: null, isDead: false, currentIllnesses: [], illnessYears: {},
             ownedAssets: [], realEstateListings: [], nextPropertyId: 1, nextListingId: 1,
             currentHousingMarketShift: 0, currentHousingMarketEvent: "stable",
-            playerPath: null, annualIncome: 0, lastTaxesPaid: 0, educationLevel: "None", yearsInSchool: 0,
+            playerPath: null, annualIncome: 0, lastTaxesPaid: 0, _previousLastTaxesPaid: 0, educationLevel: "None", yearsInSchool: 0,
             currentlyPursuing: null, educationCredentials: [], jobTitle: "Unemployed",
             isExamModalOpen: false, currentExamQuestion: null, examsPassedThisDegree: 0,
             examsTakenThisDegree: 0, examQuestionsThisYearTotal: 0, examQuestionsThisYearAnswered: 0,
@@ -3896,10 +3931,18 @@
             heartAttackOverlayReactRoot.render(
                 <HeartAttackOverlay fatalOutcome={state._heartAttackOutcomeDeath === true} onAcknowledge={handleHeartAttackAcknowledge} />
             );
+            window.requestAnimationFrame(function () {
+                if (typeof SoundManager !== "undefined" && SoundManager.play) {
+                    SoundManager.play("heart_attack");
+                }
+            });
         }
 
         function closeHeartAttackOverlay() {
             state.isHeartAttackOverlayOpen = false;
+            if (typeof SoundManager !== "undefined" && SoundManager.stop) {
+                SoundManager.stop("heart_attack");
+            }
             if (heartAttackOverlayReactRoot) {
                 heartAttackOverlayReactRoot.render(null);
             }
@@ -4445,6 +4488,30 @@
                     gameUiEl.classList.remove("stress-critical-pulse");
                 }
             }
+
+            if (typeof SoundManager !== "undefined" && SoundManager.updateStressHeartbeat) {
+                if (!state.isDead) {
+                    SoundManager.updateStressHeartbeat(state.stressLevel);
+                } else {
+                    SoundManager.stop("heart_beat");
+                }
+            }
+
+            var taxNow = state.lastTaxesPaid || 0;
+            var taxPrev = state._previousLastTaxesPaid || 0;
+            if (
+                typeof SoundManager !== "undefined" &&
+                SoundManager.play &&
+                taxNow > 0 &&
+                taxNow !== taxPrev &&
+                state.hudDebtSalaryUnlocked &&
+                statsBarDebtSalary &&
+                !statsBarDebtSalary.classList.contains("hud-extra-hidden")
+            ) {
+                SoundManager.play("money_loss");
+                showPurchaseToastMessage("Tax reaper: you paid " + formatMoney(taxNow) + " in taxes last year.");
+            }
+            state._previousLastTaxesPaid = taxNow;
 
             eventLog.scrollTop = eventLog.scrollHeight;
         }
@@ -5297,7 +5364,10 @@
                         <p className="coping-name">{ev.name}</p>
                         <p className="coping-body">{ev.message}</p>
                         <p className="coping-impact">{impact}</p>
-                        <button type="button" className="coping-ack-btn" onClick={props.onAcknowledge}>
+                        <button type="button" className="coping-ack-btn" onClick={props.onSwipeCard}>
+                            Swipe Credit Card
+                        </button>
+                        <button type="button" className="coping-ack-btn" style={{ marginTop: 10, opacity: 0.92 }} onClick={props.onAcknowledge}>
                             Accept the Consequences
                         </button>
                     </div>
@@ -5315,7 +5385,11 @@
                 copingOverlayReactRoot = ReactDOM.createRoot(copingOverlayMount);
             }
             copingOverlayReactRoot.render(
-                <CopingMechanismOverlay event={state.pendingCopingEvent} onAcknowledge={handleDestructiveCopingAcknowledge} />
+                <CopingMechanismOverlay
+                    event={state.pendingCopingEvent}
+                    onSwipeCard={handleDestructiveCopingSwipeCard}
+                    onAcknowledge={handleDestructiveCopingAcknowledge}
+                />
             );
         }
 
@@ -5325,6 +5399,13 @@
             if (copingOverlayReactRoot) {
                 copingOverlayReactRoot.render(null);
             }
+        }
+
+        function handleDestructiveCopingSwipeCard() {
+            if (typeof SoundManager !== "undefined" && SoundManager.play) {
+                SoundManager.play("money_loss");
+            }
+            handleDestructiveCopingAcknowledge();
         }
 
         function handleDestructiveCopingAcknowledge() {
@@ -8712,7 +8793,35 @@
             });
         });
 
-        document.getElementById("age-up-btn").addEventListener("click", ageUp);
+        document.getElementById("age-up-btn").addEventListener("click", function () {
+            if (typeof SoundManager !== "undefined" && SoundManager.play) {
+                SoundManager.play("ui_click");
+            }
+            ageUp();
+        });
+
+        (function initHudVolumeAndIntroAudio() {
+            var volBtn = document.getElementById("hud-volume-btn");
+            function syncVolBtn() {
+                if (!volBtn || typeof SoundManager === "undefined") return;
+                var m = SoundManager.isMuted();
+                volBtn.textContent = m ? "🔇" : "🔊";
+                volBtn.setAttribute("aria-pressed", m ? "true" : "false");
+                volBtn.setAttribute("aria-label", m ? "Unmute sound" : "Mute sound");
+            }
+            window.onSoundManagerMuteChange = syncVolBtn;
+            if (volBtn && typeof SoundManager !== "undefined") {
+                syncVolBtn();
+                volBtn.addEventListener("click", function (e) {
+                    e.stopPropagation();
+                    SoundManager.toggleMute();
+                    syncVolBtn();
+                });
+            }
+            if (typeof SoundManager !== "undefined" && SoundManager.startIntroAmbience) {
+                SoundManager.startIntroAmbience({ fadeInMs: 900, volume: 0.32 });
+            }
+        })();
         document.getElementById("education-nav-btn").addEventListener("click", function () {
             if (!state.isDead && state.playerPath && !state.legacyAnalysis && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isPerformanceReviewOverlayOpen && !state.isCareerExamOpen && !state.isFiredOverlayOpen && !state.isRetirementOverlayOpen && !state.isDateTriviaOpen && !state.isCopingOverlayOpen && !state.isNervousBreakdownOverlayOpen && !state.isLayoffOverlayOpen && !state.isInflationOverlayOpen && !state.isMortgagePaidOverlayOpen && !state.isForeclosureOverlayOpen && !state.isDivorceOverlayOpen && !state.isHeartAttackOverlayOpen && !state.isCarScrappedOverlayOpen && !state.isEvictionOverlayOpen) openEducationTab();
         });
@@ -8744,6 +8853,9 @@
         });
 
         introLogo.addEventListener("animationend", function () {
+            if (typeof SoundManager !== "undefined" && SoundManager.stopIntroAmbienceFade) {
+                SoundManager.stopIntroAmbienceFade(1400);
+            }
             introScreen.style.display = "none";
             setupScreen.style.display = "flex";
             requestAnimationFrame(function () {
