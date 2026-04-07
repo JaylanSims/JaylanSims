@@ -975,6 +975,7 @@
             degreeWrongAnswersThisEnrollment: 0,
             hudDebtSalaryUnlocked: false,
             isEmployed: false,
+            jobType: "None",
             isEnrolled: false,
             degreeHistory: [],
             currentEnrollment: null,
@@ -982,8 +983,18 @@
             yearsAtCurrentJob: 0,
             currentJobLevel: 1,
             pendingPromotion: null,
-            isPromotionOverlayOpen: false
+            isPromotionOverlayOpen: false,
+            currentHousing: null,
+            roommate: null,
+            rentExpenseInBudget: 0
         };
+
+        const RENTAL_LISTINGS = [
+            { id: "dorm", name: "University Dorm", annualCost: 6000, roommateEligible: false, requiresEnrollment: true },
+            { id: "studio", name: "Studio Apartment", annualCost: 12000, roommateEligible: false, requiresEnrollment: false },
+            { id: "twoBed", name: "2-Bedroom Apartment", annualCost: 18000, roommateEligible: true, requiresEnrollment: false },
+            { id: "loft", name: "Luxury Loft", annualCost: 30000, roommateEligible: true, requiresEnrollment: false }
+        ];
 
         const TRACK_DEBT_BASE = {
             STEM: 30000,
@@ -1213,6 +1224,37 @@
                 { title: "Automotive Technician", salary: 46840, requiredEducation: "Trade Certificate" }
             ]
         };
+
+        const ODD_JOBS_GENERAL = [
+            { title: "Barista", salary: 24000, requiredEducation: "None", jobKind: "OddJob" },
+            { title: "Retail Cashier", salary: 22000, requiredEducation: "None", jobKind: "OddJob" },
+            { title: "Ride-Share Driver", salary: 28000, requiredEducation: "None", jobKind: "OddJob" },
+            { title: "Campus Dining Staff", salary: 20000, requiredEducation: "None", jobKind: "OddJob" }
+        ];
+
+        const ODD_JOBS_BY_PATH = {
+            STEM: [
+                { title: "Math/Science Tutor", salary: 26000, requiredEducation: "None", jobKind: "OddJob" },
+                { title: "IT Help Desk Assistant", salary: 30000, requiredEducation: "None", jobKind: "OddJob" },
+                { title: "Undergraduate Lab Tech", salary: 28000, requiredEducation: "None", jobKind: "OddJob" }
+            ],
+            Humanities: [
+                { title: "Freelance Writer/Blogger", salary: 25000, requiredEducation: "None", jobKind: "OddJob" },
+                { title: "Local Museum Guide", salary: 24000, requiredEducation: "None", jobKind: "OddJob" },
+                { title: "Social Media Assistant", salary: 27000, requiredEducation: "None", jobKind: "OddJob" }
+            ],
+            Trades: [
+                { title: "General Construction Laborer", salary: 32000, requiredEducation: "None", jobKind: "OddJob" },
+                { title: "Apprentice / Tool Fetcher", salary: 28000, requiredEducation: "None", jobKind: "OddJob" },
+                { title: "Handyman/Tasker", salary: 30000, requiredEducation: "None", jobKind: "OddJob" }
+            ]
+        };
+
+        function getOddJobsListForPlayer() {
+            var path = state.playerPath;
+            var track = ODD_JOBS_BY_PATH[path] || [];
+            return ODD_JOBS_GENERAL.concat(track);
+        }
 
         function shuffleExamOptionsInPlace(arr) {
             for (var i = arr.length - 1; i > 0; i--) {
@@ -1737,11 +1779,29 @@
             const p = state.currentlyPursuing ? EDUCATION_PROGRAMS[state.currentlyPursuing] : null;
             if (p && p.pipeline === "residency") return;
             if (!state.isEmployed || !state.isEnrolled) return;
+            if (state.jobType !== "Career") return;
             if (state.happiness >= 25) return;
             if (state.currentIllnesses.includes("severeAcademicBurnout")) return;
             if (Math.random() >= 0.5) return;
             diagnoseIllness("severeAcademicBurnout", { skipHappinessPenalty: true, forceOverlay: true });
             logEvent("Dual hustle overload: Severe Academic Burnout diagnosed.");
+        }
+
+        function applyDualHustleStressForYear() {
+            if (!state.isEmployed || !state.isEnrolled) return;
+            var prog = state.currentlyPursuing ? EDUCATION_PROGRAMS[state.currentlyPursuing] : null;
+            if (prog && prog.pipeline === "residency") return;
+            var jt = state.jobTitle;
+            if (jt === "Student" || jt === "Unemployed" || jt === "Medical Resident") return;
+            if (state.jobType === "OddJob") {
+                state.happiness -= 10;
+            } else if (state.jobType === "Career") {
+                if (state.playerPath === "STEM") {
+                    state.happiness -= 35;
+                } else {
+                    state.happiness -= 20;
+                }
+            }
         }
 
         function clampStat(num) {
@@ -1752,6 +1812,7 @@
 
         function updateUI() {
             syncCurrentEnrollment();
+            evictDormIfNotEnrolled(true);
             syncFinancialAliases();
             state.health = clampStat(state.health);
             state.happiness = clampStat(state.happiness);
@@ -2401,6 +2462,7 @@
             state.isExamActive = false;
             state.currentExamQuestion = null;
             syncCurrentEnrollment();
+            evictDormIfNotEnrolled(false);
         }
 
         function handleAdvancedAcademicDismissal(program, requiredPasses) {
@@ -2501,12 +2563,8 @@
                 state.isEmployed = false;
             }
 
-            if (state.isEmployed && state.isEnrolled && program.pipeline !== "residency") {
-                if (state.playerPath === "STEM") {
-                    state.happiness -= 35;
-                } else {
-                    state.happiness -= 20;
-                }
+            if (program.pipeline !== "residency") {
+                applyDualHustleStressForYear();
             }
 
             state.smarts += 2;
@@ -2608,6 +2666,9 @@
         }
 
         function meetsEducationRequirement(requiredEducation) {
+            if (requiredEducation === "None") {
+                return true;
+            }
             const creds = state.educationCredentials;
             if (requiredEducation === "Trade Certificate") {
                 return creds.includes("Trade Certificate");
@@ -2650,6 +2711,7 @@
             state.annualIncome = 0;
             state.salary = 0;
             state.isEmployed = false;
+            state.jobType = "None";
             state.yearsAtCurrentJob = 0;
             state.currentJobLevel = 1;
             state.pendingPromotion = null;
@@ -2678,12 +2740,14 @@
         }
 
         function applyForJob(job) {
-            const chance = getHireChance();
+            const isOddJob = job.jobKind === "OddJob";
+            const chance = isOddJob ? 0.95 : getHireChance();
             if (Math.random() < chance) {
                 state.annualIncome = job.salary;
                 state.jobTitle = job.title;
                 state.salary = job.salary;
                 state.isEmployed = true;
+                state.jobType = isOddJob ? "OddJob" : "Career";
                 state.yearsAtCurrentJob = 0;
                 state.currentJobLevel = 1;
                 state.pendingPromotion = null;
@@ -2704,22 +2768,25 @@
         function openJobBoard() {
             const enrProg = state.currentlyPursuing ? EDUCATION_PROGRAMS[state.currentlyPursuing] : null;
             if (enrProg && enrProg.pipeline === "residency") {
-                openModal("Find a Job", "You cannot take a standard job during Medical Residency.", [
+                openModal("Career Path Jobs", "You cannot take a standard job during Medical Residency.", [
                     { label: "Close", handler: function () { closeModal(); } }
                 ]);
                 return;
             }
             if (state.isEmployed) {
-                openModal("Find a Job", "You already have a job. Open Careers and use Quit Job if you want to apply elsewhere.", [
+                openModal("Career Path Jobs", "You already have a job. Use Quit Job in Careers if you want to apply elsewhere.", [
                     { label: "Close", handler: function () { closeModal(); } }
                 ]);
                 return;
             }
-            if (state.currentlyPursuing || state.jobSearchBlocked) {
-                const blockReason = state.currentlyPursuing
-                    ? "You are still in school. Graduate first to apply for jobs."
-                    : "Find a Job is locked because you were academically dismissed. Graduate to unlock career applications.";
-                openModal("Find a Job", blockReason, [
+            if (state.currentlyPursuing) {
+                openModal("Career Path Jobs", "Degree-track careers unlock after you graduate. Use Odd Jobs & Part-Time while in school.", [
+                    { label: "Close", handler: function () { closeModal(); } }
+                ]);
+                return;
+            }
+            if (state.jobSearchBlocked) {
+                openModal("Career Path Jobs", "Career applications are locked until you resolve academic dismissal and graduate.", [
                     { label: "Close", handler: function () { closeModal(); } }
                 ]);
                 return;
@@ -2739,11 +2806,45 @@
                 };
             });
             actions.push({ label: "Close", handler: function () { closeModal(); } });
-            openModal("Find a Job", "Career opportunities for the " + state.playerPath + " path.", actions);
+            openModal("Career Path (Requires Degree)", "Professional roles on your " + state.playerPath + " path. Hiring is competitive.", actions);
+        }
+
+        function openOddJobsBoard() {
+            const enrProg = state.currentlyPursuing ? EDUCATION_PROGRAMS[state.currentlyPursuing] : null;
+            if (enrProg && enrProg.pipeline === "residency") {
+                openModal("Odd Jobs & Part-Time", "No side jobs during Medical Residency.", [
+                    { label: "Close", handler: function () { closeModal(); } }
+                ]);
+                return;
+            }
+            if (state.isEmployed) {
+                openModal("Odd Jobs & Part-Time", "Quit your current job first to apply for a different one.", [
+                    { label: "Close", handler: function () { closeModal(); } }
+                ]);
+                return;
+            }
+            const jobs = getOddJobsListForPlayer();
+            const actions = jobs.map(function (job) {
+                return {
+                    label: "Apply: " + job.title + " — " + formatMoney(job.salary) + " (~95% hire)",
+                    handler: function () {
+                        applyForJob(job);
+                    }
+                };
+            });
+            actions.push({ label: "Close", handler: function () { closeModal(); } });
+            openModal(
+                "Odd Jobs & Part-Time",
+                "No degree required. General listings plus " + state.playerPath + "-themed work. Easy to get hired; lighter stress if you study at the same time.",
+                actions
+            );
         }
 
         function openCareersTab() {
-            const canFindJob = !state.currentlyPursuing && !state.jobSearchBlocked && !state.isEmployed;
+            const enrProg = state.currentlyPursuing ? EDUCATION_PROGRAMS[state.currentlyPursuing] : null;
+            const residencyBlock = enrProg && enrProg.pipeline === "residency";
+            const canCareerBoard = !state.isEmployed && !state.currentlyPursuing && !state.jobSearchBlocked && !residencyBlock;
+            const canOddJobsBoard = !state.isEmployed && state.playerPath && !residencyBlock;
             const lockReason = state.currentlyPursuing
                 ? "You are currently enrolled in school."
                 : state.jobSearchBlocked
@@ -2752,10 +2853,11 @@
 
             if (state.isEmployed) {
                 const panel =
-                    "<strong>Active Career</strong><br><br>" +
+                    "<strong>Active Employment</strong><br><br>" +
+                    "Type: " + (state.jobType === "OddJob" ? "Part-time / Odd Job" : state.jobType === "Career" ? "Career" : "Other") + "<br>" +
                     "Current Position: " + state.jobTitle + "<br>" +
                     "Current Salary: " + formatMoney(state.annualIncome) + " / year<br><br>" +
-                    "<span style=\"color:#bdbdbd;font-size:0.9rem;\">Jobs are limited to your " + state.playerPath + " path and your earned credentials.</span>";
+                    "<span style=\"color:#bdbdbd;font-size:0.9rem;\">Career jobs use your " + state.playerPath + " path and credentials. Odd jobs never require a degree.</span>";
                 openModal(
                     "Careers",
                     panel,
@@ -2774,9 +2876,23 @@
 
             openModal(
                 "Careers",
-                "Status: " + state.jobTitle + " | Annual Income: " + formatMoney(state.annualIncome) + "<br>" + lockReason,
+                "Status: " + state.jobTitle + " | Annual Income: " + formatMoney(state.annualIncome) + "<br>" + lockReason +
+                    "<br><br><strong>Choose a job board:</strong>",
                 [
-                    { label: canFindJob ? "Find a Job" : "Find a Job (Locked)", disabled: !canFindJob, handler: function () { if (canFindJob) openJobBoard(); } },
+                    {
+                        label: canCareerBoard ? "Career Path (Requires Degree)" : "Career Path (Locked)",
+                        disabled: !canCareerBoard,
+                        handler: function () {
+                            if (canCareerBoard) openJobBoard();
+                        }
+                    },
+                    {
+                        label: canOddJobsBoard ? "Odd Jobs & Part-Time" : "Odd Jobs (Unavailable)",
+                        disabled: !canOddJobsBoard,
+                        handler: function () {
+                            if (canOddJobsBoard) openOddJobsBoard();
+                        }
+                    },
                     { label: "Close", handler: function () { closeModal(); } }
                 ]
             );
@@ -2815,17 +2931,33 @@
                 state.annualIncome = typeof program.residencyStipend === "number" ? program.residencyStipend : 45000;
                 state.salary = state.annualIncome;
                 state.isEmployed = true;
-            } else if (program.pipeline !== "undergrad" && state.isEmployed) {
+                state.jobType = "Career";
+            } else if (program.pipeline === "undergrad" && state.isEmployed && state.jobType === "OddJob") {
                 state._savedJobBeforeSchoolYear = {
                     jobTitle: state.jobTitle,
                     annualIncome: state.annualIncome,
                     salary: state.salary,
-                    isEmployed: true
+                    isEmployed: true,
+                    jobType: "OddJob"
                 };
                 state.jobTitle = "Student";
                 state.annualIncome = 0;
                 state.salary = 0;
                 state.isEmployed = false;
+                state.jobType = "None";
+            } else if (program.pipeline !== "undergrad" && state.isEmployed) {
+                state._savedJobBeforeSchoolYear = {
+                    jobTitle: state.jobTitle,
+                    annualIncome: state.annualIncome,
+                    salary: state.salary,
+                    isEmployed: true,
+                    jobType: state.jobType
+                };
+                state.jobTitle = "Student";
+                state.annualIncome = 0;
+                state.salary = 0;
+                state.isEmployed = false;
+                state.jobType = "None";
             } else {
                 state.annualIncome = 0;
                 state.salary = 0;
@@ -2962,6 +3094,7 @@
             state.jobSearchBlocked = false;
             state._savedJobBeforeSchoolYear = null;
             state.educationLevel = program.educationLevel;
+            evictDormIfNotEnrolled(false);
 
             if (program.pipeline === "residency") {
                 state.jobTitle = "Unemployed";
@@ -2973,6 +3106,7 @@
                 state.annualIncome = savedJob.annualIncome;
                 state.salary = savedJob.salary;
                 state.isEmployed = true;
+                state.jobType = savedJob.jobType === "OddJob" ? "OddJob" : "Career";
             }
 
             logEvent("Graduation: You earned " + program.degreeName + ".");
@@ -3067,10 +3201,104 @@
             );
         }
 
+        function getEffectiveAnnualRentCost() {
+            if (!state.currentHousing || state.currentHousing.type !== "Rent") {
+                return 0;
+            }
+            var base = state.currentHousing.annualCost;
+            if (state.roommate && (state.roommate.status === "Good" || state.roommate.status === "Bad")) {
+                return Math.round(base * 0.5);
+            }
+            return base;
+        }
+
         function syncFinancialAliases() {
+            state.annualExpenses = Math.max(0, state.annualExpenses - state.rentExpenseInBudget);
+            var newRent = getEffectiveAnnualRentCost();
+            state.annualExpenses += newRent;
+            state.rentExpenseInBudget = newRent;
             state.bankBalance = state.cash;
             state.expenses = state.annualExpenses;
             state.debt = getDisplayedStudentDebt();
+        }
+
+        function getRentalListingById(id) {
+            for (var i = 0; i < RENTAL_LISTINGS.length; i++) {
+                if (RENTAL_LISTINGS[i].id === id) return RENTAL_LISTINGS[i];
+            }
+            return null;
+        }
+
+        function currentRentalListingMeta() {
+            if (!state.currentHousing || state.currentHousing.type !== "Rent") return null;
+            return getRentalListingById(state.currentHousing.rentalId);
+        }
+
+        function clearRentalHousing() {
+            state.currentHousing = null;
+            state.roommate = null;
+            syncFinancialAliases();
+        }
+
+        function evictDormIfNotEnrolled(silent) {
+            if (!state.currentHousing || state.currentHousing.rentalId !== "dorm" || state.isEnrolled) return;
+            if (!silent) {
+                logEvent("You had to leave the University Dorm because you are no longer enrolled.");
+            }
+            state.currentHousing = null;
+            state.roommate = null;
+        }
+
+        function selectRental(rentalId) {
+            syncFinancialAliases();
+            var listing = getRentalListingById(rentalId);
+            if (!listing) return;
+            if (state.ownedAssets.length > 0) {
+                showPurchaseToastMessage("You already own property. Sell it before renting.");
+                return;
+            }
+            if (listing.requiresEnrollment && !state.isEnrolled) {
+                showPurchaseToastMessage("University Dorm is only available while enrolled in school.");
+                return;
+            }
+            var balance = state.bankBalance;
+            if (balance < listing.annualCost) {
+                showPurchaseToastMessage("Insufficient funds. First year rent requires " + formatMoney(listing.annualCost) + " available.");
+                return;
+            }
+            state.cash -= listing.annualCost;
+            state.currentHousing = {
+                type: "Rent",
+                name: listing.name,
+                annualCost: listing.annualCost,
+                rentalId: listing.id
+            };
+            state.roommate = null;
+            logEvent("You signed a lease: " + listing.name + ". Paid " + formatMoney(listing.annualCost) + " for the first year upfront.");
+            syncFinancialAliases();
+            updateUI();
+        }
+
+        function findRoommate() {
+            var meta = currentRentalListingMeta();
+            if (!meta || !meta.roommateEligible) return;
+            if (state.roommate) {
+                logEvent("You already have a roommate.");
+                return;
+            }
+            var good = Math.random() < 0.7;
+            state.roommate = { status: good ? "Good" : "Bad" };
+            logEvent("You found a roommate: " + (good ? "a good match — rent is split." : "a difficult roommate — rent is split but stress may follow."));
+            syncFinancialAliases();
+            updateUI();
+        }
+
+        function removeRoommate() {
+            if (!state.roommate) return;
+            state.roommate = null;
+            logEvent("Your roommate moved out. You pay full rent again.");
+            syncFinancialAliases();
+            updateUI();
         }
 
         function applyProceduralEffects(effects) {
@@ -3233,6 +3461,10 @@
 
         function buyProperty(listingId) {
             syncFinancialAliases();
+            if (state.currentHousing && state.currentHousing.type === "Rent") {
+                showPurchaseToastMessage("End your lease before buying property.");
+                return;
+            }
             const listing = state.realEstateListings.find(function (item) { return item.id === listingId; });
             if (!listing) return;
 
@@ -3947,8 +4179,10 @@
 
             if (
                 state.isEmployed &&
+                state.jobType === "Career" &&
                 state.jobTitle !== "Student" &&
                 state.jobTitle !== "Unemployed" &&
+                state.jobTitle !== "Medical Resident" &&
                 state.yearsAtCurrentJob >= 3 &&
                 state.currentJobLevel < 4 &&
                 Math.random() < 0.3
