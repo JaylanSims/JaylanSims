@@ -330,6 +330,60 @@
             gap: 10px;
         }
 
+        .higher-ed-catalog {
+            margin: 12px 0 0;
+            max-height: 42vh;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .higher-ed-card {
+            border: 1px solid #333;
+            border-radius: 10px;
+            padding: 10px 12px;
+            background: #1e1e1e;
+            text-align: left;
+        }
+
+        .higher-ed-card h4 {
+            margin: 0 0 6px;
+            font-size: 0.98rem;
+        }
+
+        .higher-ed-card .meta {
+            margin: 0;
+            font-size: 0.85rem;
+            color: #bdbdbd;
+            line-height: 1.4;
+        }
+
+        .prereq-met {
+            color: #69f0ae;
+        }
+
+        .prereq-miss {
+            color: #ff8a80;
+        }
+
+        .higher-ed-enroll {
+            margin-top: 8px;
+            width: 100%;
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid #444;
+            background: #2a2a2a;
+            color: #fff;
+            font-size: 0.92rem;
+            cursor: pointer;
+        }
+
+        .higher-ed-enroll:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+        }
+
         #resignation-overlay {
             position: fixed;
             top: 0;
@@ -741,7 +795,11 @@
             isExamActive: false,
             degreeWrongAnswersThisEnrollment: 0,
             hudDebtSalaryUnlocked: false,
-            isEmployed: false
+            isEmployed: false,
+            isEnrolled: false,
+            degreeHistory: [],
+            currentEnrollment: null,
+            _savedJobBeforeSchoolYear: null
         };
 
         const TRACK_DEBT_BASE = {
@@ -766,6 +824,7 @@
         const resignationText = document.getElementById("resignation-text");
         const yearlyExamReactMount = document.getElementById("yearly-exam-react-root");
         let yearlyExamReactRoot = null;
+        let higherEdCatalogRoot = null;
         const diagnosisOverlayRoot = document.getElementById("diagnosis-overlay-root");
         const deathScreen = document.getElementById("death-screen");
         const deathTitle = document.getElementById("death-title");
@@ -860,13 +919,58 @@
         };
 
         const EDUCATION_PROGRAMS = {
-            STEM_BASE: { path: "STEM", degreeName: "BS in STEM", yearsRequired: 4, educationLevel: "BS in STEM", credentials: ["Bachelor's Degree"] },
-            HUMANITIES_BASE: { path: "Humanities", degreeName: "BA in Humanities", yearsRequired: 4, educationLevel: "BA in Humanities", credentials: ["Bachelor's Degree"] },
-            TRADES_BASE: { path: "Trades", degreeName: "Trade Certificate", yearsRequired: 4, educationLevel: "Trade Certificate", credentials: ["Trade Certificate"] },
-            STEM_MASTERS: { path: "STEM", degreeName: "Master's Degree", yearsRequired: 2, educationLevel: "Master's Degree", credentials: ["Bachelor's Degree", "Master's Degree"] },
-            STEM_MEDICAL: { path: "STEM", degreeName: "Medical Degree", yearsRequired: 4, educationLevel: "Medical Degree", credentials: ["Bachelor's Degree", "Master's Degree", "Medical Degree", "Doctorate"] },
-            HUMANITIES_MASTERS: { path: "Humanities", degreeName: "Master's Degree", yearsRequired: 2, educationLevel: "Master's Degree", credentials: ["Bachelor's Degree", "Master's Degree"] },
-            HUMANITIES_LAW: { path: "Humanities", degreeName: "Law Degree", yearsRequired: 3, educationLevel: "Law Degree", credentials: ["Bachelor's Degree", "Law Degree"] }
+            STEM_BASE: {
+                path: "STEM", degreeName: "BS in STEM", yearsRequired: 4, educationLevel: "BS in STEM",
+                credentials: ["Bachelor's Degree"], pipeline: "undergrad", prerequisiteDegreeNames: []
+            },
+            HUMANITIES_BASE: {
+                path: "Humanities", degreeName: "BA in Arts", yearsRequired: 4, educationLevel: "BA in Arts",
+                credentials: ["Bachelor's Degree"], pipeline: "undergrad", prerequisiteDegreeNames: []
+            },
+            TRADES_BASE: {
+                path: "Trades", degreeName: "Trade Certificate", yearsRequired: 4, educationLevel: "Trade Certificate",
+                credentials: ["Trade Certificate"], pipeline: "undergrad", prerequisiteDegreeNames: []
+            },
+            STEM_MASTERS: {
+                path: "STEM", degreeName: "Master's in STEM", yearsRequired: 2, educationLevel: "Master's in STEM",
+                credentials: ["Master's Degree"], pipeline: "advanced",
+                prerequisiteDegreeNames: ["BS in STEM"], annualTuitionDebt: 20000
+            },
+            STEM_PHD: {
+                path: "STEM", degreeName: "Ph.D. in STEM", yearsRequired: 4, educationLevel: "Ph.D. in STEM",
+                credentials: ["Doctorate"], pipeline: "advanced",
+                prerequisiteDegreeNames: ["Master's in STEM"], annualTuitionDebt: 20000
+            },
+            STEM_MEDICAL: {
+                path: "STEM", degreeName: "Medical School", yearsRequired: 4, educationLevel: "Medical School",
+                credentials: [], pipeline: "medSchool", prerequisiteDegreeNames: ["BS in STEM"], annualTuitionDebt: 40000
+            },
+            STEM_RESIDENCY: {
+                path: "STEM", degreeName: "Medical Residency", yearsRequired: 4, educationLevel: "Medical Residency",
+                credentials: ["Medical Degree", "Doctorate"], pipeline: "residency",
+                prerequisiteDegreeNames: ["Medical School"], annualTuitionDebt: 0, residencyStipend: 45000
+            },
+            HUMANITIES_MASTERS: {
+                path: "Humanities", degreeName: "Master's in Arts", yearsRequired: 2, educationLevel: "Master's in Arts",
+                credentials: ["Master's Degree"], pipeline: "advanced",
+                prerequisiteDegreeNames: ["BA in Arts"], annualTuitionDebt: 20000
+            },
+            HUMANITIES_DOCTORATE: {
+                path: "Humanities", degreeName: "Doctorate in Arts", yearsRequired: 4, educationLevel: "Doctorate in Arts",
+                credentials: ["Doctorate"], pipeline: "advanced",
+                prerequisiteDegreeNames: ["Master's in Arts"], annualTuitionDebt: 20000
+            },
+            HUMANITIES_LAW: {
+                path: "Humanities", degreeName: "Law Degree", yearsRequired: 3, educationLevel: "Law Degree",
+                credentials: ["Law Degree"], pipeline: "advanced",
+                prerequisiteDegreeNames: ["BA in Arts"], annualTuitionDebt: 20000
+            }
+        };
+
+        const HIGHER_ED_CATALOG_ORDER = {
+            STEM: ["STEM_MASTERS", "STEM_PHD", "STEM_MEDICAL", "STEM_RESIDENCY"],
+            Humanities: ["HUMANITIES_MASTERS", "HUMANITIES_DOCTORATE", "HUMANITIES_LAW"],
+            Trades: []
         };
 
         const JOB_MARKET = {
@@ -1186,6 +1290,14 @@
             anxiety: { name: "Moderate Anxiety", tier: "medium", curable: true, minVisits: 10, maxVisits: 18 },
             moderateAdhd: { name: "Moderate ADHD", tier: "medium", curable: false },
             bipolarII: { name: "Bipolar II", tier: "medium", curable: false },
+            severeAcademicBurnout: {
+                name: "Severe Academic Burnout",
+                tier: "medium",
+                curable: true,
+                minVisits: 8,
+                maxVisits: 14,
+                annualHappinessDrainOverride: 25
+            },
 
             schizophrenia: { name: "Schizophrenia", tier: "severe", curable: false },
             bipolarI: { name: "Bipolar I", tier: "severe", curable: false },
@@ -1204,7 +1316,8 @@
         function addMentalIllnessDefinitions() {
             Object.keys(MENTAL_ILLNESS_DEFINITIONS).forEach(function (key) {
                 const def = MENTAL_ILLNESS_DEFINITIONS[key];
-                const drain = MENTAL_TIER_HAPPINESS_DRAIN[def.tier] || 10;
+                const tierDrain = MENTAL_TIER_HAPPINESS_DRAIN[def.tier] || 10;
+                const drain = typeof def.annualHappinessDrainOverride === "number" ? def.annualHappinessDrainOverride : tierDrain;
                 const existing = DISEASES[key] || {};
                 DISEASES[key] = Object.assign({}, existing, {
                     name: def.name,
@@ -1239,7 +1352,8 @@
                 { key: "borderlinePersonalityDisorder", weight: 0.35 },
                 { key: "dissociativeIdentityDisorder", weight: 0.12 },
                 { key: "schizoaffectiveDisorder", weight: 0.2 },
-                { key: "severeDepressionPsychosis", weight: 0.18 }
+                { key: "severeDepressionPsychosis", weight: 0.18 },
+                { key: "severeAcademicBurnout", weight: 0.15 }
             ];
 
             extraMentalRolls.forEach(function (entry) {
@@ -1361,6 +1475,64 @@
             return added;
         }
 
+        function syncCurrentEnrollment() {
+            const program = state.currentlyPursuing ? EDUCATION_PROGRAMS[state.currentlyPursuing] : null;
+            if (!program || !state.isInSchool) {
+                state.currentEnrollment = null;
+                return;
+            }
+            const yearsLeft = Math.max(0, program.yearsRequired - state.yearsInSchool);
+            const annualCost = typeof program.annualTuitionDebt === "number" ? program.annualTuitionDebt : 0;
+            state.currentEnrollment = {
+                degreeName: program.degreeName,
+                yearsLeft: yearsLeft,
+                annualCost: annualCost,
+                programKey: state.currentlyPursuing
+            };
+        }
+
+        function programPrerequisitesMet(program) {
+            if (!program || !program.prerequisiteDegreeNames || !program.prerequisiteDegreeNames.length) {
+                return true;
+            }
+            return program.prerequisiteDegreeNames.every(function (name) {
+                return state.degreeHistory.indexOf(name) !== -1;
+            });
+        }
+
+        function getPrerequisiteLabel(program) {
+            if (!program.prerequisiteDegreeNames || !program.prerequisiteDegreeNames.length) {
+                return "";
+            }
+            return "Requires " + program.prerequisiteDegreeNames.join(" + ");
+        }
+
+        function addDegreesToHistory(program) {
+            if (!program || !program.degreeName) return;
+            if (state.degreeHistory.indexOf(program.degreeName) === -1) {
+                state.degreeHistory.push(program.degreeName);
+            }
+        }
+
+        function applyAdvancedTuitionDebt(program) {
+            if (!program || program.pipeline === "undergrad" || program.pipeline === "residency") return;
+            const amt = typeof program.annualTuitionDebt === "number" ? program.annualTuitionDebt : 0;
+            if (amt > 0) {
+                state.existingDebt += amt;
+            }
+        }
+
+        function maybeTriggerDualHustleBurnout() {
+            const p = state.currentlyPursuing ? EDUCATION_PROGRAMS[state.currentlyPursuing] : null;
+            if (p && p.pipeline === "residency") return;
+            if (!state.isEmployed || !state.isEnrolled) return;
+            if (state.happiness >= 25) return;
+            if (state.currentIllnesses.includes("severeAcademicBurnout")) return;
+            if (Math.random() >= 0.5) return;
+            diagnoseIllness("severeAcademicBurnout", { skipHappinessPenalty: true, forceOverlay: true });
+            logEvent("Dual hustle overload: Severe Academic Burnout diagnosed.");
+        }
+
         function clampStat(num) {
             if (num < 0) return 0;
             if (num > 100) return 100;
@@ -1368,6 +1540,7 @@
         }
 
         function updateUI() {
+            syncCurrentEnrollment();
             syncFinancialAliases();
             state.health = clampStat(state.health);
             state.happiness = clampStat(state.happiness);
@@ -1423,6 +1596,9 @@
 
         function openModal(title, description, actions) {
             if (state.isExamModalOpen || state.isExamActive || state.isDiagnosisOverlayOpen) return;
+            if (higherEdCatalogRoot) {
+                higherEdCatalogRoot.render(null);
+            }
             modalTitle.textContent = title;
             modalDescription.innerHTML = description;
             modalActions.innerHTML = "";
@@ -1447,6 +1623,9 @@
 
         function closeModal() {
             modalOverlay.style.display = "none";
+            if (higherEdCatalogRoot) {
+                higherEdCatalogRoot.render(null);
+            }
         }
 
         function YearlyExamOverlay(props) {
@@ -1798,6 +1977,9 @@
         }
 
         function getRequiredExamPassesForProgram(program) {
+            if (program && program.pipeline && program.pipeline !== "undergrad") {
+                return Math.ceil(program.yearsRequired * 0.5);
+            }
             const byRatio = Math.ceil(program.yearsRequired * 0.75);
             if (program.yearsRequired >= 4) {
                 return Math.max(3, byRatio);
@@ -1805,8 +1987,44 @@
             return byRatio;
         }
 
+        function clearEnrollmentAfterDismissalOrQuit() {
+            state.currentlyPursuing = null;
+            state.yearsInSchool = 0;
+            state.examsPassedThisDegree = 0;
+            state.examsTakenThisDegree = 0;
+            state.isInSchool = false;
+            state.isEnrolled = false;
+            state.isExamModalOpen = false;
+            state.isExamActive = false;
+            state.currentExamQuestion = null;
+            syncCurrentEnrollment();
+        }
+
+        function handleAdvancedAcademicDismissal(program, requiredPasses) {
+            const passedCount = state.examsPassedThisDegree;
+            const debtLine = "You have finished your studies with " + formatMoney(state.existingDebt) + " in student debt.";
+            logEvent("Academic dismissal: failed to meet exam threshold for " + program.degreeName + ". No degree awarded; tuition debt remains.");
+            clearEnrollmentAfterDismissalOrQuit();
+            state._savedJobBeforeSchoolYear = null;
+            state.jobSearchBlocked = false;
+            openModal(
+                "Academic Dismissal",
+                "<strong>You did not pass at least 50% of the required exams for " + program.degreeName + ".</strong><br><br>" +
+                "You passed " + passedCount + "/" + program.yearsRequired + " exams (minimum required: " + requiredPasses + "). " +
+                "You are not awarded this degree. Accumulated program debt remains on your record.<br><br>" + debtLine,
+                [{ label: "Continue", handler: function () { closeModal(); updateUI(); } }]
+            );
+            updateUI();
+        }
+
         function handleAcademicDismissal(program, requiredPasses) {
             const passedCount = state.examsPassedThisDegree;
+
+            if (program && program.pipeline && program.pipeline !== "undergrad") {
+                handleAdvancedAcademicDismissal(program, requiredPasses);
+                return;
+            }
+
             applyDegreeEndDebt();
             state.degreeWrongAnswersThisEnrollment = 0;
             const debtLine = "You have finished your studies with " + formatMoney(state.existingDebt) + " in student debt.";
@@ -1817,6 +2035,8 @@
             state.examsPassedThisDegree = 0;
             state.examsTakenThisDegree = 0;
             state.isInSchool = true;
+            state.isEnrolled = true;
+            syncCurrentEnrollment();
 
             logEvent("Academic dismissal: you did not pass enough yearly exams for " + program.degreeName + ".");
             openModal(
@@ -1843,19 +2063,57 @@
             const program = state.currentlyPursuing ? EDUCATION_PROGRAMS[state.currentlyPursuing] : null;
             if (!program) return;
 
+            const savedJob = state._savedJobBeforeSchoolYear;
+
             state.age += 1;
-            state.annualIncome = 0;
-            state.salary = 0;
-            state.jobTitle = "Student";
-            state.isEmployed = false;
             state.yearsInSchool += 1;
+
+            if (program.pipeline === "residency") {
+                state.jobTitle = "Medical Resident";
+                state.annualIncome = typeof program.residencyStipend === "number" ? program.residencyStipend : 45000;
+                state.salary = state.annualIncome;
+                state.isEmployed = true;
+                state._savedJobBeforeSchoolYear = null;
+                const stipendNet = state.annualIncome * 0.75;
+                state.cash += stipendNet;
+                logEvent("Residency stipend (after tax): +" + formatMoney(stipendNet) + ".");
+            } else if (program.pipeline !== "undergrad" && savedJob && savedJob.isEmployed) {
+                state.jobTitle = savedJob.jobTitle;
+                state.annualIncome = savedJob.annualIncome;
+                state.salary = savedJob.salary;
+                state.isEmployed = true;
+                state._savedJobBeforeSchoolYear = null;
+                const netIncome = state.annualIncome * 0.75;
+                state.cash += netIncome;
+                logEvent("Dual hustle: work income while studying: +" + formatMoney(netIncome) + " after taxes.");
+            } else {
+                state.annualIncome = 0;
+                state.salary = 0;
+                state.jobTitle = "Student";
+                state.isEmployed = false;
+            }
+
+            if (state.isEmployed && state.isEnrolled && program.pipeline !== "residency") {
+                if (state.playerPath === "STEM") {
+                    state.happiness -= 35;
+                } else {
+                    state.happiness -= 20;
+                }
+            }
+
             state.smarts += 2;
             state.happiness -= 1;
             state.health -= 1;
 
+            applyAdvancedTuitionDebt(program);
+
+            maybeTriggerDualHustleBurnout();
+
             if (state.yearsInSchool >= 1) {
                 state.hudDebtSalaryUnlocked = true;
             }
+
+            syncCurrentEnrollment();
 
             logEvent(
                 "Age " + state.age + ": Final exam " + (answerWasCorrect ? "passed" : "failed") +
@@ -1960,6 +2218,11 @@
         }
 
         function quitJob() {
+            const prog = state.currentlyPursuing ? EDUCATION_PROGRAMS[state.currentlyPursuing] : null;
+            if (prog && prog.pipeline === "residency") {
+                logEvent("You cannot quit during Medical Residency.");
+                return;
+            }
             state.jobTitle = "Unemployed";
             state.annualIncome = 0;
             state.salary = 0;
@@ -2002,6 +2265,13 @@
         }
 
         function openJobBoard() {
+            const enrProg = state.currentlyPursuing ? EDUCATION_PROGRAMS[state.currentlyPursuing] : null;
+            if (enrProg && enrProg.pipeline === "residency") {
+                openModal("Find a Job", "You cannot take a standard job during Medical Residency.", [
+                    { label: "Close", handler: function () { closeModal(); } }
+                ]);
+                return;
+            }
             if (state.isEmployed) {
                 openModal("Find a Job", "You already have a job. Open Careers and use Quit Job if you want to apply elsewhere.", [
                     { label: "Close", handler: function () { closeModal(); } }
@@ -2078,6 +2348,10 @@
         function enrollInProgram(programKey) {
             const program = EDUCATION_PROGRAMS[programKey];
             if (!program) return;
+            if (!programPrerequisitesMet(program)) {
+                logEvent("Enrollment blocked: prerequisites not met for " + program.degreeName + ".");
+                return;
+            }
             state.currentlyPursuing = programKey;
             state.yearsInSchool = 0;
             state.examsPassedThisDegree = 0;
@@ -2087,14 +2361,38 @@
             state.isExamModalOpen = false;
             state.isExamActive = false;
             state.isInSchool = true;
-            state.jobSearchBlocked = true;
-            if (state.playerPath === "STEM") {
+            state.isEnrolled = true;
+            state.jobSearchBlocked = program.pipeline === "undergrad" || program.pipeline === "residency";
+            state._savedJobBeforeSchoolYear = null;
+
+            if (program.pipeline === "undergrad" && state.playerPath === "STEM") {
                 state.existingDebt += STEM_BASE_TUITION;
             }
-            state.annualIncome = 0;
-            state.salary = 0;
-            state.jobTitle = "Student";
-            state.isEmployed = false;
+
+            if (program.pipeline === "residency") {
+                state.jobTitle = "Medical Resident";
+                state.annualIncome = typeof program.residencyStipend === "number" ? program.residencyStipend : 45000;
+                state.salary = state.annualIncome;
+                state.isEmployed = true;
+            } else if (program.pipeline !== "undergrad" && state.isEmployed) {
+                state._savedJobBeforeSchoolYear = {
+                    jobTitle: state.jobTitle,
+                    annualIncome: state.annualIncome,
+                    salary: state.salary,
+                    isEmployed: true
+                };
+                state.jobTitle = "Student";
+                state.annualIncome = 0;
+                state.salary = 0;
+                state.isEmployed = false;
+            } else {
+                state.annualIncome = 0;
+                state.salary = 0;
+                state.jobTitle = "Student";
+                state.isEmployed = false;
+            }
+
+            syncCurrentEnrollment();
             logEvent("You enrolled in " + program.degreeName + ".");
             updateUI();
         }
@@ -2113,39 +2411,131 @@
             updateUI();
         }
 
-        function openHigherEducationMenu() {
-            if (state.playerPath === "Trades") return;
-            const actions = [];
-            if (state.playerPath === "STEM") {
-                actions.push({ label: "Master's Degree (2 years)", handler: function () { closeModal(); enrollInProgram("STEM_MASTERS"); } });
-                actions.push({ label: "Medical School / Doctorate (4 years)", handler: function () { closeModal(); enrollInProgram("STEM_MEDICAL"); } });
-            } else {
-                actions.push({ label: "Master's Degree (2 years)", handler: function () { closeModal(); enrollInProgram("HUMANITIES_MASTERS"); } });
-                actions.push({ label: "Law School (3 years)", handler: function () { closeModal(); enrollInProgram("HUMANITIES_LAW"); } });
+        function HigherEducationCatalog(props) {
+            const keys = HIGHER_ED_CATALOG_ORDER[state.playerPath] || [];
+            const enrolled = !!state.currentlyPursuing;
+            return (
+                <div className="higher-ed-catalog">
+                    {keys.map(function (key) {
+                        const prog = EDUCATION_PROGRAMS[key];
+                        if (!prog) return null;
+                        const met = programPrerequisitesMet(prog);
+                        const prereqText = getPrerequisiteLabel(prog) || "No prerequisites";
+                        const duration = prog.yearsRequired + " Years";
+                        const tuition = typeof prog.annualTuitionDebt === "number" && prog.annualTuitionDebt > 0
+                            ? formatMoney(prog.annualTuitionDebt) + "/yr"
+                            : prog.pipeline === "residency"
+                                ? "Stipend " + formatMoney(prog.residencyStipend || 45000) + "/yr (no tuition debt)"
+                                : "$0/yr";
+                        const canEnroll = met && !enrolled;
+                        return (
+                            <div key={key} className="higher-ed-card">
+                                <h4>{prog.degreeName}</h4>
+                                <p className="meta">Duration: {duration}</p>
+                                <p className="meta">Annual tuition (debt): {tuition}</p>
+                                <p className={"meta " + (met ? "prereq-met" : "prereq-miss")}>{prereqText}</p>
+                                <button
+                                    type="button"
+                                    className="higher-ed-enroll"
+                                    disabled={!canEnroll}
+                                    onClick={function () {
+                                        if (!canEnroll) return;
+                                        props.onEnroll(key);
+                                    }}
+                                >
+                                    Enroll
+                                </button>
+                            </div>
+                        );
+                    })}
+                </div>
+            );
+        }
+
+        function mountHigherEducationCatalog() {
+            if (!modalDescription) return;
+            if (!higherEdCatalogRoot) {
+                higherEdCatalogRoot = ReactDOM.createRoot(modalDescription);
             }
-            actions.push({ label: "Cancel", handler: function () { closeModal(); } });
-            openModal("Earn More Education", "Choose your next degree.", actions);
+            higherEdCatalogRoot.render(
+                <div>
+                    <p style={{ margin: "0 0 8px", color: "#d0d0d0", fontSize: "0.92rem", lineHeight: 1.4 }}>
+                        Programs for your path. Enroll is disabled while you are already in a program or if prerequisites are missing.
+                    </p>
+                    <HigherEducationCatalog
+                        onEnroll={function (key) {
+                            closeModal();
+                            enrollInProgram(key);
+                        }}
+                    />
+                </div>
+            );
+        }
+
+        function openHigherEducationCatalogModal() {
+            if (state.isExamModalOpen || state.isExamActive || state.isDiagnosisOverlayOpen) return;
+            if (state.playerPath === "Trades") return;
+            if (state.jobSearchBlocked) {
+                openModal("Higher Education", "Career applications and new enrollments are locked until you resolve academic dismissal.", [
+                    { label: "Close", handler: function () { closeModal(); } }
+                ]);
+                return;
+            }
+            if (higherEdCatalogRoot) {
+                higherEdCatalogRoot.render(null);
+            }
+            modalTitle.textContent = "Higher Education Catalog";
+            modalActions.innerHTML = "";
+            const closeBtn = document.createElement("button");
+            closeBtn.className = "modal-btn";
+            closeBtn.textContent = "Close";
+            closeBtn.addEventListener("click", function () {
+                closeModal();
+            });
+            modalActions.appendChild(closeBtn);
+            modalOverlay.style.display = "flex";
+            mountHigherEducationCatalog();
         }
 
         function completeProgram(programKey) {
             const program = EDUCATION_PROGRAMS[programKey];
             if (!program) return;
-            applyDegreeEndDebt();
+            const savedJob = state._savedJobBeforeSchoolYear;
+            if (program.pipeline === "undergrad" || !program.pipeline) {
+                applyDegreeEndDebt();
+            }
             state.degreeWrongAnswersThisEnrollment = 0;
             const debtLine = "You have finished your studies with " + formatMoney(state.existingDebt) + " in student debt.";
+
+            addDegreesToHistory(program);
+            program.credentials.forEach(addCredential);
 
             state.currentlyPursuing = null;
             state.yearsInSchool = 0;
             state.examsPassedThisDegree = 0;
             state.examsTakenThisDegree = 0;
             state.isInSchool = false;
+            state.isEnrolled = false;
             state.isExamActive = false;
             state.academicDismissed = false;
             state.jobSearchBlocked = false;
-            state.isEmployed = false;
+            state._savedJobBeforeSchoolYear = null;
             state.educationLevel = program.educationLevel;
-            program.credentials.forEach(addCredential);
+
+            if (program.pipeline === "residency") {
+                state.jobTitle = "Unemployed";
+                state.annualIncome = 0;
+                state.salary = 0;
+                state.isEmployed = false;
+            } else if (savedJob && savedJob.isEmployed) {
+                state.jobTitle = savedJob.jobTitle;
+                state.annualIncome = savedJob.annualIncome;
+                state.salary = savedJob.salary;
+                state.isEmployed = true;
+            }
+
             logEvent("Graduation: You earned " + program.degreeName + ".");
+            syncCurrentEnrollment();
 
             const actions = [
                 {
@@ -2165,29 +2555,41 @@
             ];
             if (state.playerPath !== "Trades") {
                 actions.push({
-                    label: "Earn More Education",
+                    label: "Higher Education Catalog",
                     handler: function () {
                         closeModal();
-                        openHigherEducationMenu();
+                        openHigherEducationCatalogModal();
                     }
                 });
             }
 
+            let gradBody = "After years of hard work, you have officially graduated with your " + program.degreeName + "!<br><br>" + debtLine;
+            if (programKey === "STEM_MEDICAL") {
+                gradBody += "<br><br><strong>Medical Residency</strong> now begins automatically (4 years, resident stipend, no outside employment).";
+                enrollInProgram("STEM_RESIDENCY");
+            }
+
             openModal(
                 "Congratulations! 🎉",
-                "After years of hard work, you have officially graduated with your " + program.degreeName + "!<br><br>" + debtLine,
+                gradBody,
                 actions
             );
             updateUI();
         }
 
         function openEducationTab() {
+            syncCurrentEnrollment();
             const program = state.currentlyPursuing ? EDUCATION_PROGRAMS[state.currentlyPursuing] : null;
             const progress = program
                 ? "Currently pursuing: " + program.degreeName + " (" + state.yearsInSchool + "/" + program.yearsRequired + " years)"
                 : "You are not currently enrolled in school.";
             const examProgress = program
                 ? "Exam passes: " + state.examsPassedThisDegree + "/" + state.examsTakenThisDegree + "."
+                : "";
+            const enrollLine = state.currentEnrollment
+                ? "<br><strong>Current enrollment:</strong> " + state.currentEnrollment.degreeName +
+                    " — " + state.currentEnrollment.yearsLeft + " year(s) left, " +
+                    formatMoney(state.currentEnrollment.annualCost) + "/yr tuition debt."
                 : "";
 
             const actions = [
@@ -2206,9 +2608,19 @@
                 }
             ];
 
+            if (state.playerPath && state.playerPath !== "Trades") {
+                actions.splice(1, 0, {
+                    label: "Higher Education Catalog",
+                    handler: function () {
+                        closeModal();
+                        openHigherEducationCatalogModal();
+                    }
+                });
+            }
+
             openModal(
                 "Education",
-                "Path: " + state.playerPath + " | Education Level: " + state.educationLevel + ". " + progress + " " + examProgress,
+                "Path: " + state.playerPath + " | Education Level: " + state.educationLevel + ". " + progress + " " + examProgress + enrollLine,
                 actions
             );
         }
