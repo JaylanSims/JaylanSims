@@ -3168,13 +3168,7 @@
         }
 
         function getHireChance() {
-            if (state.playerPath === "Trades") {
-                return 0.75 + Math.random() * 0.15;
-            }
-            if (state.playerPath === "STEM") {
-                return 0.50 + Math.random() * 0.20;
-            }
-            return 0.15 + Math.random() * 0.15;
+            return getHireChanceForPath(state.playerPath);
         }
 
         function quitJob() {
@@ -3844,28 +3838,15 @@
         }
 
         function getGlobalHousingMarketShiftForYear() {
-            let shift = 0;
-            let eventType = "stable";
-            if (Math.random() < 0.05) {
-                if (Math.random() < 0.5) {
-                    shift = -0.20;
-                    eventType = "crash";
-                    logEvent("Housing Market Crash: real estate values dropped by 20% this year.");
-                } else {
-                    shift = 0.20;
-                    eventType = "boom";
-                    logEvent("Housing Boom: real estate values jumped by 20% this year.");
-                }
-            }
-            state.currentHousingMarketShift = shift;
-            state.currentHousingMarketEvent = eventType;
+            state.currentHousingMarketShift = 0;
+            state.currentHousingMarketEvent = "stable";
         }
 
         function applyHousingMarketForYear() {
             getGlobalHousingMarketShiftForYear();
 
             state.ownedAssets.forEach(function (property) {
-                const marketFluctuation = Math.random() * 0.12 - 0.05;
+                const marketFluctuation = Math.random() * 0.10 - 0.05;
                 const totalShift = marketFluctuation + state.currentHousingMarketShift;
                 property.currentValue = Math.max(10000, Math.round(property.currentValue * (1 + totalShift)));
                 property.lastMarketFluctuation = totalShift;
