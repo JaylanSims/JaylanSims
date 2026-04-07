@@ -82,21 +82,31 @@
         }
 
         #intro-open-brand {
-            max-width: 340px;
-            width: 88%;
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
             margin: 0 auto;
             animation: slideAndFade 4s ease-in-out forwards;
         }
 
-        #intro-open-brand .intro-open-title {
-            margin: 0;
-            font-family: "Playfair Display", Georgia, "Times New Roman", serif;
-            font-size: clamp(1.75rem, 6vw, 2.35rem);
-            font-weight: 700;
-            line-height: 1.15;
-            color: #ffffff;
-            text-align: center;
-            letter-spacing: 0.04em;
+        #intro-logo-canvas {
+            display: block;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+            -ms-interpolation-mode: nearest-neighbor;
+        }
+
+        #intro-logo-source {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 1px;
+            height: 1px;
+            opacity: 0;
+            pointer-events: none;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
         }
 
         #intro-advisor-panel {
@@ -2076,7 +2086,8 @@
     <div id="app-container">
         <div id="intro-screen">
             <div id="intro-open-brand" aria-hidden="false">
-                <p class="intro-open-title">MARGINS OF ERROR</p>
+                <canvas id="intro-logo-canvas" aria-label="JS Games"></canvas>
+                <img id="intro-logo-source" src="/images/js-games-logo.png" alt="" decoding="async" />
             </div>
             <div id="intro-advisor-panel" aria-live="polite">
                 <h2>Career Advisor</h2>
@@ -2357,6 +2368,60 @@
         const setupScreen = document.getElementById("setup-screen");
         const introScreen = document.getElementById("intro-screen");
         const introOpenBrand = document.getElementById("intro-open-brand");
+        const introLogoCanvas = document.getElementById("intro-logo-canvas");
+        const introLogoSource = document.getElementById("intro-logo-source");
+        var INTRO_LOGO_PATH = "/images/js-games-logo.png";
+
+        function renderIntroLogoCanvas() {
+            if (!introLogoCanvas || !introLogoSource) return;
+            var img = introLogoSource;
+            var nw = img.naturalWidth;
+            var nh = img.naturalHeight;
+            if (!nw || !nh) return;
+            var maxCssW = Math.min(340, Math.floor(window.innerWidth * 0.88));
+            var maxCssH = Math.floor(window.innerHeight * 0.55);
+            var scaleW = Math.floor(maxCssW / nw);
+            var scaleH = Math.floor(maxCssH / nh);
+            var k = Math.min(scaleW, scaleH);
+            if (k < 1) k = 1;
+            var cssW = nw * k;
+            var cssH = nh * k;
+            var br = Math.max(1, Math.floor(window.devicePixelRatio || 1));
+            introLogoCanvas.width = cssW * br;
+            introLogoCanvas.height = cssH * br;
+            introLogoCanvas.style.width = cssW + "px";
+            introLogoCanvas.style.height = cssH + "px";
+            var ctx = introLogoCanvas.getContext("2d");
+            if (!ctx) return;
+            ctx.imageSmoothingEnabled = false;
+            if ("mozImageSmoothingEnabled" in ctx) ctx.mozImageSmoothingEnabled = false;
+            if ("webkitImageSmoothingEnabled" in ctx) ctx.webkitImageSmoothingEnabled = false;
+            if ("msImageSmoothingEnabled" in ctx) ctx.msImageSmoothingEnabled = false;
+            ctx.setTransform(br, 0, 0, br, 0, 0);
+            ctx.clearRect(0, 0, cssW, cssH);
+            ctx.drawImage(img, 0, 0, nw, nh, 0, 0, cssW, cssH);
+        }
+
+        function initIntroLogoFromFile() {
+            if (!introLogoSource || !introLogoCanvas) return;
+            introLogoSource.src = INTRO_LOGO_PATH;
+            function onReady() {
+                renderIntroLogoCanvas();
+            }
+            if (introLogoSource.complete && introLogoSource.naturalWidth > 0) {
+                onReady();
+            } else {
+                introLogoSource.onload = onReady;
+                introLogoSource.onerror = function () {
+                    console.warn("Intro logo failed to load:", INTRO_LOGO_PATH);
+                };
+            }
+            window.addEventListener("resize", function () {
+                if (!introOpenBrand || introOpenBrand.style.display === "none") return;
+                if (introLogoSource.naturalWidth > 0) renderIntroLogoCanvas();
+            });
+        }
+        initIntroLogoFromFile();
         const introAdvisorPanel = document.getElementById("intro-advisor-panel");
         const introChooseWiselyBtn = document.getElementById("intro-choose-wisely-btn");
         const gameUI = document.getElementById("game-ui");
