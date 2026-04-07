@@ -1788,6 +1788,72 @@
             font-weight: 700;
             cursor: pointer;
         }
+
+        @keyframes stress-heartbeat-vignette {
+            0%,
+            100% {
+                box-shadow: inset 0 0 0 0 rgba(183, 28, 28, 0);
+            }
+            50% {
+                box-shadow: inset 0 0 45px 12px rgba(183, 28, 28, 0.35);
+            }
+        }
+
+        #game-ui.stress-critical-pulse {
+            animation: stress-heartbeat-vignette 1.1s ease-in-out infinite;
+        }
+
+        #heart-attack-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 10018;
+            background: radial-gradient(ellipse at center, rgba(80, 0, 0, 0.92) 0%, rgba(10, 0, 0, 0.98) 70%);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: #fff;
+            padding: 24px;
+            box-sizing: border-box;
+        }
+
+        .heart-attack-card {
+            max-width: 520px;
+            width: 100%;
+            background: rgba(30, 0, 0, 0.9);
+            border: 2px solid #e53935;
+            border-radius: 16px;
+            padding: 26px 22px;
+            text-align: center;
+            box-shadow: 0 0 40px rgba(229, 57, 53, 0.4);
+        }
+
+        .heart-attack-card h2 {
+            margin: 0 0 16px;
+            color: #ff8a80;
+            font-size: 1.25rem;
+        }
+
+        .heart-attack-card p {
+            margin: 0 0 20px;
+            line-height: 1.55;
+            color: #ffcdd2;
+            font-size: 0.95rem;
+        }
+
+        .heart-attack-ack-btn {
+            width: 100%;
+            padding: 14px;
+            border-radius: 12px;
+            border: 1px solid #ef5350;
+            background: linear-gradient(180deg, #c62828, #5c0000);
+            color: #fff;
+            font-weight: 700;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
@@ -1805,6 +1871,7 @@
     <div id="mortgage-paid-overlay-root"></div>
     <div id="foreclosure-overlay-root"></div>
     <div id="divorce-overlay-root"></div>
+    <div id="heart-attack-overlay-root"></div>
     <div id="eviction-overlay-root"></div>
     <div id="app-container">
         <div id="intro-screen">
@@ -1982,6 +2049,12 @@
             preventAutoRemarry: false,
             isDivorceOverlayOpen: false,
             _postDivorceResume: null,
+            stressLevel: 0,
+            chronicHighStressYears: 0,
+            _stressHappinessMultiplier: 1,
+            isHeartAttackOverlayOpen: false,
+            _postHeartAttackResume: null,
+            _heartAttackOutcomeDeath: false,
             housingStatus: "Renting",
             mortgageBalance: 0,
             annualMortgagePayment: 0,
@@ -2075,6 +2148,8 @@
         let foreclosureOverlayReactRoot = null;
         const divorceOverlayMount = document.getElementById("divorce-overlay-root");
         let divorceOverlayReactRoot = null;
+        const heartAttackOverlayMount = document.getElementById("heart-attack-overlay-root");
+        let heartAttackOverlayReactRoot = null;
         const evictionOverlayMount = document.getElementById("eviction-overlay-root");
         let evictionOverlayReactRoot = null;
         let higherEdCatalogRoot = null;
@@ -2096,6 +2171,7 @@
         const alignmentDashboard = document.getElementById("alignment-dashboard");
 
         const healthFill = document.getElementById("health-fill");
+        const gameUiEl = document.getElementById("game-ui");
         const happinessFill = document.getElementById("happiness-fill");
         const smartsFill = document.getElementById("smarts-fill");
 
@@ -2152,7 +2228,7 @@
                         outcome: "Cash +$50,000 and Happiness -20.",
                         effect: function () {
                             state.cash += 50000;
-                            state.happiness -= 20;
+                            loseHappiness(20);
                         }
                     },
                     {
@@ -2766,6 +2842,10 @@
                 name: "Heart Disease", cureCost: 85000, curable: false, annualHealthDrain: 15,
                 deathMessage: "You suffered a massive, fatal heart attack due to your advanced Heart Disease."
             },
+            hypertension: {
+                name: "Hypertension", cureCost: 0, curable: false, uncuredByDoctor: true, annualHealthDrain: 10,
+                deathMessage: "Uncontrolled hypertension led to a catastrophic cardiovascular event."
+            },
             ebola: {
                 name: "Ebola", cureCost: 250000, curable: true, annualHealthDrain: 90,
                 deathMessage: "Your body was rapidly and violently overwhelmed by the hemorrhagic Ebola virus."
@@ -3272,12 +3352,12 @@
             var jt = state.jobTitle;
             if (jt === "Student" || jt === "Unemployed" || jt === "Medical Resident") return;
             if (state.jobType === "OddJob") {
-                state.happiness -= 10;
+                loseHappiness(10);
             } else if (state.jobType === "Career") {
                 if (state.playerPath === "STEM") {
-                    state.happiness -= 35;
+                    loseHappiness(35);
                 } else {
-                    state.happiness -= 20;
+                    loseHappiness(20);
                 }
             }
         }
@@ -3286,6 +3366,169 @@
             if (num < 0) return 0;
             if (num > 100) return 100;
             return num;
+        }
+
+        function computeStressLevel() {
+            var s = 0;
+            var al = getAlignment();
+            if (al === "Selling Out") s += 40;
+            if (al === "True Calling") s -= 20;
+            if (state.jobType === "Career" && state.isEmployed === true) {
+                var effTier = getEffectiveJobTierForTimeDrain();
+                if (effTier === 1) s += 20;
+            }
+            syncFinancialAliases();
+            if (state.cash < 0) s += 10;
+            if (s < 0) s = 0;
+            if (s > 100) s = 100;
+            return s;
+        }
+
+        function refreshStressHappinessMultiplier() {
+            state.stressLevel = computeStressLevel();
+            state._stressHappinessMultiplier = state.stressLevel > 70 ? 2 : 1;
+        }
+
+        function loseHappiness(amount) {
+            var n = Math.max(0, Number(amount) || 0);
+            if (n <= 0) return;
+            var mult = typeof state._stressHappinessMultiplier === "number" ? state._stressHappinessMultiplier : 1;
+            state.happiness -= Math.round(n * mult);
+        }
+
+        function applyHeartAttackSurvivalRecovery() {
+            var prevGross = state.isEmployed ? state.annualIncome || 0 : 0;
+            state._breakdownPrevAnnualGross = prevGross;
+            state.disabilityIncome = state.isEmployed ? Math.round(prevGross * 0.3) : 0;
+            state.isEmployed = false;
+            state.jobTitle = "Medical Leave (Disability)";
+            state.annualIncome = state.disabilityIncome;
+            state.salary = state.disabilityIncome;
+            state.jobType = "None";
+            state.oddJobBaseSalary = null;
+            state.yearsAtCurrentJob = 0;
+            state.currentJobLevel = 1;
+            state.pendingPromotion = null;
+            state.isPromotionOverlayOpen = false;
+            if (promotionOverlayReactRoot) promotionOverlayReactRoot.render(null);
+            resetPerformanceReviewTracking();
+            resetCareerPerformanceScore();
+            state.medicalLeaveYearsRemaining = 5;
+            state.health = 5;
+            logEvent(
+                "Heart attack survival: intensive care and recovery. Mandatory medical leave for 5 years. Disability pay " +
+                    formatMoney(state.disabilityIncome) +
+                    "/yr."
+            );
+            syncFinancialAliases();
+            state.health = clampStat(state.health);
+        }
+
+        function maybeInterceptHeartAttackStress(resumeFn) {
+            refreshStressHappinessMultiplier();
+            if (state.stressLevel <= 85) return false;
+            var chance = 0.05 + (state.chronicHighStressYears || 0) * 0.03;
+            if (Math.random() >= chance) return false;
+            state._postHeartAttackResume = resumeFn;
+            state._heartAttackOutcomeDeath = Math.random() < 0.9;
+            state.isHeartAttackOverlayOpen = true;
+            renderHeartAttackOverlay();
+            return true;
+        }
+
+        function walkStressBiologyAfterIncome(resumeFn) {
+            refreshStressHappinessMultiplier();
+            if (state.stressLevel > 80) {
+                state.chronicHighStressYears = (state.chronicHighStressYears || 0) + 1;
+                state.health -= 15;
+                logEvent("Chronic high stress: -15 Health this year.");
+                if (state.chronicHighStressYears >= 5 && !state.currentIllnesses.includes("hypertension")) {
+                    diagnoseIllness("hypertension", { skipHappinessPenalty: true, forceOverlay: false, skipDiagnosisOverlay: true });
+                    logEvent("Years of sustained stress: diagnosed with Hypertension (permanent -10 Health/yr, cannot be cured).");
+                }
+            } else {
+                state.chronicHighStressYears = 0;
+            }
+            state.health = clampStat(state.health);
+            if (state.health <= 0) {
+                onPlayerDeath(GENERIC_HEALTH_DEATH_MESSAGE);
+                yearlyResetMentalSuppression();
+                return;
+            }
+            if (state.stressLevel > 80) {
+                showPurchaseToastMessage(
+                    "Your chest feels tight and you're struggling to breathe. The stress is taking a serious toll on your body."
+                );
+            }
+            if (maybeInterceptHeartAttackStress(resumeFn)) {
+                return;
+            }
+            if (typeof resumeFn === "function") {
+                resumeFn();
+            }
+        }
+
+        function HeartAttackOverlay(props) {
+            var fatal = props.fatalOutcome === true;
+            return (
+                <div id="heart-attack-overlay" role="dialog" aria-modal="true" aria-label="Medical emergency">
+                    <div className="heart-attack-card">
+                        <h2>HEART ATTACK 💔</h2>
+                        <p>
+                            {fatal
+                                ? "Your heart seized. Emergency services could not save you in time."
+                                : "You collapsed at work. Paramedics revived you, but the damage is catastrophic — years of recovery lie ahead."}
+                        </p>
+                        <button type="button" className="heart-attack-ack-btn" onClick={props.onAcknowledge}>
+                            {fatal ? "Accept fate" : "Face the aftermath"}
+                        </button>
+                    </div>
+                </div>
+            );
+        }
+
+        function renderHeartAttackOverlay() {
+            if (!heartAttackOverlayMount) return;
+            if (!state.isHeartAttackOverlayOpen) {
+                if (heartAttackOverlayReactRoot) heartAttackOverlayReactRoot.render(null);
+                return;
+            }
+            if (!heartAttackOverlayReactRoot) {
+                heartAttackOverlayReactRoot = ReactDOM.createRoot(heartAttackOverlayMount);
+            }
+            heartAttackOverlayReactRoot.render(
+                <HeartAttackOverlay fatalOutcome={state._heartAttackOutcomeDeath === true} onAcknowledge={handleHeartAttackAcknowledge} />
+            );
+        }
+
+        function closeHeartAttackOverlay() {
+            state.isHeartAttackOverlayOpen = false;
+            if (heartAttackOverlayReactRoot) {
+                heartAttackOverlayReactRoot.render(null);
+            }
+        }
+
+        function handleHeartAttackAcknowledge() {
+            var fn = state._postHeartAttackResume;
+            state._postHeartAttackResume = null;
+            var fatal = state._heartAttackOutcomeDeath === true;
+            closeHeartAttackOverlay();
+            if (fatal) {
+                onPlayerDeath("Stress-Induced Myocardial Infarction");
+                yearlyResetMentalSuppression();
+                updateUI();
+                return;
+            }
+            syncFinancialAliases();
+            var bal = state.cash || 0;
+            state.cash = Math.round(bal * 0.2);
+            logEvent("Heart attack: medical bills consumed 80% of your liquid savings.");
+            syncFinancialAliases();
+            applyHeartAttackSurvivalRecovery();
+            if (typeof fn === "function") {
+                fn();
+            }
+            updateUI();
         }
 
         function calculateTaxes(grossIncome) {
@@ -3549,7 +3792,7 @@
                 state.roommate = null;
                 logEvent("Foreclosure: property seized; no studio listing available — you have no lease.");
             }
-            state.happiness -= 50;
+            loseHappiness(50);
             state.happiness = clampStat(state.happiness);
             syncFinancialAliases();
             closeForeclosureOverlay();
@@ -3747,6 +3990,7 @@
             syncCurrentEnrollment();
             evictDormIfNotEnrolled(true);
             syncFinancialAliases();
+            refreshStressHappinessMultiplier();
             state.health = clampStat(state.health);
             state.happiness = clampStat(state.happiness);
             state.smarts = clampStat(state.smarts);
@@ -3790,6 +4034,14 @@
             healthFill.style.width = state.health + "%";
             happinessFill.style.width = state.happiness + "%";
             smartsFill.style.width = state.smarts + "%";
+
+            if (gameUiEl) {
+                if (!state.isDead && state.stressLevel > 80) {
+                    gameUiEl.classList.add("stress-critical-pulse");
+                } else {
+                    gameUiEl.classList.remove("stress-critical-pulse");
+                }
+            }
 
             eventLog.scrollTop = eventLog.scrollHeight;
         }
@@ -3843,7 +4095,7 @@
 
         function openModal(title, description, actions, options) {
             options = options || {};
-            if (state.isExamModalOpen || state.isExamActive || state.isDiagnosisOverlayOpen || state.isPromotionOverlayOpen || state.isPerformanceReviewOverlayOpen || state.isCareerExamOpen || state.isFiredOverlayOpen || state.isRetirementOverlayOpen || state.isDateTriviaOpen || state.isCopingOverlayOpen || state.isNervousBreakdownOverlayOpen || state.isLayoffOverlayOpen || state.isInflationOverlayOpen || state.isMortgagePaidOverlayOpen || state.isForeclosureOverlayOpen || state.isDivorceOverlayOpen || state.isEvictionOverlayOpen) return;
+            if (state.isExamModalOpen || state.isExamActive || state.isDiagnosisOverlayOpen || state.isPromotionOverlayOpen || state.isPerformanceReviewOverlayOpen || state.isCareerExamOpen || state.isFiredOverlayOpen || state.isRetirementOverlayOpen || state.isDateTriviaOpen || state.isCopingOverlayOpen || state.isNervousBreakdownOverlayOpen || state.isLayoffOverlayOpen || state.isInflationOverlayOpen || state.isMortgagePaidOverlayOpen || state.isForeclosureOverlayOpen || state.isDivorceOverlayOpen || state.isHeartAttackOverlayOpen || state.isEvictionOverlayOpen) return;
             if (higherEdCatalogRoot) {
                 higherEdCatalogRoot.render(null);
             }
@@ -4096,7 +4348,7 @@
             if (promotionOverlayReactRoot) promotionOverlayReactRoot.render(null);
             resetPerformanceReviewTracking();
             resetCareerPerformanceScore();
-            state.happiness -= 15;
+            loseHappiness(15);
             logEvent("Humanities sector layoff: position eliminated. Happiness -15 (not counted as a firing).");
             syncFinancialAliases();
             state.happiness = clampStat(state.happiness);
@@ -4399,7 +4651,7 @@
             state.pendingPromotion = null;
             state.isPromotionOverlayOpen = false;
             if (promotionOverlayReactRoot) promotionOverlayReactRoot.render(null);
-            state.happiness -= 20;
+            loseHappiness(20);
             state.timesFired = (state.timesFired || 0) + 1;
             resetCareerPerformanceScore();
             resetPerformanceReviewTracking();
@@ -4513,7 +4765,7 @@
             } else if (avg >= 20) {
                 state.annualIncome = Math.round(state.annualIncome * 0.85);
                 state.salary = state.annualIncome;
-                state.happiness -= 10;
+                loseHappiness(10);
                 logEvent("Performance review: poor rating — pay docked (-15% salary), -10 Happiness.");
             } else {
                 state.jobTitle = "Unemployed";
@@ -4529,7 +4781,7 @@
                 if (promotionOverlayReactRoot) {
                     promotionOverlayReactRoot.render(null);
                 }
-                state.happiness -= 20;
+                loseHappiness(20);
                 state.timesFired = (state.timesFired || 0) + 1;
                 resetCareerPerformanceScore();
                 logEvent("Performance review: terminated — fired for low morale, -20 Happiness.");
@@ -4561,7 +4813,7 @@
             if (!p.fastTrack) {
                 resetCareerPerformanceScore();
             }
-            state.happiness -= 15;
+            loseHappiness(15);
             logEvent("You accepted a promotion to " + p.newTitle + " with a salary of " + formatMoney(p.newSalary) + ". Stress from the role reduced Happiness by 15.");
             closePromotionOverlay();
             runAgeUpWorkYearAfterPromotion();
@@ -4734,7 +4986,7 @@
             syncFinancialAliases();
             state.cash -= state.annualExpenses;
             state.health -= 1;
-            state.happiness -= 1;
+            loseHappiness(1);
             var gross;
             if (state.isRetired) {
                 gross = state.pensionIncome || 0;
@@ -4749,6 +5001,7 @@
             state.cash += netIncome;
             state.salary = gross;
             syncFinancialAliases();
+            refreshStressHappinessMultiplier();
             if (gross > 0) {
                 if (state.isRetired) {
                     logEvent(
@@ -4770,8 +5023,10 @@
                 state.yearsAtCurrentJob += 1;
             }
             tickMedicalLeaveCountdown();
-            continueAfterIncomeAndHousing(function () {
-                finishWorkYearCareerPhase();
+            walkStressBiologyAfterIncome(function () {
+                continueAfterIncomeAndHousing(function () {
+                    finishWorkYearCareerPhase();
+                });
             });
         }
 
@@ -4872,7 +5127,7 @@
 
         function continueAgeUpAfterRoommateEviction() {
             state.roommate = null;
-            state.happiness -= 20;
+            loseHappiness(20);
             logEvent("Roommate conflict: your roommate ended the arrangement. Happiness -20; you now pay full rent.");
             function resumeAfterEviction() {
                 state.age += 1;
@@ -5157,7 +5412,7 @@
             if (config.setHappinessZero) {
                 state.happiness = 0;
             } else if (!config.skipHappinessPenalty && !alreadyHasIllness) {
-                state.happiness -= HAPPINESS_PENALTY_ON_DIAGNOSIS;
+                loseHappiness(HAPPINESS_PENALTY_ON_DIAGNOSIS);
             }
 
             if (disease.oneTimeHealthHit && !alreadyHasIllness) {
@@ -5172,7 +5427,7 @@
                 return true;
             }
 
-            if (!alreadyHasIllness || config.forceOverlay) {
+            if ((!alreadyHasIllness || config.forceOverlay) && !config.skipDiagnosisOverlay) {
                 openDiagnosisOverlayForIllness(illnessKey);
             }
             return true;
@@ -5263,7 +5518,7 @@
                     ? Math.round(baseDrain * MENTAL_HEALTH_SUPPRESSION_FACTOR)
                     : baseDrain;
 
-                state.happiness -= appliedDrain;
+                loseHappiness(appliedDrain);
                 logEvent(disease.name + " mental strain: -" + appliedDrain + " Happiness this year" + (mentalState.isSuppressed ? " (suppressed)." : "."));
                 if (!mentalState.isSuppressed && state.happiness <= 0) {
                     hadUnsuppressedAtZero = true;
@@ -5470,7 +5725,7 @@
             updateUI();
         }
 
-        function schoolYearAfterIncomeAndCosts() {
+        function schoolYearAfterIncomeAndCostsCore() {
             const program = state.currentlyPursuing ? EDUCATION_PROGRAMS[state.currentlyPursuing] : null;
             if (!program) return;
 
@@ -5516,12 +5771,14 @@
                 state.oddJobBaseSalary = null;
             }
 
+            refreshStressHappinessMultiplier();
+
             if (program.pipeline !== "residency") {
                 applyDualHustleStressForYear();
             }
 
             state.smarts += 2;
-            state.happiness -= 1;
+            loseHappiness(1);
             state.health -= 1;
 
             applyAdvancedTuitionDebt(program);
@@ -5585,9 +5842,11 @@
             function resumeSchoolYear() {
                 state.age += 1;
                 state.yearsInSchool += 1;
-                schoolYearAfterIncomeAndCosts();
-                continueAfterIncomeAndHousing(function () {
-                    schoolYearAfterGraduationOrRetirement();
+                schoolYearAfterIncomeAndCostsCore();
+                walkStressBiologyAfterIncome(function () {
+                    continueAfterIncomeAndHousing(function () {
+                        schoolYearAfterGraduationOrRetirement();
+                    });
                 });
             }
 
@@ -6522,7 +6781,12 @@
         function applyProceduralEffects(effects) {
             state.cash += effects.cash || 0;
             state.health += effects.health || 0;
-            state.happiness += effects.happiness || 0;
+            var h = effects.happiness || 0;
+            if (h < 0) {
+                loseHappiness(-h);
+            } else if (h > 0) {
+                state.happiness += h;
+            }
 
             if (effects.death === true || state.health <= 0) {
                 state.health = 0;
@@ -6941,7 +7205,7 @@
                     state.health -= healthDrain;
                 }
                 if (disease.annualHappinessDrain && !isMentalIllness(key)) {
-                    state.happiness -= disease.annualHappinessDrain;
+                    loseHappiness(disease.annualHappinessDrain);
                 }
                 if (disease.annualSmartsDrain) {
                     state.smarts -= disease.annualSmartsDrain;
@@ -7022,6 +7286,13 @@
                             return;
                         }
 
+                        if (disease.uncuredByDoctor) {
+                            logEvent(disease.name + " is a chronic condition managed with lifestyle — it cannot be removed by a single doctor visit.");
+                            closeModal();
+                            updateUI();
+                            return;
+                        }
+
                         if (state.cash < disease.cureCost) {
                             logEvent("You couldn't afford treatment for " + disease.name + ".");
                             closeModal();
@@ -7064,7 +7335,7 @@
                         applyActionWithRefresh("You worked overtime. Salary rose, but your health and happiness dropped.", function () {
                             state.salary *= 1.10;
                             state.health -= 10;
-                            state.happiness -= 15;
+                            loseHappiness(15);
                         });
                     }
                 },
@@ -7076,7 +7347,7 @@
                                 state.salary *= 1.15;
                                 logEvent("Your raise request succeeded.");
                             } else {
-                                state.happiness -= 10;
+                                loseHappiness(10);
                                 logEvent("Your raise request was denied.");
                             }
                         });
@@ -7123,7 +7394,11 @@
                 state.health += effects.health;
             }
             if (effects && typeof effects.happiness === "number") {
-                state.happiness += effects.happiness;
+                if (effects.happiness < 0) {
+                    loseHappiness(-effects.happiness);
+                } else if (effects.happiness > 0) {
+                    state.happiness += effects.happiness;
+                }
             }
             if (effects && typeof effects.smarts === "number") {
                 state.smarts += effects.smarts;
@@ -7662,7 +7937,7 @@
                     state.cash -= 1000;
                     state.salary *= 1.05;
                     state.annualIncome = state.salary;
-                    state.happiness -= 4;
+                    loseHappiness(4);
                     logEvent("Networking event: salary +5%, Happiness -4.");
                     state.happiness = clampStat(state.happiness);
                     syncFinancialAliases();
@@ -7742,6 +8017,7 @@
             closeMortgagePaidOverlay();
             closeForeclosureOverlay();
             closeDivorceOverlay();
+            closeHeartAttackOverlay();
             closeEvictionOverlay();
             closeDiagnosisOverlay();
             gameUI.style.display = "none";
@@ -7854,7 +8130,7 @@
         }
 
         function ageUp() {
-            if (state.isDead || !state.playerPath || state.isExamModalOpen || state.isExamActive || state.isDiagnosisOverlayOpen || state.isPromotionOverlayOpen || state.isPerformanceReviewOverlayOpen || state.isCareerExamOpen || state.isFiredOverlayOpen || state.isRetirementOverlayOpen || state.isDateTriviaOpen || state.isCopingOverlayOpen || state.isNervousBreakdownOverlayOpen || state.isLayoffOverlayOpen || state.isInflationOverlayOpen || state.isMortgagePaidOverlayOpen || state.isForeclosureOverlayOpen || state.isDivorceOverlayOpen || state.isEvictionOverlayOpen) return;
+            if (state.isDead || !state.playerPath || state.isExamModalOpen || state.isExamActive || state.isDiagnosisOverlayOpen || state.isPromotionOverlayOpen || state.isPerformanceReviewOverlayOpen || state.isCareerExamOpen || state.isFiredOverlayOpen || state.isRetirementOverlayOpen || state.isDateTriviaOpen || state.isCopingOverlayOpen || state.isNervousBreakdownOverlayOpen || state.isLayoffOverlayOpen || state.isInflationOverlayOpen || state.isMortgagePaidOverlayOpen || state.isForeclosureOverlayOpen || state.isDivorceOverlayOpen || state.isHeartAttackOverlayOpen || state.isEvictionOverlayOpen) return;
 
             if (state.isInSchool && state.currentlyPursuing) {
                 openYearlyExamOverlay();
@@ -7932,19 +8208,19 @@
 
         document.getElementById("age-up-btn").addEventListener("click", ageUp);
         document.getElementById("education-nav-btn").addEventListener("click", function () {
-            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isPerformanceReviewOverlayOpen && !state.isCareerExamOpen && !state.isFiredOverlayOpen && !state.isRetirementOverlayOpen && !state.isDateTriviaOpen && !state.isCopingOverlayOpen && !state.isNervousBreakdownOverlayOpen && !state.isLayoffOverlayOpen && !state.isInflationOverlayOpen && !state.isMortgagePaidOverlayOpen && !state.isForeclosureOverlayOpen && !state.isDivorceOverlayOpen && !state.isEvictionOverlayOpen) openEducationTab();
+            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isPerformanceReviewOverlayOpen && !state.isCareerExamOpen && !state.isFiredOverlayOpen && !state.isRetirementOverlayOpen && !state.isDateTriviaOpen && !state.isCopingOverlayOpen && !state.isNervousBreakdownOverlayOpen && !state.isLayoffOverlayOpen && !state.isInflationOverlayOpen && !state.isMortgagePaidOverlayOpen && !state.isForeclosureOverlayOpen && !state.isDivorceOverlayOpen && !state.isHeartAttackOverlayOpen && !state.isEvictionOverlayOpen) openEducationTab();
         });
         document.getElementById("careers-nav-btn").addEventListener("click", function () {
-            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isPerformanceReviewOverlayOpen && !state.isCareerExamOpen && !state.isFiredOverlayOpen && !state.isRetirementOverlayOpen && !state.isDateTriviaOpen && !state.isCopingOverlayOpen && !state.isNervousBreakdownOverlayOpen && !state.isLayoffOverlayOpen && !state.isInflationOverlayOpen && !state.isMortgagePaidOverlayOpen && !state.isForeclosureOverlayOpen && !state.isDivorceOverlayOpen && !state.isEvictionOverlayOpen) openCareersTab();
+            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isPerformanceReviewOverlayOpen && !state.isCareerExamOpen && !state.isFiredOverlayOpen && !state.isRetirementOverlayOpen && !state.isDateTriviaOpen && !state.isCopingOverlayOpen && !state.isNervousBreakdownOverlayOpen && !state.isLayoffOverlayOpen && !state.isInflationOverlayOpen && !state.isMortgagePaidOverlayOpen && !state.isForeclosureOverlayOpen && !state.isDivorceOverlayOpen && !state.isHeartAttackOverlayOpen && !state.isEvictionOverlayOpen) openCareersTab();
         });
         document.getElementById("relationships-nav-btn").addEventListener("click", function () {
-            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isPerformanceReviewOverlayOpen && !state.isCareerExamOpen && !state.isFiredOverlayOpen && !state.isRetirementOverlayOpen && !state.isDateTriviaOpen && !state.isCopingOverlayOpen && !state.isNervousBreakdownOverlayOpen && !state.isLayoffOverlayOpen && !state.isInflationOverlayOpen && !state.isMortgagePaidOverlayOpen && !state.isForeclosureOverlayOpen && !state.isDivorceOverlayOpen && !state.isEvictionOverlayOpen) openRelationshipsMenu();
+            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isPerformanceReviewOverlayOpen && !state.isCareerExamOpen && !state.isFiredOverlayOpen && !state.isRetirementOverlayOpen && !state.isDateTriviaOpen && !state.isCopingOverlayOpen && !state.isNervousBreakdownOverlayOpen && !state.isLayoffOverlayOpen && !state.isInflationOverlayOpen && !state.isMortgagePaidOverlayOpen && !state.isForeclosureOverlayOpen && !state.isDivorceOverlayOpen && !state.isHeartAttackOverlayOpen && !state.isEvictionOverlayOpen) openRelationshipsMenu();
         });
         document.getElementById("activities-nav-btn").addEventListener("click", function () {
-            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isPerformanceReviewOverlayOpen && !state.isCareerExamOpen && !state.isFiredOverlayOpen && !state.isRetirementOverlayOpen && !state.isDateTriviaOpen && !state.isCopingOverlayOpen && !state.isNervousBreakdownOverlayOpen && !state.isLayoffOverlayOpen && !state.isInflationOverlayOpen && !state.isMortgagePaidOverlayOpen && !state.isForeclosureOverlayOpen && !state.isDivorceOverlayOpen && !state.isEvictionOverlayOpen) openActivitiesMenu();
+            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isPerformanceReviewOverlayOpen && !state.isCareerExamOpen && !state.isFiredOverlayOpen && !state.isRetirementOverlayOpen && !state.isDateTriviaOpen && !state.isCopingOverlayOpen && !state.isNervousBreakdownOverlayOpen && !state.isLayoffOverlayOpen && !state.isInflationOverlayOpen && !state.isMortgagePaidOverlayOpen && !state.isForeclosureOverlayOpen && !state.isDivorceOverlayOpen && !state.isHeartAttackOverlayOpen && !state.isEvictionOverlayOpen) openActivitiesMenu();
         });
         document.getElementById("assets-nav-btn").addEventListener("click", function () {
-            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isPerformanceReviewOverlayOpen && !state.isCareerExamOpen && !state.isFiredOverlayOpen && !state.isRetirementOverlayOpen && !state.isDateTriviaOpen && !state.isCopingOverlayOpen && !state.isNervousBreakdownOverlayOpen && !state.isLayoffOverlayOpen && !state.isInflationOverlayOpen && !state.isMortgagePaidOverlayOpen && !state.isForeclosureOverlayOpen && !state.isDivorceOverlayOpen && !state.isEvictionOverlayOpen) openAssetsMenu();
+            if (!state.isDead && state.playerPath && !state.isExamModalOpen && !state.isExamActive && !state.isDiagnosisOverlayOpen && !state.isPromotionOverlayOpen && !state.isPerformanceReviewOverlayOpen && !state.isCareerExamOpen && !state.isFiredOverlayOpen && !state.isRetirementOverlayOpen && !state.isDateTriviaOpen && !state.isCopingOverlayOpen && !state.isNervousBreakdownOverlayOpen && !state.isLayoffOverlayOpen && !state.isInflationOverlayOpen && !state.isMortgagePaidOverlayOpen && !state.isForeclosureOverlayOpen && !state.isDivorceOverlayOpen && !state.isHeartAttackOverlayOpen && !state.isEvictionOverlayOpen) openAssetsMenu();
         });
         document.getElementById("play-again-btn").addEventListener("click", function () {
             location.reload();
