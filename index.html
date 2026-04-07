@@ -1183,6 +1183,49 @@
         let yearlyProceduralEventTotal = 0;
         let yearlyProceduralEventRemaining = 0;
 
+        const proceduralWordBanks = {
+            relative: ["cousin", "uncle", "aunt", "step-brother", "grandma"],
+            animal: ["rabid raccoon", "stray dog", "massive bear", "feral cat", "pigeon"],
+            item: ["dirty magazine", "gold watch", "bag of weird pills", "stack of cash"],
+            location: ["the grocery store", "a dark alley", "the park", "your front porch"],
+            ailment: ["the flu", "food poisoning", "a mysterious rash", "a crippling migraine"]
+        };
+
+        const GENERATED_WORDS_PER_BANK = 1000000000;
+
+        const proceduralEventTemplates = [
+            {
+                id: "animal_attack",
+                title: "Wild Encounter!",
+                description: "While walking near [location], a [animal] suddenly lunges at you!",
+                choices: [
+                    { text: "Fight it off!", effects: { health: -20, happiness: -10 } },
+                    { text: "Run for your life!", effects: { health: -5, happiness: -5 } }
+                ]
+            },
+            {
+                id: "found_item",
+                title: "Look What I Found",
+                description: "Your [relative] calls you over and gives you a [item] they found near [location].",
+                choices: [
+                    { text: "Take it.", effects: { cash: 50, happiness: 15 } },
+                    { text: "Refuse it. That's weird.", effects: { happiness: -5 } }
+                ]
+            },
+            {
+                id: "sudden_illness",
+                title: "Feeling Under the Weather",
+                description: "You wake up feeling terrible. The doctor says you have caught [ailment].",
+                choices: [
+                    { text: "Pay $100 for medicine.", effects: { cash: -100, health: 10, happiness: 5 } },
+                    { text: "Tough it out.", effects: { health: -30, happiness: -20 } }
+                ]
+            }
+        ];
+
+        let yearlyProceduralEventTotal = 0;
+        let yearlyProceduralEventRemaining = 0;
+
         function formatMoney(num) {
             return "$" + Math.round(num).toLocaleString("en-US");
         }
