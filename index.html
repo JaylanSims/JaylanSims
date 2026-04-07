@@ -399,6 +399,61 @@
             background: #451f1f;
         }
 
+        #diagnosis-overlay {
+            position: fixed;
+            inset: 0;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.9);
+            z-index: 10000;
+        }
+
+        #diagnosis-overlay.open {
+            display: flex;
+        }
+
+        #diagnosis-card {
+            width: 100%;
+            max-width: 520px;
+            border-radius: 14px;
+            border: 1px solid #3a3a3a;
+            background: #171717;
+            box-shadow: 0 18px 50px rgba(0, 0, 0, 0.65);
+            padding: 18px;
+        }
+
+        #diagnosis-title {
+            margin: 0 0 10px;
+            font-size: 1.2rem;
+        }
+
+        #diagnosis-text,
+        #diagnosis-cost {
+            margin: 0 0 12px;
+            line-height: 1.35;
+            color: #d8d8d8;
+        }
+
+        #diagnosis-actions {
+            display: grid;
+            gap: 10px;
+        }
+
+        .diagnosis-btn {
+            width: 100%;
+            border: 1px solid #3a3a3a;
+            border-radius: 10px;
+            background: #232323;
+            color: #fff;
+            text-align: left;
+            padding: 13px;
+            font-size: 0.98rem;
+            cursor: pointer;
+            min-height: 52px;
+        }
+
         #death-screen {
             display: none;
             flex: 1;
@@ -512,6 +567,7 @@
         </div>
 
         <div id="yearly-exam-root"></div>
+        <div id="diagnosis-overlay-root"></div>
 
         <div id="death-screen">
             <p id="tombstone">🪦</p>
@@ -532,7 +588,9 @@
             playerPath: null, annualIncome: 0, educationLevel: "None", yearsInSchool: 0,
             currentlyPursuing: null, educationCredentials: [], jobTitle: "Unemployed",
             isExamModalOpen: false, currentExamQuestion: null, examsPassedThisDegree: 0,
-            examsTakenThisDegree: 0, jobSearchBlocked: true, academicDismissed: false
+            examsTakenThisDegree: 0, jobSearchBlocked: true, academicDismissed: false,
+            isDiagnosisOverlayOpen: false, currentDiagnosisIllnessKey: null,
+            canAccessDoctor: true, activeView: "MainGameplay"
         };
 
         const setupScreen = document.getElementById("setup-screen");
@@ -545,6 +603,7 @@
         const modalDescription = document.getElementById("modal-description");
         const modalActions = document.getElementById("modal-actions");
         const yearlyExamRoot = document.getElementById("yearly-exam-root");
+        const diagnosisOverlayRoot = document.getElementById("diagnosis-overlay-root");
         const deathScreen = document.getElementById("death-screen");
         const deathSummary = document.getElementById("death-summary");
         const deathLifeNote = document.getElementById("death-life-note");
@@ -1030,7 +1089,7 @@
         }
 
         function openModal(title, description, actions) {
-            if (state.isExamModalOpen) return;
+            if (state.isExamModalOpen || state.isDiagnosisOverlayOpen) return;
             modalTitle.textContent = title;
             modalDescription.innerHTML = description;
             modalActions.innerHTML = "";
@@ -1116,6 +1175,121 @@
             yearlyExamRoot.innerHTML = "";
         }
 
+        function escapeHtml(text) {
+            return String(text)
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#39;");
+        }
+
+        function DiagnosisOverlay(props) {
+            const disease = DISEASES[props.illnessKey];
+            if (!disease) return "";
+            const doctorBtnAttrs = props.canAccessDoctor ? "" : "disabled";
+            const doctorLabel = props.canAccessDoctor ? "Go to the Doctor" : "Go to the Doctor (Unavailable)";
+            return "<div id=\"diagnosis-overlay\" class=\"open\" role=\"dialog\" aria-modal=\"true\" aria-label=\"Medical Diagnosis\">" +
+                "<div id=\"diagnosis-card\">" +
+                "<h2 id=\"diagnosis-title\">MEDICAL DIAGNOSIS 🩺</h2>" +
+                "<p id=\"diagnosis-text\">You have been diagnosed with " + escapeHtml(disease.name) + ".</p>" +
+                "<p id=\"diagnosis-cost\">Base treatment cost: " + formatMoney(disease.cureCost) + "</p>" +
+                "<div id=\"diagnosis-actions\">" +
+                "<button class=\"diagnosis-btn\" id=\"diagnosis-okay-btn\">Okay</button>" +
+                "<button class=\"diagnosis-btn\" id=\"diagnosis-doctor-btn\" " + doctorBtnAttrs + ">" + doctorLabel + "</button>" +
+                "</div>" +
+                "</div>" +
+                "</div>";
+        }
+
+        function renderDiagnosisOverlay() {
+            if (!state.isDiagnosisOverlayOpen || !state.currentDiagnosisIllnessKey) {
+                diagnosisOverlayRoot.innerHTML = "";
+                return;
+            }
+
+            diagnosisOverlayRoot.innerHTML = DiagnosisOverlay({
+                illnessKey: state.currentDiagnosisIllnessKey,
+                canAccessDoctor: state.canAccessDoctor
+            });
+
+            const okayBtn = document.getElementById("diagnosis-okay-btn");
+            const doctorBtn = document.getElementById("diagnosis-doctor-btn");
+
+            if (okayBtn) {
+                okayBtn.addEventListener("click", function () {
+                    closeDiagnosisOverlay();
+                });
+            }
+            if (doctorBtn && state.canAccessDoctor) {
+                doctorBtn.addEventListener("click", function () {
+                    closeDiagnosisOverlay();
+                    openDoctorComponent();
+                });
+            }
+        }
+
+        function closeDiagnosisOverlay() {
+            state.isDiagnosisOverlayOpen = false;
+            state.currentDiagnosisIllnessKey = null;
+            diagnosisOverlayRoot.innerHTML = "";
+        }
+
+        function openDiagnosisOverlayForIllness(illnessKey) {
+            if (!DISEASES[illnessKey]) return;
+            closeModal();
+            state.isDiagnosisOverlayOpen = true;
+            state.currentDiagnosisIllnessKey = illnessKey;
+            renderDiagnosisOverlay();
+        }
+
+        function openDoctorComponent() {
+            state.activeView = "DoctorComponent";
+            openDoctorMenu();
+        }
+
+        function diagnoseIllness(illnessKey, options) {
+            const disease = DISEASES[illnessKey];
+            const config = options || {};
+            if (!disease) return false;
+
+            const alreadyHasIllness = state.currentIllnesses.includes(illnessKey);
+            if (!alreadyHasIllness) {
+                if (state.currentIllnesses.length >= 4) return false;
+                state.currentIllnesses.push(illnessKey);
+                state.illnessYears[illnessKey] = 0;
+            }
+
+            if (config.setHappinessZero || illnessKey === "depression") {
+                state.happiness = 0;
+            } else if (!config.skipHappinessPenalty && !alreadyHasIllness) {
+                state.happiness -= HAPPINESS_PENALTY_ON_DIAGNOSIS;
+            }
+
+            if (disease.oneTimeHealthHit && !alreadyHasIllness) {
+                state.health -= disease.oneTimeHealthHit;
+                logEvent("You were diagnosed with " + disease.name + ". Immediate health impact: -" + disease.oneTimeHealthHit + " HP.");
+            } else if (!alreadyHasIllness) {
+                logEvent("You were diagnosed with " + disease.name + ".");
+            }
+
+            if (state.health <= 0) {
+                onPlayerDeath(disease.deathMessage || GENERIC_HEALTH_DEATH_MESSAGE);
+                return true;
+            }
+
+            if (!alreadyHasIllness || config.forceOverlay) {
+                openDiagnosisOverlayForIllness(illnessKey);
+            }
+            return true;
+        }
+
+        function maybeTriggerDepressionFromLowStats() {
+            if (state.currentIllnesses.includes("depression")) return false;
+            if (state.happiness > 0) return false;
+            return diagnoseIllness("depression", { setHappinessZero: true, skipHappinessPenalty: true });
+        }
+
         function handleAcademicDismissal(program, requiredPasses) {
             const passedCount = state.examsPassedThisDegree;
             state.academicDismissed = true;
@@ -1135,6 +1309,8 @@
                         label: "Continue",
                         handler: function () {
                             closeModal();
+                            state.happiness = 0;
+                            diagnoseIllness("depression", { setHappinessZero: true, skipHappinessPenalty: true, forceOverlay: true });
                             updateUI();
                         }
                     }
