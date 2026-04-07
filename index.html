@@ -467,6 +467,46 @@
             transform: scale(0.995);
         }
 
+        .modal-btn-buy-afford {
+            background: linear-gradient(180deg, #1b5e20 0%, #2e7d32 100%) !important;
+            border-color: #4caf50 !important;
+            color: #fff !important;
+            font-weight: 600;
+        }
+
+        .modal-btn-buy-deny {
+            background: #2a2a2a !important;
+            border-color: #444 !important;
+            color: #888 !important;
+            cursor: not-allowed !important;
+        }
+
+        #purchase-toast {
+            position: fixed;
+            left: 50%;
+            bottom: 96px;
+            transform: translateX(-50%) translateY(20px);
+            max-width: min(420px, 92vw);
+            padding: 12px 16px;
+            background: #3d1f1f;
+            border: 1px solid #c62828;
+            border-radius: 10px;
+            color: #ffcdd2;
+            font-size: 0.92rem;
+            line-height: 1.35;
+            text-align: center;
+            z-index: 20000;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.25s ease, transform 0.25s ease;
+            box-shadow: 0 8px 28px rgba(0, 0, 0, 0.5);
+        }
+
+        #purchase-toast.visible {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+
         #yearly-exam-overlay {
             position: fixed;
             top: 0;
@@ -751,6 +791,8 @@
             </div>
         </div>
 
+        <div id="purchase-toast" role="status" aria-live="polite"></div>
+
         <div id="resignation-overlay" aria-hidden="true">
             <div id="resignation-card">
                 <h2 id="resignation-title">Confirm resignation</h2>
@@ -821,6 +863,8 @@
         const modalTitle = document.getElementById("modal-title");
         const modalDescription = document.getElementById("modal-description");
         const modalActions = document.getElementById("modal-actions");
+        const purchaseToast = document.getElementById("purchase-toast");
+        let purchaseToastTimer = null;
         const resignationOverlay = document.getElementById("resignation-overlay");
         const resignationText = document.getElementById("resignation-text");
         const yearlyExamReactMount = document.getElementById("yearly-exam-react-root");
@@ -1597,6 +1641,22 @@
             eventLog.appendChild(p);
         }
 
+        function showPurchaseToastMessage(message) {
+            if (!purchaseToast) {
+                logEvent(message);
+                return;
+            }
+            purchaseToast.textContent = message;
+            purchaseToast.classList.add("visible");
+            if (purchaseToastTimer) {
+                window.clearTimeout(purchaseToastTimer);
+            }
+            purchaseToastTimer = window.setTimeout(function () {
+                purchaseToast.classList.remove("visible");
+                purchaseToastTimer = null;
+            }, 3200);
+        }
+
         function formatSignedMoney(value) {
             const abs = Math.abs(value);
             return (value >= 0 ? "+" : "-") + formatMoney(abs);
@@ -1631,11 +1691,18 @@
             actions.forEach(function (action) {
                 const btn = document.createElement("button");
                 btn.className = "modal-btn";
+                if (action.buttonVariant === "buyAfford") {
+                    btn.classList.add("modal-btn-buy-afford");
+                } else if (action.buttonVariant === "buyDeny") {
+                    btn.classList.add("modal-btn-buy-deny");
+                }
                 btn.textContent = action.label;
                 if (action.disabled) {
                     btn.disabled = true;
-                    btn.style.opacity = "0.45";
-                    btn.style.cursor = "not-allowed";
+                    if (action.buttonVariant !== "buyDeny") {
+                        btn.style.opacity = "0.45";
+                        btn.style.cursor = "not-allowed";
+                    }
                 }
                 btn.addEventListener("click", function () {
                     action.handler();
@@ -2888,15 +2955,19 @@
         }
 
         function buyProperty(listingId) {
+            syncFinancialAliases();
             const listing = state.realEstateListings.find(function (item) { return item.id === listingId; });
             if (!listing) return;
 
-            const canPayInFull = state.cash >= listing.price;
+            const balance = state.bankBalance;
+            const canPayInFull = balance >= listing.price;
             const downPayment = Math.round(listing.price * 0.20);
-            if (!canPayInFull && state.cash < downPayment) {
-                logEvent("You don't have enough cash to buy " + listing.propertyType + ".");
-                closeModal();
-                updateUI();
+            const requiredNow = canPayInFull ? listing.price : downPayment;
+
+            if (balance < requiredNow) {
+                const msg = "Insufficient funds: need " + formatMoney(requiredNow) + " (bank " + formatMoney(balance) + ") for " + listing.propertyType + ".";
+                showPurchaseToastMessage(msg);
+                logEvent(msg);
                 return;
             }
 
@@ -3260,8 +3331,9 @@
             if (state.realEstateListings.length === 0) {
                 generateRealEstateMarket();
             }
+            syncFinancialAliases();
             const currentNetWorth = state.cash + state.investments - state.debt;
-            const canInvest = state.cash > 0 && currentNetWorth > 0;
+            const canInvest = state.bankBalance > 0 && currentNetWorth > 0;
             const marketLabel = state.currentHousingMarketEvent === "crash"
                 ? "<span style=\"color:#ff6b6b;\">Market Mood: Crash (-20%)</span>"
                 : state.currentHousingMarketEvent === "boom"
@@ -3299,24 +3371,38 @@
                 });
             });
 
+            const bankBal = state.bankBalance;
             state.realEstateListings.forEach(function (listing) {
                 const downPayment = Math.round(listing.price * 0.20);
-                const canBuy = state.cash >= downPayment;
+                const canPayFull = bankBal >= listing.price;
+                const required = canPayFull ? listing.price : downPayment;
+                const canBuy = bankBal >= required;
+                const priceLabel = formatMoney(listing.price);
+                const reqLabel = formatMoney(required);
                 actions.push({
-                    label: "Buy " + listing.propertyType + " (" + formatMoney(listing.price) + ")",
+                    label: canBuy
+                        ? "Buy for " + priceLabel + (canPayFull ? " (cash)" : " (20% down " + reqLabel + ")")
+                        : "Insufficient Funds (Requires " + reqLabel + ")",
                     disabled: !canBuy,
+                    buttonVariant: canBuy ? "buyAfford" : "buyDeny",
                     handler: function () {
-                        if (!canBuy) return;
+                        if (!canBuy) {
+                            showPurchaseToastMessage("Insufficient funds. Need " + reqLabel + " (have " + formatMoney(bankBal) + ").");
+                            return;
+                        }
                         buyProperty(listing.id);
                     }
                 });
             });
 
             actions.push({
-                label: canInvest ? "Invest 50% Cash" : "Invest 50% Cash (Unavailable)",
+                label: canInvest ? "Invest 50% Cash" : "Insufficient Funds (Invest Unavailable)",
                 disabled: !canInvest,
                 handler: function () {
-                    if (!canInvest) return;
+                    if (!canInvest) {
+                        showPurchaseToastMessage("Insufficient funds in your bank balance to invest.");
+                        return;
+                    }
                     applyActionWithRefresh("You invested 50% cash, and your net worth dropped by 50%.", function () {
                         const amt = state.cash * 0.5;
                         state.cash -= amt;
@@ -3328,10 +3414,13 @@
                 }
             });
             actions.push({
-                label: canInvest ? "Contribute 10% Cash" : "Contribute 10% Cash (Unavailable)",
+                label: canInvest ? "Contribute 10% Cash" : "Insufficient Funds (Contribute Unavailable)",
                 disabled: !canInvest,
                 handler: function () {
-                    if (!canInvest) return;
+                    if (!canInvest) {
+                        showPurchaseToastMessage("Insufficient funds in your bank balance to contribute.");
+                        return;
+                    }
                     applyActionWithRefresh("You contributed 10% cash, and your net worth dropped by 10%.", function () {
                         const amt = state.cash * 0.10;
                         state.cash -= amt;
