@@ -530,6 +530,15 @@
             cursor: not-allowed !important;
         }
 
+        .modal-btn-locked-job {
+            background: #1e1e1e !important;
+            border-color: #333 !important;
+            color: #666 !important;
+            cursor: not-allowed !important;
+            font-size: 0.82rem !important;
+            line-height: 1.35 !important;
+        }
+
         #purchase-toast {
             position: fixed;
             left: 50%;
@@ -1049,7 +1058,9 @@
             isEvictionOverlayOpen: false,
             currentHousing: null,
             roommate: null,
-            rentExpenseInBudget: 0
+            rentExpenseInBudget: 0,
+            graduationTier: null,
+            totalWorkExperience: 0
         };
 
         const RENTAL_LISTINGS = [
@@ -1289,6 +1300,35 @@
                 { title: "Automotive Technician", salary: 46840, requiredEducation: "Trade Certificate" }
             ]
         };
+
+        function assignSalaryTiersToJobMarket() {
+            Object.keys(JOB_MARKET).forEach(function (path) {
+                var jobs = JOB_MARKET[path];
+                if (!jobs || !jobs.length) return;
+                var n = jobs.length;
+                var topN = Math.max(1, Math.ceil(n * 0.3));
+                var midN = Math.max(1, Math.ceil(n * 0.4));
+                if (topN + midN > n) {
+                    midN = Math.max(0, n - topN);
+                }
+                var order = jobs.map(function (_, i) { return i; });
+                order.sort(function (a, b) { return jobs[b].salary - jobs[a].salary; });
+                order.forEach(function (jobIndex, rank) {
+                    var job = jobs[jobIndex];
+                    if (rank < topN) {
+                        job.tier = 1;
+                        job.experienceRequired = 8;
+                    } else if (rank < topN + midN) {
+                        job.tier = 2;
+                        job.experienceRequired = 4;
+                    } else {
+                        job.tier = 3;
+                        job.experienceRequired = 0;
+                    }
+                });
+            });
+        }
+        assignSalaryTiersToJobMarket();
 
         const ODD_JOBS_GENERAL = [
             { title: "Barista", salary: 24000, requiredEducation: "None", jobKind: "OddJob" },
@@ -2119,7 +2159,9 @@
                 btn.textContent = action.label;
                 if (action.disabled) {
                     btn.disabled = true;
-                    if (action.buttonVariant !== "buyDeny") {
+                    if (action.buttonVariant === "lockedJob") {
+                        btn.classList.add("modal-btn-locked-job");
+                    } else if (action.buttonVariant !== "buyDeny") {
                         btn.style.opacity = "0.45";
                         btn.style.cursor = "not-allowed";
                     }
@@ -2768,6 +2810,33 @@
             return byRatio;
         }
 
+        function getExamQuestionsTotalForProgram(program) {
+            return program.yearsRequired * 2;
+        }
+
+        /** @returns {1|2|3|null} null = below 60% correct (academic dismissal) */
+        function computeGraduationTierFromExams(passed, totalQuestions) {
+            if (totalQuestions <= 0) return null;
+            var pct = (passed / totalQuestions) * 100;
+            if (pct < 60) return null;
+            if (pct >= 90) return 1;
+            if (pct >= 75) return 2;
+            return 3;
+        }
+
+        function isCareerJobUnlocked(job) {
+            if (state.graduationTier !== null && state.graduationTier <= job.tier) return true;
+            if (state.totalWorkExperience >= job.experienceRequired) return true;
+            return false;
+        }
+
+        function addCareerExperienceIfEligible() {
+            if (!state.isEmployed || state.jobType !== "Career") return;
+            var t = state.jobTitle;
+            if (t === "Student" || t === "Unemployed") return;
+            state.totalWorkExperience += 1;
+        }
+
         function clearEnrollmentAfterDismissalOrQuit() {
             state.currentlyPursuing = null;
             state.yearsInSchool = 0;
@@ -2803,10 +2872,29 @@
             updateUI();
         }
 
-        function handleAcademicDismissal(program, requiredPasses) {
+        function handleAcademicDismissal(program, requiredPasses, options) {
+            options = options || {};
             const passedCount = state.examsPassedThisDegree;
+            const totalQs = getExamQuestionsTotalForProgram(program);
+            const belowGpaBar = options.belowSixtyPercent === true;
 
             if (program && program.pipeline && program.pipeline !== "undergrad") {
+                if (belowGpaBar && passedCount >= requiredPasses) {
+                    const debtLine = "You have finished your studies with " + formatMoney(state.existingDebt) + " in student debt.";
+                    logEvent("Academic dismissal: exam average below 60% for " + program.degreeName + ".");
+                    clearEnrollmentAfterDismissalOrQuit();
+                    state._savedJobBeforeSchoolYear = null;
+                    state.jobSearchBlocked = false;
+                    openModal(
+                        "Academic Dismissal — Below 60% Correct",
+                        "<strong>Your overall exam performance fell below 60% correct.</strong><br><br>" +
+                        "You answered " + passedCount + "/" + totalQs + " questions correctly. Degrees require at least 60% mastery to graduate. " +
+                        "You are not awarded " + program.degreeName + ". Tuition debt from this program remains on your record.<br><br>" + debtLine,
+                        [{ label: "Continue", handler: function () { closeModal(); updateUI(); } }]
+                    );
+                    updateUI();
+                    return;
+                }
                 handleAdvancedAcademicDismissal(program, requiredPasses);
                 return;
             }
@@ -2830,11 +2918,19 @@
             state.examQuestionsThisYearTotal = 0;
             state.examQuestionsThisYearAnswered = 0;
 
-            openModal(
-                "Academic Dismissal — Failed Final Year",
-                "<strong>You did not meet the graduation exam requirement.</strong><br><br>You passed " + passedCount + "/" + (program.yearsRequired * 2) +
+            var dismissTitle = "Academic Dismissal — Failed Final Year";
+            var dismissBody = "<strong>You did not meet the graduation exam requirement.</strong><br><br>You passed " + passedCount + "/" + totalQs +
                 " exam questions (minimum required: " + requiredPasses + "). You must restart " +
-                program.degreeName + " from Year 1. Careers and Find a Job stay locked until you graduate successfully.<br><br>" + debtLine,
+                program.degreeName + " from Year 1. Careers and Find a Job stay locked until you graduate successfully.<br><br>" + debtLine;
+            if (belowGpaBar && passedCount >= requiredPasses) {
+                dismissTitle = "Academic Dismissal — Below 60% Correct";
+                dismissBody = "<strong>Your overall exam performance fell below 60% correct.</strong><br><br>You answered " + passedCount + "/" + totalQs +
+                    " questions correctly. You met the minimum pass count but not the 60% mastery bar to graduate. You must restart " +
+                    program.degreeName + " from Year 1.<br><br>" + debtLine;
+            }
+            openModal(
+                dismissTitle,
+                dismissBody,
                 [
                     {
                         label: "Continue",
@@ -2873,6 +2969,7 @@
                 state.annualIncome = savedJob.annualIncome;
                 state.salary = savedJob.salary;
                 state.isEmployed = true;
+                state.jobType = savedJob.jobType === "OddJob" ? "OddJob" : "Career";
                 state._savedJobBeforeSchoolYear = null;
                 const netIncome = state.annualIncome * 0.75;
                 state.cash += netIncome;
@@ -2911,6 +3008,7 @@
             state.examQuestionsThisYearAnswered = 0;
 
             syncFinancialAliases();
+            addCareerExperienceIfEligible();
             if (state.health <= 0) {
                 onPlayerDeath(GENERIC_HEALTH_DEATH_MESSAGE);
                 return;
@@ -2918,10 +3016,14 @@
 
             if (state.yearsInSchool >= program.yearsRequired) {
                 const requiredPasses = getRequiredExamPassesForProgram(program);
-                if (state.examsPassedThisDegree >= requiredPasses) {
-                    completeProgram(state.currentlyPursuing);
-                } else {
+                const totalQs = getExamQuestionsTotalForProgram(program);
+                const graduationTier = computeGraduationTierFromExams(state.examsPassedThisDegree, totalQs);
+                if (state.examsPassedThisDegree < requiredPasses) {
                     handleAcademicDismissal(program, requiredPasses);
+                } else if (graduationTier === null) {
+                    handleAcademicDismissal(program, requiredPasses, { belowSixtyPercent: true });
+                } else {
+                    completeProgram(state.currentlyPursuing, graduationTier);
                 }
                 return;
             }
@@ -3064,6 +3166,10 @@
 
         function applyForJob(job) {
             const isOddJob = job.jobKind === "OddJob";
+            if (!isOddJob && job.tier != null && !isCareerJobUnlocked(job)) {
+                logEvent("Application blocked: insufficient GPA tier or career experience for " + job.title + ".");
+                return;
+            }
             const chance = isOddJob ? 0.95 : getHireChance();
             if (Math.random() < chance) {
                 state.annualIncome = job.salary;
@@ -3116,20 +3222,35 @@
             }
             const jobs = JOB_MARKET[state.playerPath] || [];
             const actions = jobs.map(function (job) {
-                const eligible = meetsEducationRequirement(job.requiredEducation);
+                const credOk = meetsEducationRequirement(job.requiredEducation);
+                const tierOk = isCareerJobUnlocked(job);
+                const canApply = credOk && tierOk;
+                var label;
+                if (!credOk) {
+                    label = job.title + " — Requires " + job.requiredEducation;
+                } else if (!tierOk) {
+                    label = "Locked: Requires Tier " + job.tier + " Degree OR " + job.experienceRequired + " Years Exp. — " +
+                        job.title + " (" + formatMoney(job.salary) + ")";
+                } else {
+                    label = "Apply: " + job.title + " — " + formatMoney(job.salary);
+                }
                 return {
-                    label: eligible
-                        ? "Apply: " + job.title + " — " + formatMoney(job.salary)
-                        : job.title + " — Requires " + job.requiredEducation,
-                    disabled: !eligible,
+                    label: label,
+                    disabled: !canApply,
+                    buttonVariant: !canApply && credOk ? "lockedJob" : undefined,
                     handler: function () {
-                        if (!eligible) return;
+                        if (!canApply) return;
                         applyForJob(job);
                     }
                 };
             });
             actions.push({ label: "Close", handler: function () { closeModal(); } });
-            openModal("Career Path (Requires Degree)", "Professional roles on your " + state.playerPath + " path. Hiring is competitive.", actions);
+            openModal(
+                "Career Path (Requires Degree)",
+                "<strong>Total Career Experience: " + state.totalWorkExperience + " Years</strong> (full-time career work only; odd jobs do not count.)<br><br>" +
+                    "Professional roles on your " + state.playerPath + " path. Higher salaries need a strong GPA tier or enough years of experience.",
+                actions
+            );
         }
 
         function openOddJobsBoard() {
@@ -3199,7 +3320,8 @@
 
             openModal(
                 "Careers",
-                "Status: " + state.jobTitle + " | Annual Income: " + formatMoney(state.annualIncome) + "<br>" + lockReason +
+                "<strong>Total Career Experience: " + state.totalWorkExperience + " Years</strong><br>" +
+                    "Status: " + state.jobTitle + " | Annual Income: " + formatMoney(state.annualIncome) + "<br>" + lockReason +
                     "<br><br><strong>Choose a job board:</strong>",
                 [
                     {
@@ -3393,7 +3515,7 @@
             mountHigherEducationCatalog();
         }
 
-        function completeProgram(programKey) {
+        function completeProgram(programKey, graduationTier) {
             const program = EDUCATION_PROGRAMS[programKey];
             if (!program) return;
             const savedJob = state._savedJobBeforeSchoolYear;
@@ -3402,6 +3524,14 @@
             }
             state.degreeWrongAnswersThisEnrollment = 0;
             const debtLine = "You have finished your studies with " + formatMoney(state.existingDebt) + " in student debt.";
+            const totalQs = getExamQuestionsTotalForProgram(program);
+            const passed = state.examsPassedThisDegree;
+            var pctRounded = totalQs > 0 ? Math.round((passed / totalQs) * 1000) / 10 : 0;
+            if (typeof graduationTier === "number") {
+                state.graduationTier = state.graduationTier == null
+                    ? graduationTier
+                    : Math.min(state.graduationTier, graduationTier);
+            }
 
             addDegreesToHistory(program);
             program.credentials.forEach(addCredential);
@@ -3461,7 +3591,20 @@
                 });
             }
 
-            let gradBody = "After years of hard work, you have officially graduated with your " + program.degreeName + "!<br><br>" + debtLine;
+            var tierLine = "";
+            if (state.graduationTier === 1) {
+                tierLine = "<br><br><strong>GPA tier: Tier 1 (A-Student — " + pctRounded + "% correct)</strong><br>" +
+                    "You graduated with Top Honors! Your Tier 1 record proves your mastery, unlocking the highest-paying jobs on your track immediately.";
+            } else if (state.graduationTier === 2) {
+                tierLine = "<br><br><strong>GPA tier: Tier 2 (B-Student — " + pctRounded + "% correct)</strong><br>" +
+                    "You graduated with solid performance. Your Tier 2 record opens mid-tier professional roles now; keep building experience to reach the top salaries.";
+            } else if (state.graduationTier === 3) {
+                tierLine = "<br><br><strong>GPA tier: Tier 3 (C-Student — " + pctRounded + "% correct)</strong><br>" +
+                    "You graduated, but just barely. Your Tier 3 record means elite employers will not hire you yet—you will start in entry-level roles and can unlock higher tiers through career experience.";
+            }
+            var examSummary = "<br><br><em>Final exams: " + passed + "/" + totalQs + " correct.</em>";
+
+            let gradBody = "After years of hard work, you have officially graduated with your " + program.degreeName + "!" + tierLine + examSummary + "<br><br>" + debtLine;
             if (programKey === "STEM_MEDICAL") {
                 gradBody += "<br><br><strong>Medical Residency</strong> now begins automatically (4 years, resident stipend, no outside employment).";
                 enrollInProgram("STEM_RESIDENCY");
@@ -4420,6 +4563,7 @@
         }
 
         function runAgeUpWorkYearAfterPromotion() {
+            addCareerExperienceIfEligible();
             state.investments *= (1 + (Math.random() * 0.25 - 0.10));
             applyHousingMarketForYear();
 
