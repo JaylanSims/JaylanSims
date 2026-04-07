@@ -3,7 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>BitBalance: ROI vs. Passion</title>
+    <title>Margins of Error</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
     <style>
         html, body {
             margin: 0;
@@ -70,17 +73,30 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background-color: #000;
+            background-color: #121212;
             display: flex;
+            flex-direction: column;
             justify-content: center;
             align-items: center;
             z-index: 9999;
         }
 
-        #intro-logo {
-            max-width: 300px;
-            width: 80%;
+        #intro-open-brand {
+            max-width: 340px;
+            width: 88%;
+            margin: 0 auto;
             animation: slideAndFade 4s ease-in-out forwards;
+        }
+
+        #intro-open-brand .intro-open-title {
+            margin: 0;
+            font-family: "Playfair Display", Georgia, "Times New Roman", serif;
+            font-size: clamp(1.75rem, 6vw, 2.35rem);
+            font-weight: 700;
+            line-height: 1.15;
+            color: #ffffff;
+            text-align: center;
+            letter-spacing: 0.04em;
         }
 
         #intro-advisor-panel {
@@ -100,15 +116,20 @@
 
         #intro-advisor-panel h2 {
             margin: 0;
-            font-size: 1.25rem;
-            color: #e3f2fd;
+            font-family: "Inter", system-ui, sans-serif;
+            font-size: 1.15rem;
+            font-weight: 600;
+            color: #eceff1;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
         }
 
         #intro-advisor-panel .intro-advisor-body {
             margin: 0;
-            color: #b0bec5;
+            font-family: "Inter", system-ui, sans-serif;
+            color: rgba(255, 255, 255, 0.72);
             font-size: 0.95rem;
-            line-height: 1.5;
+            line-height: 1.55;
         }
 
         #intro-choose-wisely-btn {
@@ -152,24 +173,52 @@
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            padding: 24px;
-            gap: 16px;
+            padding: 28px 24px 32px;
+            gap: 20px;
             text-align: center;
             opacity: 0;
             transition: opacity 1s ease-in;
+            background-color: #121212;
         }
 
-        .title {
-            margin: 0;
-            font-size: 1.8rem;
-            line-height: 1.2;
+        .setup-brand-header {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+            max-width: 380px;
         }
 
-        .subtitle {
+        .setup-brand-title {
             margin: 0;
-            color: #bdbdbd;
-            font-size: 0.95rem;
+            font-family: "Playfair Display", Georgia, "Times New Roman", serif;
+            font-size: clamp(2rem, 7vw, 2.65rem);
+            font-weight: 700;
+            line-height: 1.12;
+            color: #ffffff;
+            letter-spacing: 0.03em;
+        }
+
+        .setup-brand-tagline {
+            margin: 0;
+            font-family: "Inter", system-ui, sans-serif;
+            font-size: 0.78rem;
+            font-weight: 500;
+            line-height: 1.45;
+            color: #ffffff;
+            opacity: 0.7;
+            letter-spacing: 0.22em;
+            text-transform: uppercase;
+            max-width: 340px;
+        }
+
+        .setup-path-hint {
+            margin: 4px 0 0;
+            font-family: "Inter", system-ui, sans-serif;
+            font-size: 0.88rem;
+            color: rgba(255, 255, 255, 0.55);
             max-width: 360px;
+            line-height: 1.45;
         }
 
         .major-grid {
@@ -180,12 +229,13 @@
         }
 
         .major-btn {
-            border: 1px solid #333;
-            background: #1f1f1f;
+            border: 1px solid #2a2a2a;
+            background: #1a1a1a;
             color: #fff;
             border-radius: 12px;
             padding: 14px 12px;
             text-align: left;
+            font-family: "Inter", system-ui, sans-serif;
             font-size: 0.95rem;
             line-height: 1.35;
             cursor: pointer;
@@ -2025,7 +2075,9 @@
     <div id="eviction-overlay-root"></div>
     <div id="app-container">
         <div id="intro-screen">
-            <img src="/images/js-games-logo.png" alt="JS Games" id="intro-logo" onerror="this.onerror=null;this.src='/images/js-games-logo.png';">
+            <div id="intro-open-brand" aria-hidden="false">
+                <p class="intro-open-title">MARGINS OF ERROR</p>
+            </div>
             <div id="intro-advisor-panel" aria-live="polite">
                 <h2>Career Advisor</h2>
                 <p class="intro-advisor-body">
@@ -2037,8 +2089,11 @@
         </div>
 
         <div id="setup-screen">
-            <h1 class="title">BitBalance: ROI vs. Passion</h1>
-            <p class="subtitle">Choose your path and survive year by year. Build wealth without sacrificing your life.</p>
+            <header class="setup-brand-header">
+                <h1 class="setup-brand-title">MARGINS OF ERROR</h1>
+                <p class="setup-brand-tagline">A Life Simulation of Passion, Profit, and Consequence.</p>
+            </header>
+            <p class="setup-path-hint">Choose your path. Each year tests tradeoffs between ambition, wellbeing, and what you leave behind.</p>
             <div class="major-grid">
                 <button class="major-btn" data-path="STEM">
                     <strong>STEM</strong>
@@ -2301,7 +2356,7 @@
 
         const setupScreen = document.getElementById("setup-screen");
         const introScreen = document.getElementById("intro-screen");
-        const introLogo = document.getElementById("intro-logo");
+        const introOpenBrand = document.getElementById("intro-open-brand");
         const introAdvisorPanel = document.getElementById("intro-advisor-panel");
         const introChooseWiselyBtn = document.getElementById("intro-choose-wisely-btn");
         const gameUI = document.getElementById("game-ui");
@@ -8912,15 +8967,20 @@
             }
         });
 
-        introLogo.addEventListener("animationend", function () {
-            if (introLogo) introLogo.style.display = "none";
-            if (introAdvisorPanel) {
-                introAdvisorPanel.classList.add("visible");
-            }
+        function showIntroAdvisorAndStartAmbience() {
+            if (introOpenBrand) introOpenBrand.style.display = "none";
+            if (introAdvisorPanel) introAdvisorPanel.classList.add("visible");
             if (typeof AudioManager !== "undefined" && AudioManager.startIntroAmbience) {
                 AudioManager.startIntroAmbience({ fadeInMs: 1000, volume: 0.4 });
             }
-        }, { once: true });
+        }
+        if (introOpenBrand) {
+            introOpenBrand.addEventListener("animationend", function () {
+                showIntroAdvisorAndStartAmbience();
+            }, { once: true });
+        } else {
+            showIntroAdvisorAndStartAmbience();
+        }
 
         if (introChooseWiselyBtn) {
             introChooseWiselyBtn.addEventListener("click", function () {
