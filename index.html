@@ -2383,9 +2383,19 @@
             var scaleW = Math.floor(maxCssW / nw);
             var scaleH = Math.floor(maxCssH / nh);
             var k = Math.min(scaleW, scaleH);
-            if (k < 1) k = 1;
-            var cssW = nw * k;
-            var cssH = nh * k;
+            var cssW;
+            var cssH;
+            if (k >= 1) {
+                cssW = nw * k;
+                cssH = nh * k;
+            } else {
+                var F = Math.max(Math.ceil(nw / maxCssW), Math.ceil(nh / maxCssH));
+                if (F < 1) F = 1;
+                cssW = Math.floor(nw / F);
+                cssH = Math.floor(nh / F);
+                if (cssW < 1) cssW = 1;
+                if (cssH < 1) cssH = 1;
+            }
             var br = Math.max(1, Math.floor(window.devicePixelRatio || 1));
             introLogoCanvas.width = cssW * br;
             introLogoCanvas.height = cssH * br;
